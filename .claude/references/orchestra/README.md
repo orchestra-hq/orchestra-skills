@@ -2,12 +2,12 @@
 
 Grouped by concern. Paths below are relative to `.claude/references/orchestra/` in this repo; from either skill folder, prefix with `../../references/orchestra/`.
 
-## Pipeline (runs, failures, remediation, memory)
-
-These describe **what went wrong** in pipelines and **how to fix or record** it:
+## Pipeline (authoring, runs, failures, remediation, memory)
 
 | File | Purpose |
 |------|---------|
+| `pipeline/yaml-authoring.md` | Schema, integrations, variables, validation (`create-orchestra-pipeline`) |
+| `pipeline/examples.md` | Multi-stage pipeline patterns (warehouse → LLM → messaging, agents) |
 | `pipeline/diagnosis-patterns.md` | Classify failures by integration and log signals |
 | `pipeline/remediation-playbooks.md` | Action paths by error category |
 | `pipeline/knowledge-store.md` | Workspace-specific fix history and failure profile (append-only) |

@@ -160,7 +160,13 @@ integration-specific error patterns that will help classify the failure.
 This is the analytical step. Using all evidence from Steps 1-3 plus the patterns in
 `../../references/orchestra/pipeline/diagnosis-patterns.md`:
 
-1. **Classify the error category.** Common categories:
+1. **Decide code vs platform.** If the failure is ingestion/sync infrastructure or another
+   vendor-managed integration (Fivetran, Airbyte, Estuary, etc.), surface `platformLink` and
+   `connectionId` and stop — do not open a Git PR. If the failure is in repo SQL, dbt, Python,
+   or misconfigured pipeline YAML, proceed with remediation. See
+   `../../references/orchestra/pipeline/diagnosis-patterns.md` (TOOL_OR_INFRASTRUCTURE).
+
+2. **Classify the error category.** Common categories:
    - `AUTH_FAILURE` — credentials expired, rotated, or insufficient permissions
    - `TIMEOUT` — task exceeded configured timeout or underlying platform timed out
    - `QUERY_ERROR` — SQL syntax error, missing table/column, type mismatch
@@ -173,14 +179,14 @@ This is the analytical step. Using all evidence from Steps 1-3 plus the patterns
    - `RATE_LIMIT` — API rate limit hit on the underlying platform
    - `DATA_ERROR` — data quality test failure, schema drift, unexpected nulls
 
-2. **Identify the root cause.** Be specific. Not just "query error" but "column
+3. **Identify the root cause.** Be specific. Not just "query error" but "column
    `user_email` does not exist in table `analytics.users` — likely a schema migration
    that removed or renamed the column."
 
-3. **Check the knowledge store** for similar past fixes. Read `../../references/orchestra/pipeline/knowledge-store.md`
+4. **Check the knowledge store** for similar past fixes. Read `../../references/orchestra/pipeline/knowledge-store.md`
    if it exists (it may not exist on first run — that's fine, skip this check).
 
-4. **Present the diagnosis** clearly to the user:
+5. **Present the diagnosis** clearly to the user:
    - Error category
    - Root cause (specific)
    - Evidence (which log line, which error message, which operation failed)
@@ -275,8 +281,11 @@ once the PR is merged.
 
 1. Trigger a new pipeline run via `start_pipeline`
    - Use the same pipeline ID and environment as the failed run
+   - Pass `branch` when validating or rerunning a Git fix branch
    - Pass any corrected `run_inputs` if applicable
    - For PR-triggered reruns, no confirmation needed — merge was the approval
+   - If `start_pipeline` returns 400 because the pipeline is paused, ask the user to unpause
+     in the Orchestra UI and retry
 2. Poll `get_pipeline_run_status` every ~30 seconds
 3. Report the outcome:
    - **Succeeded:** Update the knowledge store (see Learning loop below).

@@ -240,6 +240,8 @@ the change themselves.
 2. For dbt test failures:
    - Show which tests failed and the failure counts from `run_results.json`
    - Determine if this is a legitimate data issue or an overly strict test
+   - For `not_null` (or similar generic tests) failing on known-bad source NULLs: prefer
+     lowering severity to `warn` with `warn_if: ">= {failure_count}"` over deleting the test
    - For threshold-based tests: suggest adjusting `error_threshold_expression` or
      `warn_threshold_expression` if the threshold is too tight
    - For legitimate data issues: advise investigating the source data
@@ -256,12 +258,14 @@ the change themselves.
 ## General retry strategy
 
 When retrying a pipeline:
-1. Use `start_pipeline`
+1. Use `start_pipeline` with `alias_or_pipeline_id` (pipeline UUID or alias)
 2. Optionally specify:
    - `environment` — to test in a non-production environment first
-   - `branch` — to test a code fix on a feature branch
+   - `branch` — overrides the Git branch for the entire run (validation on a fix branch)
    - `run_inputs` — to override input values
-3. Monitor with `get_pipeline_run_status`
+3. If the pipeline is paused in Orchestra, `start_pipeline` may return HTTP 400 — ask the user
+   to unpause in the UI, then retry
+4. Monitor with `get_pipeline_run_status`
 4. If the retry succeeds, record the fix in the knowledge store
 5. If the retry fails with the same error, revisit the diagnosis
 6. If the retry fails with a new error, start a fresh diagnosis

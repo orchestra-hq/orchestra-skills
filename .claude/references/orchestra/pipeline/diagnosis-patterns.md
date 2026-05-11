@@ -44,6 +44,28 @@ could interfere with their work.
 
 ---
 
+### TOOL_OR_INFRASTRUCTURE — fix in the vendor UI, not Git
+
+**Signals:**
+- Sync or connector failures on Fivetran, Airbyte, Estuary, or similar ingestion integrations
+- Connection or credential errors on the underlying platform after Orchestra dispatched the task
+- `platformLink` on the task run points at an external dashboard
+- Errors that reference connector state, sync locks, or vendor-specific error codes rather than
+  repo SQL, dbt models, or Python tracebacks
+
+**How to identify:** The failed task's `integration` is a managed sync or SaaS connector, or
+`externalMessage` describes platform-side state Orchestra cannot change from pipeline YAML.
+
+**Action:** Surface `platformLink` and `connectionId` (or connector id from `taskParameters`).
+Tell the user what to fix in that product's UI. Do not open a Git PR for connector or
+infrastructure issues unless the failure is clearly misconfiguration in version-controlled
+pipeline YAML or application code.
+
+**SKIPPED tasks:** Downstream tasks skipped after an upstream failure are symptoms, not
+separate root causes — diagnose the first failed task in the run.
+
+---
+
 ### AUTH_FAILURE
 **Log signals:**
 - `401`, `403`, `Unauthorized`, `Forbidden`, `Access Denied`

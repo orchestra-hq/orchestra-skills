@@ -1,6 +1,7 @@
 # Orchestra MCP — tools quick reference
 
-Tool map for Orchestra pipeline skills (`fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
+Tool map for Orchestra pipeline skills (`fix-orchestra-pipeline`, `triage-orchestra-pipeline`,
+`create-orchestra-pipeline`).
 Use these MCP tools for all operations unless the allowed REST read-only fallback applies — see
 `../api/rest-pipeline-yaml.md`.
 
