@@ -9,6 +9,7 @@ This repository is documentation and workflow instructions for AI agents, not an
 | Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/fix-orchestra-pipeline/SKILL.md` | `.claude/skills/fix-orchestra-pipeline/SKILL.md` | `.cursor/skills/fix-orchestra-pipeline/SKILL.md` |
 | Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/triage-orchestra-pipeline/SKILL.md` | `.claude/skills/triage-orchestra-pipeline/SKILL.md` | `.cursor/skills/triage-orchestra-pipeline/SKILL.md` |
 | Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same | same | same |
+| Set up dbt Slim CI in Orchestra on an existing production pipeline | `orchestra-dbt-slim-ci-setup` | `skills/orchestra-dbt-slim-ci-setup/SKILL.md` | `.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md` | `.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md` |
 
 Read the full generated `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
 
@@ -42,6 +43,7 @@ From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<n
 skills/
   fix-orchestra-pipeline/
   triage-orchestra-pipeline/
+  orchestra-dbt-slim-ci-setup/
 references/
   orchestra/
     README.md
