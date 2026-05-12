@@ -20,7 +20,7 @@ Diagnose, fix, and retry failed Orchestra pipelines — then learn from every fi
 ## Prerequisites
 
 This skill requires the **Orchestra MCP server** to be connected. If it is not connected,
-**read `../../../references/orchestra/mcp/setup.md`**
+**read `../../references/orchestra/mcp/setup.md`**
 and follow the setup steps with the user before proceeding.
 
 The Orchestra API key must be configured in the MCP server. All MCP calls are scoped to the
@@ -28,10 +28,10 @@ user's workspace.
 
 ## MCP-first policy (single exception)
 
-Use Orchestra MCP tools for all operations in this skill. Argument summaries: `../../../references/orchestra/mcp/tools-quick-ref.md`.
+Use Orchestra MCP tools for all operations in this skill. Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
 
 The only allowed direct Orchestra REST call is **reading pipeline YAML** when needed and MCP
-cannot return the full definition. Details: `../../../references/orchestra/api/rest-pipeline-yaml.md`.
+cannot return the full definition. Details: `../../references/orchestra/api/rest-pipeline-yaml.md`.
 
 Do not use direct REST calls for listing runs, logs, artifacts, operations, retrying runs,
 or updating pipelines.
@@ -150,7 +150,7 @@ For each failed task run:
 3. **Operations:** Call `list_operations` filtered by `task_run_id` to see
    sub-operations (individual dbt models, Snowflake queries, etc.) and their statuses.
 
-**Read `../../../references/orchestra/pipeline/diagnosis-patterns.md`** before proceeding to Step 4. It contains
+**Read `../../references/orchestra/pipeline/diagnosis-patterns.md`** before proceeding to Step 4. It contains
 integration-specific error patterns that will help classify the failure.
 
 ### Step 4 — Diagnose the error
@@ -158,13 +158,13 @@ integration-specific error patterns that will help classify the failure.
 **Goal:** Classify the failure and identify the root cause.
 
 This is the analytical step. Using all evidence from Steps 1-3 plus the patterns in
-`../../../references/orchestra/pipeline/diagnosis-patterns.md`:
+`../../references/orchestra/pipeline/diagnosis-patterns.md`:
 
 1. **Decide code vs platform.** If the failure is ingestion/sync infrastructure or another
    vendor-managed integration (Fivetran, Airbyte, Estuary, etc.), surface `platformLink` and
    `connectionId` and stop — do not open a Git PR. If the failure is in repo SQL, dbt, Python,
    or misconfigured pipeline YAML, proceed with remediation. See
-   `../../../references/orchestra/pipeline/diagnosis-patterns.md` (TOOL_OR_INFRASTRUCTURE).
+   `../../references/orchestra/pipeline/diagnosis-patterns.md` (TOOL_OR_INFRASTRUCTURE).
 
 2. **Classify the error category.** Common categories:
    - `AUTH_FAILURE` — credentials expired, rotated, or insufficient permissions
@@ -183,7 +183,7 @@ This is the analytical step. Using all evidence from Steps 1-3 plus the patterns
    `user_email` does not exist in table `analytics.users` — likely a schema migration
    that removed or renamed the column."
 
-4. **Check the knowledge store** for similar past fixes. Read `../../../references/orchestra/pipeline/knowledge-store.md`
+4. **Check the knowledge store** for similar past fixes. Read `../../references/orchestra/pipeline/knowledge-store.md`
    if it exists (it may not exist on first run — that's fine, skip this check).
 
 5. **Present the diagnosis** clearly to the user:
@@ -192,13 +192,13 @@ This is the analytical step. Using all evidence from Steps 1-3 plus the patterns
    - Evidence (which log line, which error message, which operation failed)
    - Confidence level (high/medium/low)
 
-**Read `../../../references/orchestra/pipeline/remediation-playbooks.md`** before proceeding to Step 5.
+**Read `../../references/orchestra/pipeline/remediation-playbooks.md`** before proceeding to Step 5.
 
 ### Step 5 — Apply the fix
 
 **Goal:** Fix the issue or tell the user exactly what to do.
 
-Based on the diagnosis, consult `../../../references/orchestra/pipeline/remediation-playbooks.md` and take action:
+Based on the diagnosis, consult `../../references/orchestra/pipeline/remediation-playbooks.md` and take action:
 
 **Fixes the agent can apply directly:**
 - **Retry** — if the error is transient (timeout, rate limit, platform blip), trigger a
@@ -246,7 +246,7 @@ once the PR is merged.
 ### Learning loop — Update the knowledge store
 
 After every successful fix, record what was learned. Create or append to
-`../../../references/orchestra/pipeline/knowledge-store.md` with:
+`../../references/orchestra/pipeline/knowledge-store.md` with:
 
 ```
 ## Fix: [DATE] — [Pipeline Name]
@@ -258,7 +258,7 @@ After every successful fix, record what was learned. Create or append to
 - **Confidence:** [was the first diagnosis correct?]
 ```
 
-Also update `../../../references/orchestra/pipeline/diagnosis-patterns.md` if a new pattern was discovered that
+Also update `../../references/orchestra/pipeline/diagnosis-patterns.md` if a new pattern was discovered that
 isn't already documented.
 
 On first run for a new user, also query `list_task_runs` with `status=FAILED` across all recent
@@ -387,49 +387,3 @@ Always end a successful fix with a compact summary block:
   `update_pipeline`.
   Git-backed pipelines require code changes committed to the repository. Check `storageProvider`
   in the `list_pipelines` response to determine which type it is.
-
-### Step 5b — Poll PR and auto-retry on merge
-
-**Goal:** Watch the PR and trigger the pipeline rerun automatically once it merges — no manual step from the user.
-
-After sharing the PR URL, emit one status line and then use `ScheduleWakeup` to re-enter this skill at regular intervals:
-
-```
-⏳ PR #178 open — polling every 60 s, will auto-trigger pipeline on merge.
-```
-
-**Polling loop:**
-
-1. Check PR state:
-   ```
-   gh pr view {pr_number} --repo {owner/repo} --json state,mergedAt
-   ```
-
-2. **If `state == "MERGED"`:** Proceed immediately to Step 6 — trigger `start_pipeline`
-   using the original pipeline ID and environment. No confirmation needed (the user
-   already approved the fix by merging the PR).
-
-3. **If `state == "CLOSED"` (not merged):** The PR was closed without merging. Report
-   this and ask the user how to proceed — do not auto-retry.
-
-4. **If `state == "OPEN"`:** Schedule the next check. Use `ScheduleWakeup` with
-   `delaySeconds: 60` while cache is warm (first ~4 checks). After 4 checks with no
-   merge, switch to `delaySeconds: 270` to stay within the 5-minute cache window.
-   Pass the same `/fix-orchestra-pipeline` invocation as the `prompt` so the next
-   wake re-enters the skill with full context.
-
-   Store the PR number, repo, pipeline ID, and environment in the wake-up context by
-   encoding them in the prompt string, e.g.:
-   ```
-   /fix-orchestra-pipeline poll pr=178 repo=owner/repo pipeline_id=d1b9a7ce-ed16-4774-9378-ea3d950555fe env=Production
-   ```
-
-**Polling output format** (one line per check, not a full summary):
-
-```
-⏳ PR #178 — OPEN (2 min elapsed, next check in 60 s)
-⏳ PR #178 — OPEN (3 min elapsed, next check in 60 s)
-✅ PR #178 — MERGED — triggering pipeline rerun…
-```
-
-**Do not** re-diagnose or re-explain the fix on each poll tick. One line only.

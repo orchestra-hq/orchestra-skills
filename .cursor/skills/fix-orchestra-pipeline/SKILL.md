@@ -11,6 +11,7 @@ description: >
   Orchestra integrations including dbt, Snowflake, Python, HTTP, Fivetran, Airbyte, and more.
   Trigger this skill even if the user just pastes an Orchestra error message, pipeline run URL,
   pipeline run link from the Orchestra UI, a UUID, a Slack alert, or a pipeline name/alias.
+disable-model-invocation: true
 ---
 
 # Fix Orchestra Pipeline
@@ -388,14 +389,14 @@ Always end a successful fix with a compact summary block:
   Git-backed pipelines require code changes committed to the repository. Check `storageProvider`
   in the `list_pipelines` response to determine which type it is.
 
-### Step 5b — Poll PR and auto-retry on merge
+### Step 5b — Poll PR and trigger retry on merge
 
-**Goal:** Watch the PR and trigger the pipeline rerun automatically once it merges — no manual step from the user.
+**Goal:** Watch the PR and trigger the pipeline rerun once it merges.
 
-After sharing the PR URL, emit one status line and then use `ScheduleWakeup` to re-enter this skill at regular intervals:
+After sharing the PR URL, emit one status line and keep polling in the same conversation until the PR reaches a terminal state or the user asks to stop:
 
 ```
-⏳ PR #178 open — polling every 60 s, will auto-trigger pipeline on merge.
+⏳ PR #178 open — checking every 60 s; will trigger the pipeline on merge.
 ```
 
 **Polling loop:**
@@ -412,17 +413,10 @@ After sharing the PR URL, emit one status line and then use `ScheduleWakeup` to 
 3. **If `state == "CLOSED"` (not merged):** The PR was closed without merging. Report
    this and ask the user how to proceed — do not auto-retry.
 
-4. **If `state == "OPEN"`:** Schedule the next check. Use `ScheduleWakeup` with
-   `delaySeconds: 60` while cache is warm (first ~4 checks). After 4 checks with no
-   merge, switch to `delaySeconds: 270` to stay within the 5-minute cache window.
-   Pass the same `/fix-orchestra-pipeline` invocation as the `prompt` so the next
-   wake re-enters the skill with full context.
-
-   Store the PR number, repo, pipeline ID, and environment in the wake-up context by
-   encoding them in the prompt string, e.g.:
-   ```
-   /fix-orchestra-pipeline poll pr=178 repo=owner/repo pipeline_id=d1b9a7ce-ed16-4774-9378-ea3d950555fe env=Production
-   ```
+4. **If `state == "OPEN"`:** Wait about 60 seconds, then check again. After several
+   checks with no merge, widen the interval to about 4–5 minutes. Keep the PR number,
+   repo, pipeline ID, and environment in the conversation context so each poll resumes
+   the same fix workflow.
 
 **Polling output format** (one line per check, not a full summary):
 

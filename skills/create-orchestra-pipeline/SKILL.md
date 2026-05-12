@@ -14,9 +14,9 @@ Author or update an Orchestra `version: v1` pipeline YAML, validate it, and fix 
 
 ## References
 
-- `../../../references/orchestra/pipeline/yaml-authoring.md` — schema, integrations, variables, optional sections
-- `../../../references/orchestra/pipeline/examples.md` — multi-stage patterns (warehouse → LLM → messaging, agents)
-- `../../../references/orchestra/mcp/tools-quick-ref.md` — `validate_pipeline`, `create_pipeline`, `update_pipeline`
+- `../../references/orchestra/pipeline/yaml-authoring.md` — schema, integrations, variables, optional sections
+- `../../references/orchestra/pipeline/examples.md` — multi-stage patterns (warehouse → LLM → messaging, agents)
+- `../../references/orchestra/mcp/tools-quick-ref.md` — `validate_pipeline`, `create_pipeline`, `update_pipeline`
 - [Orchestra docs](https://docs.getorchestra.io) for integration parameters not covered in the reference
 
 ## Workflow
@@ -39,7 +39,7 @@ connection references, and schedule format.
 
 ### Step 3 — Write or edit the YAML
 
-Follow `../../../references/orchestra/pipeline/yaml-authoring.md` for structure, required fields,
+Follow `../../references/orchestra/pipeline/yaml-authoring.md` for structure, required fields,
 integration table, and variable syntax. Omit empty `tags` arrays.
 
 ### Step 4 — Validate

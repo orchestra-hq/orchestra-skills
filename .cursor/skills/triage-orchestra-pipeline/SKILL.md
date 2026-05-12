@@ -9,6 +9,7 @@ description: >
   wants a review gate before applying changes. Also trigger when the user describes a
   symptom in a downstream system ("dashboard looks wrong", "chart is stale", "dbt model
   has bad data") even if no pipeline error exists — the skill will trace the symptom upstream.
+disable-model-invocation: true
 ---
 
 # Triage Orchestra Pipeline
