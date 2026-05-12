@@ -1,7 +1,7 @@
 # Knowledge Store
 
 This file is maintained by the Orchestra **pipeline** skills (`fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
-It records past pipeline fixes and discovered patterns — not MCP wiring or REST details (see `.claude/references/orchestra/README.md`).
+It records past pipeline fixes and discovered patterns — not MCP wiring or REST details (see `references/orchestra/README.md`).
 
 ## How this file works
 

@@ -19,22 +19,22 @@ to main until the user says so.
 
 ## Shared references
 
-Orchestra docs live under `references/orchestra/`. Index and layout: `../../../references/orchestra/README.md`. Paths below are relative to this skill folder.
+Orchestra docs live under `references/orchestra/`. Index and layout: `../../references/orchestra/README.md`. Paths below are relative to this skill folder.
 
 **Pipeline**
 
-- `../../../references/orchestra/pipeline/diagnosis-patterns.md` — error classification
-- `../../../references/orchestra/pipeline/remediation-playbooks.md` — fix strategies
-- `../../../references/orchestra/pipeline/knowledge-store.md` — past fixes / failure profile
+- `../../references/orchestra/pipeline/diagnosis-patterns.md` — error classification
+- `../../references/orchestra/pipeline/remediation-playbooks.md` — fix strategies
+- `../../references/orchestra/pipeline/knowledge-store.md` — past fixes / failure profile
 
 **MCP**
 
-- `../../../references/orchestra/mcp/setup.md` — connect Orchestra MCP server
-- `../../../references/orchestra/mcp/tools-quick-ref.md` — tool arguments and behaviour
+- `../../references/orchestra/mcp/setup.md` — connect Orchestra MCP server
+- `../../references/orchestra/mcp/tools-quick-ref.md` — tool arguments and behaviour
 
 **API (fallback only)**
 
-- `../../../references/orchestra/api/rest-pipeline-yaml.md` — allowed read-only YAML fetch when MCP lacks full definition
+- `../../references/orchestra/api/rest-pipeline-yaml.md` — allowed read-only YAML fetch when MCP lacks full definition
 
 ## Workflow
 
@@ -139,7 +139,7 @@ adjust the downstream layer to match the new logic.
 ### Step 1 — Identify & diagnose (error-first path)
 
 Run the full diagnosis: find the failed run, get task runs, fetch logs/artifacts/operations,
-classify the error, identify root cause. Read `../../../references/orchestra/pipeline/diagnosis-patterns.md` and `../../../references/orchestra/pipeline/knowledge-store.md`
+classify the error, identify root cause. Read `../../references/orchestra/pipeline/diagnosis-patterns.md` and `../../references/orchestra/pipeline/knowledge-store.md`
 as normal.
 
 Do not present a verbose diagnosis block to the user yet. Collect all findings silently —
@@ -288,7 +288,7 @@ and why this is the right fix rather than a data issue.>
 1. `gh pr merge <N> --repo <owner/repo> --squash --delete-branch` for each PR
 2. `start_pipeline(pipeline_id, environment=Production)`
 3. Poll until terminal, output resolution summary
-4. Update `../../../references/orchestra/pipeline/knowledge-store.md`
+4. Update `../../references/orchestra/pipeline/knowledge-store.md`
 
 **`reject`** (or: "no", "close it", "abandon"):
 1. `gh pr close <N> --repo <owner/repo>` for each PR
@@ -316,5 +316,5 @@ and why this is the right fix rather than a data issue.>
 - **Commits are suspects, not convictions.** If a commit looks related but you're not
   certain, say so in the triage summary and give the user the option to investigate
   further before opening a PR.
-- **Reuse shared Orchestra references.** Read `../../../references/orchestra/pipeline/knowledge-store.md` during diagnosis.
+- **Reuse shared Orchestra references.** Read `../../references/orchestra/pipeline/knowledge-store.md` during diagnosis.
   After a successful merge+run, write the new entry exactly as `fix-orchestra-pipeline` does.

@@ -1,24 +1,24 @@
 # Agent guide — orchestra-skills
 
-This repository is documentation and workflow instructions for AI agents, not an application runtime. Skills live under `.claude/skills/`; shared Orchestra material lives under `.claude/references/orchestra/`.
+This repository is documentation and workflow instructions for AI agents, not an application runtime. Author skills under `skills/`; generated discovery trees live under `.claude/skills/` and `.cursor/skills/`. Shared Orchestra material lives under `references/orchestra/`.
 
 ## Choose a skill first
 
-| User intent | Skill | Path |
-|-------------|-------|------|
-| Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `.claude/skills/fix-orchestra-pipeline/SKILL.md` |
-| Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `.claude/skills/triage-orchestra-pipeline/SKILL.md` |
-| Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same |
+| User intent | Skill | Canonical | Claude | Cursor |
+|-------------|-------|-----------|--------|--------|
+| Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/fix-orchestra-pipeline/SKILL.md` | `.claude/skills/fix-orchestra-pipeline/SKILL.md` | `.cursor/skills/fix-orchestra-pipeline/SKILL.md` |
+| Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/triage-orchestra-pipeline/SKILL.md` | `.claude/skills/triage-orchestra-pipeline/SKILL.md` | `.cursor/skills/triage-orchestra-pipeline/SKILL.md` |
+| Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same | same | same |
 
-Read the full `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
+Read the full generated `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
 
 ## Reference index
 
-From a skill directory, prefix paths with `../../references/orchestra/`. From the repository root, use `.claude/references/orchestra/`.
+From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<name>/`), prefix paths with `../../../references/orchestra/`. From the repository root, use `references/orchestra/`.
 
 | Topic | File |
 |-------|------|
-| Index | `.claude/references/orchestra/README.md` |
+| Index | `references/orchestra/README.md` |
 | Failure classification | `pipeline/diagnosis-patterns.md` |
 | Remediation actions | `pipeline/remediation-playbooks.md` |
 | Past fixes and failure profile | `pipeline/knowledge-store.md` |
@@ -39,24 +39,29 @@ From a skill directory, prefix paths with `../../references/orchestra/`. From th
 ## Repository layout
 
 ```text
+skills/
+  fix-orchestra-pipeline/
+  triage-orchestra-pipeline/
+references/
+  orchestra/
+    README.md
+    pipeline/
+    mcp/
+    api/
 .claude/
-  skills/
-    fix-orchestra-pipeline/SKILL.md
-    triage-orchestra-pipeline/SKILL.md
-  references/
-    orchestra/
-      README.md
-      pipeline/
-      mcp/
-      api/
+  skills/          # generated
+.cursor/
+  skills/          # generated
 AGENTS.md
 README.md
+scripts/
+  sync_skills.py
 ```
 
 ## Editing this repository
 
-- Change skill workflows in `.claude/skills/*/SKILL.md`.
-- Change shared playbooks and tool notes under `.claude/references/orchestra/`.
+- Change skill workflows in `skills/*/SKILL.md` and optional `claude.md` / `cursor.md`; run `python scripts/sync_skills.py` before committing.
+- Change shared playbooks and tool notes under `references/orchestra/`.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.
 

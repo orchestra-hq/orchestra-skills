@@ -6,24 +6,26 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 
 | Path | Purpose |
 |------|---------|
-| [`.claude/skills/`](.claude/skills/) | Executable skill workflows (`SKILL.md` per skill) |
-| [`.claude/references/orchestra/`](.claude/references/orchestra/) | Shared diagnosis, remediation, MCP, and API reference material |
+| [`skills/`](skills/) | Canonical skill source (`SKILL.md` per skill; optional `claude.md` / `cursor.md`) |
+| [`.claude/skills/`](.claude/skills/) | Generated Claude Code skill discovery |
+| [`.cursor/skills/`](.cursor/skills/) | Generated Cursor skill discovery |
+| [`references/orchestra/`](references/orchestra/) | Shared diagnosis, remediation, MCP, and API reference material |
 | [`AGENTS.md`](AGENTS.md) | Short orientation for coding agents working in this repository |
 
 ### Skills
 
-| Skill | Use when |
-|-------|----------|
-| [`fix-orchestra-pipeline`](.claude/skills/fix-orchestra-pipeline/SKILL.md) | A pipeline or task failed and you want end-to-end diagnosis, fixes, retry, and learning from past fixes |
-| [`triage-orchestra-pipeline`](.claude/skills/triage-orchestra-pipeline/SKILL.md) | You want a fix prepared on a branch with validation, then a human review gate before merge |
+| Skill | Use when | Claude | Cursor |
+|-------|----------|--------|--------|
+| `fix-orchestra-pipeline` | A pipeline or task failed and you want end-to-end diagnosis, fixes, retry, and learning from past fixes | [`.claude/skills/fix-orchestra-pipeline/SKILL.md`](.claude/skills/fix-orchestra-pipeline/SKILL.md) | [`.cursor/skills/fix-orchestra-pipeline/SKILL.md`](.cursor/skills/fix-orchestra-pipeline/SKILL.md) |
+| `triage-orchestra-pipeline` | You want a fix prepared on a branch with validation, then a human review gate before merge | [`.claude/skills/triage-orchestra-pipeline/SKILL.md`](.claude/skills/triage-orchestra-pipeline/SKILL.md) | [`.cursor/skills/triage-orchestra-pipeline/SKILL.md`](.cursor/skills/triage-orchestra-pipeline/SKILL.md) |
 
-Both skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, and retries. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](.claude/references/orchestra/api/rest-pipeline-yaml.md)).
+Both skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, and retries. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
 
 ### Reference library
 
-Start at [`.claude/references/orchestra/README.md`](.claude/references/orchestra/README.md). Highlights:
+Start at [`references/orchestra/README.md`](references/orchestra/README.md). Highlights:
 
-- **Pipeline** — error patterns, remediation playbooks, append-only workspace fix history ([`knowledge-store.md`](.claude/references/orchestra/pipeline/knowledge-store.md))
+- **Pipeline** — error patterns, remediation playbooks, append-only workspace fix history ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
 - **MCP** — server setup and tool quick reference
 - **API** — allowed read-only REST fallback for pipeline YAML
 
@@ -33,19 +35,19 @@ Start at [`.claude/references/orchestra/README.md`](.claude/references/orchestra
 
 - Python 3.10+ and [`uv`](https://docs.astral.sh/uv/)
 - An Orchestra API key (Orchestra UI → Settings → API Keys)
-- A clone of [orchestra-mcp](https://github.com/orchestra-hq/orchestra-mcp) and MCP configuration (see [`.claude/references/orchestra/mcp/setup.md`](.claude/references/orchestra/mcp/setup.md))
+- A clone of [orchestra-mcp](https://github.com/orchestra-hq/orchestra-mcp) and MCP configuration (see [`references/orchestra/mcp/setup.md`](references/orchestra/mcp/setup.md))
 
 ### Claude Code
 
 1. Clone this repository.
-2. Register the skills directory with Claude Code (project-local or global), or copy or symlink the skill folders you need into your skills path.
+2. Open the repo in Claude Code so project skills under [`.claude/skills/`](.claude/skills/) are discovered, or register that directory globally.
 3. Configure the Orchestra MCP server in `~/.claude/mcp.json` using the setup guide above.
 4. Restart Claude Code or reload MCP so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
 
 ### Cursor
 
 1. Clone this repository (or add it as a workspace).
-2. Point Cursor at the skills under [`.claude/skills/`](.claude/skills/), or copy or symlink them into [`.cursor/skills/`](.cursor/skills/) if you want project-scoped discovery.
+2. Use the committed skills under [`.cursor/skills/`](.cursor/skills/) for project-scoped discovery.
 3. Connect the Orchestra MCP server in Cursor MCP settings with the same `uv` command and `ORCHESTRA_API_KEY` as in the setup guide.
 4. For agent behavior in this repo, read [`AGENTS.md`](AGENTS.md).
 
@@ -59,8 +61,10 @@ Start at [`.claude/references/orchestra/README.md`](.claude/references/orchestra
 
 ## Contributing
 
-- Keep shared Orchestra material under `.claude/references/orchestra/`; skills should link there instead of duplicating long playbooks.
-- After a successful fix, append to [`pipeline/knowledge-store.md`](.claude/references/orchestra/pipeline/knowledge-store.md) and extend [`pipeline/diagnosis-patterns.md`](.claude/references/orchestra/pipeline/diagnosis-patterns.md) when you discover a new pattern.
+- Edit canonical skills under [`skills/`](skills/) and shared Orchestra material under [`references/orchestra/`](references/orchestra/); do not hand-edit generated trees under `.claude/skills/` or `.cursor/skills/`.
+- After changing skills, run `python scripts/sync_skills.py` and commit the regenerated outputs.
+- To add a skill, create `skills/<skill-name>/SKILL.md`, add optional `claude.md` / `cursor.md` for platform-specific steps, run sync, and commit canonical plus generated folders.
+- After a successful fix, append to [`pipeline/knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md) and extend [`pipeline/diagnosis-patterns.md`](references/orchestra/pipeline/diagnosis-patterns.md) when you discover a new pattern.
 - Do not commit API keys, `.env` files, or other secrets.
 
 Agents editing this repo should follow [`AGENTS.md`](AGENTS.md).

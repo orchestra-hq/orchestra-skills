@@ -1,0 +1,15 @@
+name: Skills sync
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify generated skill trees
+        run: python3 scripts/sync_skills.py --check

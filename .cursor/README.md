@@ -1,9 +1,8 @@
-# Claude layout
+# Cursor layout
 
 | Directory | Role |
 |-----------|------|
-| [`skills/`](skills/) | Generated Claude Code skills (`SKILL.md` per folder) |
-| [`references/`](references/) | Pointer to shared Orchestra references at repo root |
+| [`skills/`](skills/) | Generated Cursor skills (`SKILL.md` per folder) |
 
 Human-oriented setup and skill summaries: [`../README.md`](../README.md). Agent routing and operating rules: [`../AGENTS.md`](../AGENTS.md).
 
