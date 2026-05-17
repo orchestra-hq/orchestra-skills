@@ -6,6 +6,7 @@ This repository is documentation and workflow instructions for AI agents, not an
 
 | User intent | Skill | Canonical | Claude | Cursor |
 |-------------|-------|-----------|--------|--------|
+| Author a new pipeline YAML | `create-orchestra-pipeline` | `skills/create-orchestra-pipeline/SKILL.md` | `.claude/skills/create-orchestra-pipeline/SKILL.md` | `.cursor/skills/create-orchestra-pipeline/SKILL.md` |
 | Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/fix-orchestra-pipeline/SKILL.md` | `.claude/skills/fix-orchestra-pipeline/SKILL.md` | `.cursor/skills/fix-orchestra-pipeline/SKILL.md` |
 | Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/triage-orchestra-pipeline/SKILL.md` | `.claude/skills/triage-orchestra-pipeline/SKILL.md` | `.cursor/skills/triage-orchestra-pipeline/SKILL.md` |
 | Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same | same | same |
@@ -19,6 +20,8 @@ From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<n
 | Topic | File |
 |-------|------|
 | Index | `references/orchestra/README.md` |
+| YAML authoring schema & validation | `pipeline/yaml-authoring.md` |
+| Pipeline pattern examples | `pipeline/examples.md` |
 | Failure classification | `pipeline/diagnosis-patterns.md` |
 | Remediation actions | `pipeline/remediation-playbooks.md` |
 | Past fixes and failure profile | `pipeline/knowledge-store.md` |
@@ -40,6 +43,7 @@ From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<n
 
 ```text
 skills/
+  create-orchestra-pipeline/
   fix-orchestra-pipeline/
   triage-orchestra-pipeline/
 references/

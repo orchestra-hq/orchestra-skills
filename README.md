@@ -13,19 +13,19 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 | [`AGENTS.md`](AGENTS.md) | Short orientation for coding agents working in this repository |
 
 ### Skills
-
 | Skill | Use when | Claude | Cursor |
 |-------|----------|--------|--------|
+| `create-orchestra-pipeline` | You want to author a new Orchestra `version: v1` pipeline YAML, validate it, and remediate validation errors | [`.claude/skills/create-orchestra-pipeline/SKILL.md`](.claude/skills/create-orchestra-pipeline/SKILL.md) | [`.cursor/skills/create-orchestra-pipeline/SKILL.md`](.cursor/skills/create-orchestra-pipeline/SKILL.md) |
 | `fix-orchestra-pipeline` | A pipeline or task failed and you want end-to-end diagnosis, fixes, retry, and learning from past fixes | [`.claude/skills/fix-orchestra-pipeline/SKILL.md`](.claude/skills/fix-orchestra-pipeline/SKILL.md) | [`.cursor/skills/fix-orchestra-pipeline/SKILL.md`](.cursor/skills/fix-orchestra-pipeline/SKILL.md) |
 | `triage-orchestra-pipeline` | You want a fix prepared on a branch with validation, then a human review gate before merge | [`.claude/skills/triage-orchestra-pipeline/SKILL.md`](.claude/skills/triage-orchestra-pipeline/SKILL.md) | [`.cursor/skills/triage-orchestra-pipeline/SKILL.md`](.cursor/skills/triage-orchestra-pipeline/SKILL.md) |
 
-Both skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, and retries. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
+All pipeline skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, retries, and (for YAML authoring) pipeline validation when available. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
 
 ### Reference library
 
 Start at [`references/orchestra/README.md`](references/orchestra/README.md). Highlights:
 
-- **Pipeline** — error patterns, remediation playbooks, append-only workspace fix history ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
+- **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and append-only workspace fix history ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
 - **MCP** — server setup and tool quick reference
 - **API** — allowed read-only REST fallback for pipeline YAML
 
@@ -54,6 +54,8 @@ Start at [`references/orchestra/README.md`](references/orchestra/README.md). Hig
 ## Typical workflows
 
 **Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and appends to the knowledge store.
+
+**Author pipeline YAML** — Describe the desired stages/tasks and create a `version: v1` pipeline YAML. The authoring skill validates (via `orchestra-cli` or MCP) and remediates validation errors until clean.
 
 **Review before merge** — Use the triage skill when you want a branch fix, validation run, and triage summary, then explicit approval before merge and production retry.
 
