@@ -1,6 +1,6 @@
 # Orchestra MCP Server Setup
 
-When the Orchestra MCP server is not connected, use this reference to set it up before proceeding with Orchestra pipeline skills (`fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
+When the Orchestra MCP server is not connected, use this reference to set it up before proceeding with Orchestra pipeline skills (`create-orchestra-pipeline`, `fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
 
 ## Prerequisites
 
