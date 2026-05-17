@@ -135,7 +135,7 @@ def render_skill(skill_dir: Path, *, target: str) -> str:
 
 
 def copy_supporting_files(skill_dir: Path, output_dir: Path) -> None:
-    for dirname in ("scripts", "references"):
+    for dirname in ("scripts", "references", "templates"):
         source = skill_dir / dirname
         if not source.is_dir():
             continue
