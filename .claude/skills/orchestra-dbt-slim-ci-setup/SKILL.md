@@ -22,7 +22,7 @@ After setup, failed PR checks: use **pr-slim-ci-orchestra-debug** (project or or
 
 1. **Collect inputs** — Follow [references/inputs-matrix.md](references/inputs-matrix.md). Ask for must-haves; discover from repo when in a dbt project.
 2. **Detect context** — In dbt repo: read `dbt_project.yml`, `profiles.yml`, `orchestra/`, `.github/workflows/`. Outside: require repo URL, pipeline YAML path, and where GHA lives. If already configured per Orchestra docs, report and run verification only.
-3. **Load Orchestra docs** — Follow [references/mcp-playbook.md](references/mcp-playbook.md) (Orchestra Documentation MCP, then Orchestra MCP).
+3. **Load Orchestra docs** — Follow [references/orchestra/mcp-playbook.md](../../../references/orchestra/mcp-playbook.md) (Orchestra Documentation MCP, then Orchestra MCP).
 4. **Inventory pipeline** — `list_pipelines`; read YAML. Checklist: [references/retrofit-checklist.md](references/retrofit-checklist.md).
 5. **Patch pipeline YAML** — Minimal changes from [templates/pipeline-inputs-snippet.yml](templates/pipeline-inputs-snippet.yml). Git-backed: commit YAML; do not use `update_pipeline`. Orchestra-backed only: `validate_pipeline` then `create_pipeline` / `update_pipeline`.
 6. **GitHub Actions** — Add or patch workflow from [templates/github-dbt-slim-ci.yml](templates/github-dbt-slim-ci.yml). Separate pipeline repo: Action `branch` = pipeline YAML branch; `dbt_branch` only in `run_inputs`.

@@ -16,6 +16,7 @@ These describe **what went wrong** in pipelines and **how to fix or record** it:
 
 | File | Purpose |
 |------|---------|
+| `mcp-playbook.md` | Documentation + Orchestra MCP sequence (read + tool order) |
 | `mcp/setup.md` | Install and configure the Orchestra MCP server (`mcp.json`, API key) |
 | `mcp/tools-quick-ref.md` | MCP tool names, arguments, and usage notes |
 
