@@ -18,8 +18,9 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 |-------|----------|--------|--------|
 | `fix-orchestra-pipeline` | A pipeline or task failed and you want end-to-end diagnosis, fixes, retry, and learning from past fixes | [`.claude/skills/fix-orchestra-pipeline/SKILL.md`](.claude/skills/fix-orchestra-pipeline/SKILL.md) | [`.cursor/skills/fix-orchestra-pipeline/SKILL.md`](.cursor/skills/fix-orchestra-pipeline/SKILL.md) |
 | `triage-orchestra-pipeline` | You want a fix prepared on a branch with validation, then a human review gate before merge | [`.claude/skills/triage-orchestra-pipeline/SKILL.md`](.claude/skills/triage-orchestra-pipeline/SKILL.md) | [`.cursor/skills/triage-orchestra-pipeline/SKILL.md`](.cursor/skills/triage-orchestra-pipeline/SKILL.md) |
+| `orchestra-dbt-slim-ci-setup` | You want to retrofit dbt Slim CI onto an existing Orchestra production dbt pipeline (GitHub Actions `run-pipeline`, `latest_production`, `state:modified+`, `--defer`) | [`.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md`](.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | [`.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md`](.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md) |
 
-Both skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, and retries. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
+Pipeline fix and triage skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, and retries. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
 
 ### Reference library
 
