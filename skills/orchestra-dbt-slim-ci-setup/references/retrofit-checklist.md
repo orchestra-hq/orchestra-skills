@@ -16,7 +16,6 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 | `inputs.dbt_command` | `type: string`, default = current prod command (without leading `dbt`) |
 | Task `parameters.branch` | `${{ inputs.dbt_branch }}` on prod dbt task (and snapshot tasks if they must follow same branch) |
 | Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` plus existing suffixes (e.g. `--target ${{ ENV.DBT_TARGET }}`) |
-| `use_state_orchestration` | `true` when using `--state` / `--defer` / `state:modified+` |
 | `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; not tags) |
 | Dedicated CI-only pipeline | **Avoid** unless user accepts separate `latest_production` history |
 
@@ -40,7 +39,6 @@ inputs:
 parameters:
   commands: dbt ${{ inputs.dbt_command }} --target ${{ ENV.DBT_TARGET }}
   branch: ${{ inputs.dbt_branch }}
-  use_state_orchestration: true
   # production_run_identifier: main
 ```
 

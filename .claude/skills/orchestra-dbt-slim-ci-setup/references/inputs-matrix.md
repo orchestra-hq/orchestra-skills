@@ -23,7 +23,7 @@ Collect before retrofit. Group: **must-have** (ask if missing), **discoverable**
 | `dbt_project.yml` | Profile name, tags to exclude, incremental patterns |
 | `profiles.yml` | Targets; flag mismatch if workflow uses `ci`/`prod` but file only has `dev` |
 | `macros/**` | e.g. `generate_schema_name` routing for `target.name == 'ci'` |
-| `orchestra/*.yml` | Existing inputs, task ids, `use_state_orchestration` |
+| `orchestra/*.yml` | Existing inputs, task ids |
 | `.github/workflows/*` | Existing Slim CI, secrets names, pipeline id |
 | Repo layout | Pipeline YAML in dbt repo vs separate pipeline repo |
 

@@ -17,7 +17,6 @@ inputs:
 #     commands: dbt ${{ inputs.dbt_command }} --target ${{ ENV.DBT_TARGET }}
 #     package_manager: PIP
 #     python_version: '3.12'
-#     use_state_orchestration: true
 #     branch: ${{ inputs.dbt_branch }}
 #     # production_run_identifier: main
 #   connection: <dbt_core_connection_id>
