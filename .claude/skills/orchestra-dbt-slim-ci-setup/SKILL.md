@@ -1,7 +1,6 @@
 ---
 name: orchestra-dbt-slim-ci-setup
 description: Retrofits dbt Slim CI onto an existing Orchestra production dbt pipeline using latest_production, state:modified+, and --defer, with GitHub Actions run-pipeline as the primary CI trigger. Use when setting up Orchestra Slim CI, dbt CI/CD in Orchestra, run-pipeline for dbt, or latest_production defer state in a dbt repo or from outside it.
-disable-model-invocation: true
 ---
 
 # Orchestra dbt Slim CI setup
