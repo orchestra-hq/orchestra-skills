@@ -1,0 +1,35 @@
+name: Validate Skills
+
+on:
+  push:
+    paths: ['skills/**']
+  pull_request:
+    paths: ['skills/**', '.github/workflows/validate-skills.yml']
+
+env:
+  SKILLS_DIR: skills
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install skills-ref
+        run: pip install "skills-ref @ git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
+
+      - name: Validate all skills
+        run: |
+          failed=0
+          for skill in "$SKILLS_DIR"/*/; do
+            [ -f "$skill/SKILL.md" ] || continue
+            echo "── $(basename "$skill")"
+            skills-ref validate "$skill" || failed=1
+
+            lines=$(wc -l < "$skill/SKILL.md")
+            if [ "$lines" -gt 500 ]; then
+              echo "  ⚠ SKILL.md is $lines lines (500 recommended)"
+              failed=1
+            fi
+          done
+          exit $failed
