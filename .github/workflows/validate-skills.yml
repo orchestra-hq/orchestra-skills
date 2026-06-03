@@ -13,7 +13,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install skills-ref
         run: pip install "skills-ref @ git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
