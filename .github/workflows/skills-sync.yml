@@ -10,6 +10,6 @@ jobs:
   sync-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Verify generated skill trees
         run: python3 scripts/sync_skills.py --check
