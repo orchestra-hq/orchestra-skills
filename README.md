@@ -13,14 +13,19 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 | [`AGENTS.md`](AGENTS.md) | Short orientation for coding agents working in this repository |
 
 ### Skills
-| Skill | Use when | Claude | Cursor |
-|-------|----------|--------|--------|
-| `create-orchestra-pipeline` | You want to author a new Orchestra `version: v1` pipeline YAML, validate it, and remediate validation errors | [`.claude/skills/create-orchestra-pipeline/SKILL.md`](.claude/skills/create-orchestra-pipeline/SKILL.md) | [`.cursor/skills/create-orchestra-pipeline/SKILL.md`](.cursor/skills/create-orchestra-pipeline/SKILL.md) |
-| `fix-orchestra-pipeline` | A pipeline or task failed and you want end-to-end diagnosis, fixes, retry, and learning from past fixes | [`.claude/skills/fix-orchestra-pipeline/SKILL.md`](.claude/skills/fix-orchestra-pipeline/SKILL.md) | [`.cursor/skills/fix-orchestra-pipeline/SKILL.md`](.cursor/skills/fix-orchestra-pipeline/SKILL.md) |
-| `triage-orchestra-pipeline` | You want a fix prepared on a branch with validation, then a human review gate before merge | [`.claude/skills/triage-orchestra-pipeline/SKILL.md`](.claude/skills/triage-orchestra-pipeline/SKILL.md) | [`.cursor/skills/triage-orchestra-pipeline/SKILL.md`](.cursor/skills/triage-orchestra-pipeline/SKILL.md) |
-| `orchestra-dbt-slim-ci-setup` | You want to retrofit dbt Slim CI onto an existing Orchestra production dbt pipeline (GitHub Actions `run-pipeline`, `latest_production`, `state:modified+`, `--defer`) | [`.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md`](.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | [`.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md`](.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md) |
 
-All pipeline skills are MCP-first: use Orchestra MCP tools for runs, logs, artifacts, retries, and (for YAML authoring) pipeline validation when available. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
+Each skill auto-triggers when your prompt matches it — just describe the problem in natural language. The "Try saying" column shows a prompt that activates each one.
+
+| Skill | What it does | Try saying |
+|-------|--------------|------------|
+| [`fix-orchestra-pipeline`](skills/fix-orchestra-pipeline/SKILL.md) | Diagnose → fix → retry a failed pipeline end-to-end (logs, artifacts, root cause, PR, rerun). | _"Why did my pipeline fail?"_ — or paste a run URL, UUID, or error |
+| [`triage-orchestra-pipeline`](skills/triage-orchestra-pipeline/SKILL.md) | Same diagnosis, but opens a fix PR and validates it on a branch, then **stops for your approval** before merging. | _"Triage my pipeline but don't merge yet"_ |
+| [`create-orchestra-pipeline`](skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
+| [`orchestra-dbt-slim-ci-setup`](skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline. | _"Set up dbt Slim CI in Orchestra"_ |
+
+Links point to the canonical source; the equivalent generated copies live under [`.claude/skills/`](.claude/skills/) and [`.cursor/skills/`](.cursor/skills/).
+
+**To get going:** connect the [Orchestra MCP server](https://github.com/orchestra-hq/orchestra-mcp) (see [Install](#install-for-humans) below), open this repo in Claude Code or Cursor, then just ask. All pipeline skills are MCP-first — runs, logs, artifacts, retries, and validation go through MCP tools. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
 
 ### Reference library
 
