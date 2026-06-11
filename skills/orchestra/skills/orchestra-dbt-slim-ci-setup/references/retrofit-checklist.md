@@ -5,7 +5,7 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 ## Orchestra MCP inventory
 
 1. `list_pipelines` — match user pipeline id or alias.
-2. Load definition from Git-backed YAML in workspace or user path; Orchestra-backed from API/UI export.
+2. Load definition from Git-backed YAML in workspace or user path; Orchestra-backed via the `get_pipeline` MCP tool.
 3. Identify the **primary** `DBT_CORE` / `DBT_CORE_EXECUTE` task used in production (note task key, e.g. `run_dbt`).
 
 ## Checklist

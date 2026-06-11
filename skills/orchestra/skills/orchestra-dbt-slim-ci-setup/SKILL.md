@@ -41,7 +41,7 @@ After setup, failed PR checks: use **pr-slim-ci-orchestra-debug** (project or or
 
 ## Out of scope
 
-Non-GitHub CI (document start API / CLI as follow-up), new warehouse/Git OAuth setup, Lightdash preview CI, auto-fixing failing Slim CI runs.
+Non-GitHub CI (document `start_pipeline` MCP tool / CLI as follow-up), new warehouse/Git OAuth setup, Lightdash preview CI, auto-fixing failing Slim CI runs.
 
 ## Doc index
 
