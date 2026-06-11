@@ -31,9 +31,34 @@ Links point to the canonical source; the equivalent generated copies live under 
 
 Start at [`references/orchestra/README.md`](references/orchestra/README.md). Highlights:
 
-- **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and append-only workspace fix history ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
+- **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and an optional local fix-history template ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
 - **MCP** — server setup and tool quick reference
 - **API** — allowed read-only REST fallback for pipeline YAML
+
+## Adding a skill
+
+Skills are authored **once** under `skills/` and compiled into the Claude and Cursor trees by `scripts/sync_skills.py`. **Never hand-edit `.claude/skills/` or `.cursor/skills/`** — they are generated, and CI (`sync_skills.py --check`) rejects any drift.
+
+1. **Create the source.** Add `skills/<skill-name>/SKILL.md` with YAML frontmatter:
+   ```yaml
+   ---
+   name: <skill-name>
+   description: >
+     What the skill does and the phrases/situations that should trigger it.
+     This is what the agent matches on — be specific.
+   ---
+   ```
+   Drop any supporting material (reference docs, templates) in the same folder; it's copied into both generated trees.
+
+2. **(Optional) Platform-specific content.**
+   - Add `skills/<skill-name>/claude.md` or `cursor.md` — its contents are appended only to that platform's build; or
+   - inline `<!-- claude-only -->…<!-- /claude-only -->` / `<!-- cursor-only -->…<!-- /cursor-only -->` blocks in `SKILL.md`; the markers are stripped from the other platform.
+
+3. **Generate the trees.** Run `python3 scripts/sync_skills.py` (add `--skill <skill-name>` to build just one). This writes `.claude/skills/<skill-name>/` and `.cursor/skills/<skill-name>/`.
+
+4. **Commit canonical + generated together.** Include your `skills/<skill-name>/` source **and** the regenerated `.claude/`/`.cursor/` folders in the same commit, or CI will fail the sync check.
+
+5. **List it** in the [Skills](#skills) table above so people (and agents) can find it.
 
 ## Install for humans
 
@@ -59,7 +84,7 @@ Start at [`references/orchestra/README.md`](references/orchestra/README.md). Hig
 
 ## Typical workflows
 
-**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and appends to the knowledge store.
+**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and optionally records the fix to your client's memory.
 
 **Author pipeline YAML** — Describe the desired stages/tasks and create a `version: v1` pipeline YAML. The authoring skill validates (via `orchestra-cli` or MCP) and remediates validation errors until clean.
 
@@ -71,8 +96,8 @@ Start at [`references/orchestra/README.md`](references/orchestra/README.md). Hig
 
 - Edit canonical skills under [`skills/`](skills/) and shared Orchestra material under [`references/orchestra/`](references/orchestra/); do not hand-edit generated trees under `.claude/skills/` or `.cursor/skills/`.
 - After changing skills, run `python scripts/sync_skills.py` and commit the regenerated outputs.
-- To add a skill, create `skills/<skill-name>/SKILL.md`, add optional `claude.md` / `cursor.md` for platform-specific steps, run sync, and commit canonical plus generated folders.
-- After a successful fix, append to [`pipeline/knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md) and extend [`pipeline/diagnosis-patterns.md`](references/orchestra/pipeline/diagnosis-patterns.md) when you discover a new pattern.
+- To add a new skill, follow [Adding a skill](#adding-a-skill).
+- Recording fixes is optional and deferred to your client's persistent memory — never commit workspace-specific fix history. Extend [`pipeline/diagnosis-patterns.md`](references/orchestra/pipeline/diagnosis-patterns.md) only with generic, reusable patterns.
 - Do not commit API keys, `.env` files, or other secrets.
 
 Agents editing this repo should follow [`AGENTS.md`](AGENTS.md).
