@@ -10,7 +10,7 @@ Grouped by concern. Paths below are relative to `references/orchestra/` in this 
 | `pipeline/examples.md` | Multi-stage pipeline patterns (warehouse → LLM → messaging, agents) |
 | `pipeline/diagnosis-patterns.md` | Classify failures by integration and log signals |
 | `pipeline/remediation-playbooks.md` | Action paths by error category |
-| `pipeline/knowledge-store.md` | Workspace-specific fix history and failure profile (append-only) |
+| `pipeline/knowledge-store.md` | Optional local fix-history template (ships empty); recall/record is deferred to your client's persistent memory |
 
 ## MCP (connecting & tool usage)
 

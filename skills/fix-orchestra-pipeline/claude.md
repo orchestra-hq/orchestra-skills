@@ -31,7 +31,7 @@ After sharing the PR URL, emit one status line and then use `ScheduleWakeup` to 
    Store the PR number, repo, pipeline ID, and environment in the wake-up context by
    encoding them in the prompt string, e.g.:
    ```
-   /fix-orchestra-pipeline poll pr=178 repo=owner/repo pipeline_id=d1b9a7ce-ed16-4774-9378-ea3d950555fe env=Production
+   /fix-orchestra-pipeline poll pr=178 repo=owner/repo pipeline_id=123e4567-e89b-12d3-a456-426614174000 env=Production
    ```
 
 **Polling output format** (one line per check, not a full summary):
