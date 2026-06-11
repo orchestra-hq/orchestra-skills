@@ -1,22 +1,22 @@
 # Agent guide — orchestra-skills
 
-This repository is documentation and workflow instructions for AI agents, not an application runtime. Author skills under `skills/`; generated discovery trees live under `.claude/skills/` and `.cursor/skills/`. Shared Orchestra material lives under `references/orchestra/`.
+This repository is documentation and workflow instructions for AI agents, not an application runtime. Skills live under `skills/` (single source of truth — no generated copies). Shared Orchestra material lives under `references/orchestra/`.
 
 ## Choose a skill first
 
-| User intent | Skill | Canonical | Claude | Cursor |
-|-------------|-------|-----------|--------|--------|
-| Author a new pipeline YAML | `create-orchestra-pipeline` | `skills/create-orchestra-pipeline/SKILL.md` | `.claude/skills/create-orchestra-pipeline/SKILL.md` | `.cursor/skills/create-orchestra-pipeline/SKILL.md` |
-| Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/fix-orchestra-pipeline/SKILL.md` | `.claude/skills/fix-orchestra-pipeline/SKILL.md` | `.cursor/skills/fix-orchestra-pipeline/SKILL.md` |
-| Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/triage-orchestra-pipeline/SKILL.md` | `.claude/skills/triage-orchestra-pipeline/SKILL.md` | `.cursor/skills/triage-orchestra-pipeline/SKILL.md` |
-| Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same | same | same |
-| Set up dbt Slim CI in Orchestra on an existing production pipeline | `orchestra-dbt-slim-ci-setup` | `skills/orchestra-dbt-slim-ci-setup/SKILL.md` | `.claude/skills/orchestra-dbt-slim-ci-setup/SKILL.md` | `.cursor/skills/orchestra-dbt-slim-ci-setup/SKILL.md` |
+| User intent | Skill | Path |
+|-------------|-------|------|
+| Author a new pipeline YAML | `create-orchestra-pipeline` | `skills/create-orchestra-pipeline/SKILL.md` |
+| Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/fix-orchestra-pipeline/SKILL.md` |
+| Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/triage-orchestra-pipeline/SKILL.md` |
+| Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same |
+| Set up dbt Slim CI in Orchestra on an existing production pipeline | `orchestra-dbt-slim-ci-setup` | `skills/orchestra-dbt-slim-ci-setup/SKILL.md` |
 
-Read the full generated `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
+Read the full `SKILL.md` for the matching skill before changing pipelines, opening pull requests, or calling external APIs.
 
 ## Reference index
 
-From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<name>/`), prefix paths with `../../../references/orchestra/`. From the repository root, use `references/orchestra/`.
+Skill `SKILL.md` files reference shared docs with paths relative to the skill folder (`../../references/orchestra/...`). From the repository root, use `references/orchestra/`.
 
 | Topic | File |
 |-------|------|
@@ -37,7 +37,7 @@ From a generated skill directory (`.claude/skills/<name>/` or `.cursor/skills/<n
 3. **Prerequisite** — If Orchestra MCP is not connected, follow `mcp/setup.md` with the user before deep diagnosis.
 4. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
 5. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
-6. **Learn in-repo** — After a successful fix, append `pipeline/knowledge-store.md`. Add new recurring patterns to `pipeline/diagnosis-patterns.md`. Do not store MCP wiring in the knowledge store.
+6. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
 7. **Triage gate** — The triage skill must not merge to the default branch without explicit user approval (`merge`, `yes`, `approve`, and similar).
 
 ## Repository layout
@@ -54,19 +54,15 @@ references/
     pipeline/
     mcp/
     api/
-.claude/
-  skills/          # generated
-.cursor/
-  skills/          # generated
+docs/
+  marketplace-migration-plan.md
 AGENTS.md
 README.md
-scripts/
-  sync_skills.py
 ```
 
 ## Editing this repository
 
-- Change skill workflows in `skills/*/SKILL.md` and optional `claude.md` / `cursor.md`; run `python scripts/sync_skills.py` before committing.
+- Change skill workflows directly in `skills/*/SKILL.md` — there is a single skill tree, no generation step. Write skills client-agnostically: describe a capability ("if your client can schedule a wake-up…") rather than naming a specific tool.
 - Change shared playbooks and tool notes under `references/orchestra/`.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.
