@@ -1,0 +1,83 @@
+name: Validate Skills
+
+on:
+  push:
+    paths: ['skills/**', '.claude-plugin/**', '.cursor-plugin/**']
+  pull_request:
+    paths:
+      - 'skills/**'
+      - '.claude-plugin/**'
+      - '.cursor-plugin/**'
+      - '.github/workflows/validate-skills.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install skills-ref
+        run: pip install "skills-ref @ git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
+
+      - name: Validate all skills
+        run: |
+          failed=0
+          shopt -s nullglob
+          found=0
+          for skill in skills/*/skills/*/; do
+            [ -f "$skill/SKILL.md" ] || continue
+            found=1
+            echo "── $skill"
+            skills-ref validate "$skill" || failed=1
+
+            lines=$(wc -l < "$skill/SKILL.md")
+            if [ "$lines" -gt 500 ]; then
+              echo "  ⚠ SKILL.md is $lines lines (500 recommended)"
+              failed=1
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "✗ No skills found under skills/*/skills/*/SKILL.md"
+            failed=1
+          fi
+          exit $failed
+
+      - name: Validate manifests are valid JSON
+        run: |
+          failed=0
+          for manifest in \
+            .claude-plugin/marketplace.json \
+            .cursor-plugin/marketplace.json \
+            skills/*/.claude-plugin/plugin.json \
+            skills/*/.cursor-plugin/plugin.json; do
+            [ -f "$manifest" ] || continue
+            echo "── $manifest"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$manifest" || failed=1
+          done
+          exit $failed
+
+      - name: Check every skill is exposed by a plugin
+        run: |
+          failed=0
+          # Each plugin listed in the Claude marketplace must point at a real
+          # plugin dir, and every skill on disk must live under such a plugin.
+          for src in $(python3 -c "import json; [print(p['source']) for p in json.load(open('.claude-plugin/marketplace.json'))['plugins']]"); do
+            dir="${src#./}"
+            if [ ! -f "$dir/.claude-plugin/plugin.json" ]; then
+              echo "✗ Plugin source $src has no .claude-plugin/plugin.json"
+              failed=1
+            fi
+            if [ ! -d "$dir/skills" ]; then
+              echo "✗ Plugin source $src has no skills/ directory"
+              failed=1
+            fi
+          done
+          for skill in skills/*/skills/*/; do
+            [ -f "$skill/SKILL.md" ] || continue
+            plugin_root="${skill%%/skills/*}"
+            if [ ! -f "$plugin_root/.claude-plugin/plugin.json" ]; then
+              echo "✗ Skill $skill is not inside a plugin (no $plugin_root/.claude-plugin/plugin.json)"
+              failed=1
+            fi
+          done
+          exit $failed
