@@ -1,5 +1,5 @@
 ---
-name: create-snowflake-tests
+name: run-snowflake-quality-tests
 description: examine the data we have inside snowflake and based on this, build and deploy a testing pipeline and deploy it to orchestra
 ---
 
