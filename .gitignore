@@ -216,3 +216,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local-only (not shipped with the plugin)
+.claude/
+.cursor/
+scripts/vendor/
