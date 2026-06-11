@@ -25,7 +25,7 @@ Orchestra docs live under `references/orchestra/`. Index and layout: `../../refe
 
 - `../../references/orchestra/pipeline/diagnosis-patterns.md` — error classification
 - `../../references/orchestra/pipeline/remediation-playbooks.md` — fix strategies
-- `../../references/orchestra/pipeline/knowledge-store.md` — past fixes / failure profile
+- `../../references/orchestra/pipeline/knowledge-store.md` — (optional) local fix history; prefer your client's persistent memory
 
 **MCP**
 
@@ -139,8 +139,9 @@ adjust the downstream layer to match the new logic.
 ### Step 1 — Identify & diagnose (error-first path)
 
 Run the full diagnosis: find the failed run, get task runs, fetch logs/artifacts/operations,
-classify the error, identify root cause. Read `../../references/orchestra/pipeline/diagnosis-patterns.md` and `../../references/orchestra/pipeline/knowledge-store.md`
-as normal.
+classify the error, identify root cause. Read `../../references/orchestra/pipeline/diagnosis-patterns.md`;
+optionally recall similar past fixes from your client's persistent memory (or a local
+`../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one).
 
 Do not present a verbose diagnosis block to the user yet. Collect all findings silently —
 the output comes at the end in the triage summary.
@@ -288,7 +289,7 @@ and why this is the right fix rather than a data issue.>
 1. `gh pr merge <N> --repo <owner/repo> --squash --delete-branch` for each PR
 2. `start_pipeline(pipeline_id, environment=Production)`
 3. Poll until terminal, output resolution summary
-4. Update `../../references/orchestra/pipeline/knowledge-store.md`
+4. (Optional) Record the fix in your client's persistent memory — or a local `../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one. Off by default.
 
 **`reject`** (or: "no", "close it", "abandon"):
 1. `gh pr close <N> --repo <owner/repo>` for each PR
@@ -316,5 +317,6 @@ and why this is the right fix rather than a data issue.>
 - **Commits are suspects, not convictions.** If a commit looks related but you're not
   certain, say so in the triage summary and give the user the option to investigate
   further before opening a PR.
-- **Reuse shared Orchestra references.** Read `../../references/orchestra/pipeline/knowledge-store.md` during diagnosis.
-  After a successful merge+run, write the new entry exactly as `fix-orchestra-pipeline` does.
+- **Recall/record is optional.** Past-fix memory is deferred to the calling agentic client
+  (Claude Code memory, Cursor rules), with a local `knowledge-store.md` as an opt-in fallback —
+  see `fix-orchestra-pipeline`. Never commit workspace-specific fix history to this repo.

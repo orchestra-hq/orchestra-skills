@@ -15,7 +15,7 @@ description: >
 
 # Fix Orchestra Pipeline
 
-Diagnose, fix, and retry failed Orchestra pipelines — then learn from every fix.
+Diagnose, fix, and retry failed Orchestra pipelines — and optionally remember what worked.
 
 ## Prerequisites
 
@@ -52,7 +52,7 @@ https://app.getorchestra.io/pipelines/{pipeline_id}/runs/{pipeline_run_id}
 https://app.getorchestra.io/pipelines/{pipeline_id}
 ```
 
-The IDs are UUIDs (e.g. `286cb489-54f0-499b-b531-b84e3909ac9b`). If a URL contains a
+The IDs are UUIDs (e.g. `123e4567-e89b-12d3-a456-426614174000`). If a URL contains a
 pipeline_run_id, skip straight to Step 2. If it only contains a pipeline_id, query for
 the latest failed run of that pipeline.
 
@@ -183,8 +183,13 @@ This is the analytical step. Using all evidence from Steps 1-3 plus the patterns
    `user_email` does not exist in table `analytics.users` — likely a schema migration
    that removed or renamed the column."
 
-4. **Check the knowledge store** for similar past fixes. Read `../../references/orchestra/pipeline/knowledge-store.md`
-   if it exists (it may not exist on first run — that's fine, skip this check).
+4. **(Optional) Recall past fixes.** Past-fix memory is **deferred to the calling agentic
+   client**. If your client exposes persistent memory (e.g. Claude Code memory, Cursor
+   rules/memories), check it first for similar past fixes. As a fallback, read a local
+   `../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one — it ships
+   empty and may not exist. This step is optional: skip it entirely when no memory is
+   available. Treat any recalled entry as historical context and re-verify it still applies
+   before acting on it.
 
 5. **Present the diagnosis** clearly to the user:
    - Error category
@@ -239,31 +244,27 @@ once the PR is merged.
    - For PR-triggered reruns, no confirmation needed — merge was the approval
 2. Poll `get_pipeline_run_status` every ~30 seconds
 3. Report the outcome:
-   - **Succeeded:** Update the knowledge store (see Learning loop below).
+   - **Succeeded:** Optionally record the fix (see Learning loop below).
    - **Failed again (same error):** The fix didn't work. Go back to Step 4 with new evidence.
    - **Failed (different error):** New problem uncovered. Restart from Step 3.
 
-### Learning loop — Update the knowledge store
+### Learning loop — (Optional) Record what you learned
 
-After every successful fix, record what was learned. Create or append to
-`../../references/orchestra/pipeline/knowledge-store.md` with:
+Persisting fixes is **optional and deferred to the calling agentic client**. Only do it when
+the user wants a durable record — it is off by default, and nothing workspace-specific should
+be committed to this repository.
 
-```
-## Fix: [DATE] — [Pipeline Name]
-- **Error category:** [category]
-- **Integration:** [integration type]
-- **Root cause:** [specific description]
-- **Fix applied:** [what was done]
-- **Time to fix:** [how long the process took]
-- **Confidence:** [was the first diagnosis correct?]
-```
+- **Preferred:** if your client exposes persistent memory (Claude Code memory, Cursor
+  rules/memories), save a short note there so future runs can recall it.
+- **Fallback:** if the user keeps a local `../../references/orchestra/pipeline/knowledge-store.md`,
+  append an entry using the template at the bottom of that file. The published file ships empty.
 
-Also update `../../references/orchestra/pipeline/diagnosis-patterns.md` if a new pattern was discovered that
-isn't already documented.
+When you do record a fix, capture: date, pipeline name, error category, integration, root cause,
+fix applied, and whether the first diagnosis was correct.
 
-On first run for a new user, also query `list_task_runs` with `status=FAILED` across all recent
-runs to build a profile of which integrations fail most often. Store this in the knowledge
-store as a "failure frequency" section.
+If you discover a genuinely new, generic diagnosis pattern, consider noting it in
+`../../references/orchestra/pipeline/diagnosis-patterns.md` — but keep workspace-specific detail
+(pipeline IDs, connection names, account identifiers) out of shared reference files.
 
 ## Output formatting
 
@@ -367,7 +368,7 @@ Always end a successful fix with a compact summary block:
 - **Root cause:** (one line)
 - **Fix applied:** (one line)
 - **Duration:** X min
-- **Knowledge store:** Updated ✓
+- **Recorded:** Saved to client memory ✓ (only if the user opted in — omit this line otherwise)
 ```
 
 ---

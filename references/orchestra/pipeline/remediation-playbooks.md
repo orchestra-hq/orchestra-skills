@@ -266,7 +266,7 @@ When retrying a pipeline:
 3. If the pipeline is paused in Orchestra, `start_pipeline` may return HTTP 400 — ask the user
    to unpause in the UI, then retry
 4. Monitor with `get_pipeline_run_status`
-4. If the retry succeeds, record the fix in the knowledge store
+4. If the retry succeeds, optionally record the fix in your client's persistent memory (or a local knowledge store) — see `fix-orchestra-pipeline`
 5. If the retry fails with the same error, revisit the diagnosis
 6. If the retry fails with a new error, start a fresh diagnosis
 
