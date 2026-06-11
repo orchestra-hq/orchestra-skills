@@ -1,69 +1,61 @@
 # Orchestra MCP Server Setup
 
-When the Orchestra MCP server is not connected, use this reference to set it up before proceeding with Orchestra pipeline skills (`create-orchestra-pipeline`, `fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
+When the Orchestra MCP server is not connected, use this reference to connect it before proceeding with Orchestra pipeline skills (`create-orchestra-pipeline`, `fix-orchestra-pipeline`, `triage-orchestra-pipeline`).
+
+These skills use Orchestra's **cloud (hosted) MCP server** — no local install, clone, or runtime needed. See the docs: https://docs.getorchestra.io/docs/mcp
 
 ## Prerequisites
 
-- Python 3.10+
-- `uv` package manager (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
-- An Orchestra API key (Orchestra UI → Settings → API Keys)
+- An Orchestra API key (Orchestra UI → workspace Settings → API Keys)
 
-## Installation
+## Cloud MCP endpoint
 
-```bash
-git clone https://github.com/orchestra-hq/orchestra-mcp.git ~/orchestra-mcp
+```
+https://mcp.getorchestra.io/orchestra
 ```
 
-No further install step needed — `uv` handles dependencies at runtime.
+Transport: HTTP. Authenticate with the header `Authorization: Bearer <your-orchestra-api-key>`.
 
 ## Claude Code configuration
 
-Create `~/.claude/mcp.json` (global, so it's available in all projects):
+The quickest path is the CLI:
+
+```bash
+claude mcp add orchestra https://mcp.getorchestra.io/orchestra \
+  --transport http \
+  --header "Authorization: Bearer <YOUR_ORCHESTRA_API_KEY>"
+```
+
+Or add it to your MCP config (e.g. `~/.claude/mcp.json`, global so it's available in all projects):
 
 ```json
 {
   "mcpServers": {
     "orchestra": {
-      "type": "stdio",
-      "command": "uv",
-      "args": [
-        "run",
-        "--project",
-        "/Users/<you>/orchestra-mcp/orchestramcp",
-        "--with",
-        "fastmcp",
-        "fastmcp",
-        "run",
-        "server.py"
-      ],
-      "env": {
-        "ORCHESTRA_API_KEY": "<your-api-key>"
+      "url": "https://mcp.getorchestra.io/orchestra",
+      "headers": {
+        "Authorization": "Bearer <YOUR_ORCHESTRA_API_KEY>"
       }
     }
   }
 }
 ```
 
-Replace `/Users/<you>/orchestra-mcp` with the actual clone path and `<your-api-key>` with your key.
+Replace `<YOUR_ORCHESTRA_API_KEY>` with your key. Each workspace needs its own MCP connection with workspace-specific credentials.
 
 ## Verify the server is connected
 
-After saving settings, restart Claude Code (or run `/hooks` to reload config). Then confirm the Orchestra MCP tools appear — you should see tools like `list_pipeline_runs`, `get_task_runs`, etc.
-
-If tools don't appear, run:
-```bash
-uv run --project ~/orchestra-mcp/orchestramcp --with fastmcp fastmcp run server.py
-```
-and check for errors (missing deps, bad API key, wrong path).
+After saving settings, restart Claude Code (or run `/hooks` to reload config). Then confirm the Orchestra MCP tools appear — you should see tools like `list_pipeline_runs`, `list_task_runs`, etc. If they don't, check the API key and that the URL/header are correct.
 
 ## Prompting the user
 
 If the MCP server is not connected at the start of a fix session, say:
 
 > The Orchestra MCP server isn't connected. To set it up:
-> 1. Clone the repo: `git clone https://github.com/orchestra-hq/orchestra-mcp.git ~/orchestra-mcp`
-> 2. Add the MCP config to `~/.claude/mcp.json` using the JSON block in **Claude Code configuration** above
-> 3. Set your `ORCHESTRA_API_KEY` in the config
-> 4. Restart Claude Code or run `/hooks` to reload
+> 1. Add the cloud MCP server: `claude mcp add orchestra https://mcp.getorchestra.io/orchestra --transport http --header "Authorization: Bearer <YOUR_ORCHESTRA_API_KEY>"` (or add the JSON block above to `~/.claude/mcp.json`)
+> 2. Set your Orchestra API key in the `Authorization` header
+> 3. Restart Claude Code or run `/hooks` to reload
 >
 > Alternatively, paste a pipeline run URL, error message, or run ID and I'll diagnose from that instead.
+
+Self-hosting the MCP server is available via the [orchestra-mcp](https://github.com/orchestra-hq/orchestra-mcp) repo for organizations with IP restrictions — see the docs above.
