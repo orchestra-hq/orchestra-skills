@@ -6,11 +6,10 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 
 | Path | Purpose |
 |------|---------|
-| [`skills/`](skills/) | Canonical skill source (`SKILL.md` per skill; optional `claude.md` / `cursor.md`) |
-| [`.claude/skills/`](.claude/skills/) | Generated Claude Code skill discovery |
-| [`.cursor/skills/`](.cursor/skills/) | Generated Cursor skill discovery |
+| [`skills/`](skills/) | The skills — one `SKILL.md` per skill, plus any `references/`/`templates/` it needs. Single source of truth. |
 | [`references/orchestra/`](references/orchestra/) | Shared diagnosis, remediation, MCP, and API reference material |
 | [`AGENTS.md`](AGENTS.md) | Short orientation for coding agents working in this repository |
+| [`docs/`](docs/) | Repo plans, including the [plugin-marketplace migration plan](docs/marketplace-migration-plan.md) |
 
 ### Skills
 
@@ -23,15 +22,13 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 | [`create-orchestra-pipeline`](skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
 | [`orchestra-dbt-slim-ci-setup`](skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline. | _"Set up dbt Slim CI in Orchestra"_ |
 
-Links point to the canonical source; the equivalent generated copies live under [`.claude/skills/`](.claude/skills/) and [`.cursor/skills/`](.cursor/skills/).
-
-**To get going:** connect the [Orchestra MCP server](https://github.com/orchestra-hq/orchestra-mcp) (see [Install](#install-for-humans) below), open this repo in Claude Code or Cursor, then just ask. All pipeline skills are MCP-first — runs, logs, artifacts, retries, and validation go through MCP tools. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
+**To get going:** connect the [Orchestra MCP server](https://github.com/orchestra-hq/orchestra-mcp) (see [Install](#install-for-humans) below), make the skills discoverable by your client (see Install), then just ask. All pipeline skills are MCP-first — runs, logs, artifacts, retries, and validation go through MCP tools. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](references/orchestra/api/rest-pipeline-yaml.md)).
 
 ### Reference library
 
 Start at [`references/orchestra/README.md`](references/orchestra/README.md). Highlights:
 
-- **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and append-only workspace fix history ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
+- **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and an optional local fix-history template ([`knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md))
 - **MCP** — server setup and tool quick reference
 - **API** — allowed read-only REST fallback for pipeline YAML
 
@@ -43,23 +40,14 @@ Start at [`references/orchestra/README.md`](references/orchestra/README.md). Hig
 - An Orchestra API key (Orchestra UI → Settings → API Keys)
 - A clone of [orchestra-mcp](https://github.com/orchestra-hq/orchestra-mcp) and MCP configuration (see [`references/orchestra/mcp/setup.md`](references/orchestra/mcp/setup.md))
 
-### Claude Code
-
 1. Clone this repository.
-2. Open the repo in Claude Code so project skills under [`.claude/skills/`](.claude/skills/) are discovered, or register that directory globally.
-3. Configure the Orchestra MCP server in `~/.claude/mcp.json` using the setup guide above.
-4. Restart Claude Code or reload MCP so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
-
-### Cursor
-
-1. Clone this repository (or add it as a workspace).
-2. Use the committed skills under [`.cursor/skills/`](.cursor/skills/) for project-scoped discovery.
-3. Connect the Orchestra MCP server in Cursor MCP settings with the same `uv` command and `ORCHESTRA_API_KEY` as in the setup guide.
+2. Configure the Orchestra MCP server (`~/.claude/mcp.json` for Claude Code, or Cursor MCP settings) using the setup guide above, with your `ORCHESTRA_API_KEY`. Restart/reload so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
+3. Make the skills discoverable by your client. The skills live in [`skills/`](skills/) as the single source. Packaged Claude Code / Cursor distribution via the plugin marketplace is planned — see the [migration plan](docs/marketplace-migration-plan.md). Until then, point your client at a skill directly: e.g. for Claude Code, symlink or copy `skills/<name>` into `.claude/skills/`, or register `skills/` as a skills source.
 4. For agent behavior in this repo, read [`AGENTS.md`](AGENTS.md).
 
 ## Typical workflows
 
-**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and appends to the knowledge store.
+**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and optionally records the fix to your client's memory.
 
 **Author pipeline YAML** — Describe the desired stages/tasks and create a `version: v1` pipeline YAML. The authoring skill validates (via `orchestra-cli` or MCP) and remediates validation errors until clean.
 
@@ -69,10 +57,9 @@ Start at [`references/orchestra/README.md`](references/orchestra/README.md). Hig
 
 ## Contributing
 
-- Edit canonical skills under [`skills/`](skills/) and shared Orchestra material under [`references/orchestra/`](references/orchestra/); do not hand-edit generated trees under `.claude/skills/` or `.cursor/skills/`.
-- After changing skills, run `python scripts/sync_skills.py` and commit the regenerated outputs.
-- To add a skill, create `skills/<skill-name>/SKILL.md`, add optional `claude.md` / `cursor.md` for platform-specific steps, run sync, and commit canonical plus generated folders.
-- After a successful fix, append to [`pipeline/knowledge-store.md`](references/orchestra/pipeline/knowledge-store.md) and extend [`pipeline/diagnosis-patterns.md`](references/orchestra/pipeline/diagnosis-patterns.md) when you discover a new pattern.
+- Skills live under [`skills/`](skills/) and shared Orchestra material under [`references/orchestra/`](references/orchestra/). There is a single skill tree — no generated copies to keep in sync.
+- To add a skill, create `skills/<skill-name>/SKILL.md` with `name` + `description` frontmatter, put any supporting `references/`/`templates/` in the same folder, and add it to the [Skills](#skills) table. CI (`Validate Skills`) checks the frontmatter and that `SKILL.md` stays under ~500 lines. Write skills to be client-agnostic — describe capabilities (e.g. "if your client can schedule a wake-up…") rather than naming a specific tool.
+- Recording fixes is optional and deferred to your client's persistent memory — never commit workspace-specific fix history. Extend [`pipeline/diagnosis-patterns.md`](references/orchestra/pipeline/diagnosis-patterns.md) only with generic, reusable patterns.
 - Do not commit API keys, `.env` files, or other secrets.
 
 Agents editing this repo should follow [`AGENTS.md`](AGENTS.md).

@@ -1,6 +1,6 @@
 # Orchestra reference docs
 
-Grouped by concern. Paths below are relative to `references/orchestra/` in this repo; from a generated skill folder under `.claude/skills/<name>/` or `.cursor/skills/<name>/`, prefix with `../../../references/orchestra/`.
+Grouped by concern. Paths below are relative to `references/orchestra/` in this repo; from a skill folder under `skills/<name>/`, reach them with `../../references/orchestra/`.
 
 ## Pipeline (authoring, runs, failures, remediation, memory)
 
