@@ -19,11 +19,7 @@ Diagnose, fix, and retry failed Orchestra pipelines — and optionally remember 
 
 ## Prerequisites
 
-This skill requires the **Orchestra MCP server** to be connected. If it is not connected,
-**read `../../references/orchestra/mcp/setup.md`**
-and follow the setup steps with the user before proceeding.
-
-The Orchestra API key must be configured in the MCP server. All MCP calls are scoped to the
+This skill assumes the **Orchestra MCP server** is connected. All MCP calls are scoped to the
 user's workspace.
 
 ## MCP-only policy

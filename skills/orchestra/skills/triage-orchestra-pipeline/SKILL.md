@@ -29,7 +29,6 @@ Orchestra docs live under `references/orchestra/`. Index and layout: `../../refe
 
 **MCP**
 
-- `../../references/orchestra/mcp/setup.md` — connect Orchestra MCP server
 - `../../references/orchestra/mcp/tools-quick-ref.md` — tool arguments and behaviour (use `get_pipeline` to read a pipeline's full definition)
 
 ## Workflow
