@@ -19,7 +19,7 @@ Example filesystem reads:
 
 Prefer targeted `rg` / `head` over full `cat` (30KB truncation).
 
-## Orchestra MCP (workspace API)
+## Orchestra MCP
 
 **Server:** `user-Orchestra MCP Server`
 

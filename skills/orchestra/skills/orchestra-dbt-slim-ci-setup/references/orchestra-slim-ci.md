@@ -12,7 +12,6 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |
 | dbt Core in Orchestra (Git, profiles) | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup |
 | Pipeline YAML schema | https://docs.getorchestra.io/docs/core-concepts/pipelines/schema |
-| Start pipeline API | https://docs.getorchestra.io/api/pipelines/start-a-pipeline-run |
 
 ## Skill files
 

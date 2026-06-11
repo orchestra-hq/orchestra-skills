@@ -19,6 +19,4 @@ Grouped by concern. Paths below are relative to `references/orchestra/` in this 
 | `mcp-playbook.md` | Documentation + Orchestra MCP sequence (read + tool order) |
 | `mcp/tools-quick-ref.md` | MCP tool names, arguments, and usage notes |
 
-These skills use Orchestra MCP tools only — read a pipeline's full definition with `get_pipeline`; there are no direct REST/HTTP calls to Orchestra.
-
 There is **no separate knowledge store for MCP**: operational memory is pipeline-centric. Connection or tooling notes belong in commits to this repo or your global Claude config — not in `pipeline/knowledge-store.md`.

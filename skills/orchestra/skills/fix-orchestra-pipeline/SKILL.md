@@ -22,12 +22,10 @@ Diagnose, fix, and retry failed Orchestra pipelines — and optionally remember 
 This skill assumes the **Orchestra MCP server** is connected. All MCP calls are scoped to the
 user's workspace.
 
-## MCP-only policy
+## MCP tools
 
-Use Orchestra MCP tools for all operations in this skill — including reading a pipeline's full
-definition with `get_pipeline`. Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
-
-Do not make direct REST/HTTP calls to Orchestra for any operation.
+Use Orchestra MCP tools for all operations in this skill (read a pipeline's full definition with
+`get_pipeline`). Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
 
 ## Parsing user input
 

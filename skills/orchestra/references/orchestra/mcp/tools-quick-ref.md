@@ -127,4 +127,3 @@ Returns the Orchestra lineage URL for a pipeline run.
 - Time window constraints still apply (typically 7-day metadata windows in practice).
 - Prefer batching calls (`list_*`) before deep downloads.
 - Git-backed pipelines cannot be edited with `update_pipeline`; provide a repo-level fix instead.
-- These skills use Orchestra MCP tools only — no direct REST/HTTP calls to Orchestra.

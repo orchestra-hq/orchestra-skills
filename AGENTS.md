@@ -30,7 +30,7 @@ Skill `SKILL.md` files reference shared docs with paths relative to the skill fo
 
 ## Operating rules
 
-1. **MCP only** — Use Orchestra MCP for all operations: listing runs, task runs, logs, artifacts, operations, retries, and reading a pipeline's full definition (`get_pipeline`). The Orchestra MCP server is assumed connected. Do not make direct REST/HTTP calls to Orchestra.
+1. **MCP** — Use Orchestra MCP for all operations: listing runs, task runs, logs, artifacts, operations, retries, and reading a pipeline's full definition (`get_pipeline`). The Orchestra MCP server is assumed connected.
 2. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
 3. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
 4. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
@@ -58,7 +58,6 @@ skills/
         README.md
         pipeline/
         mcp/
-        api/
         schemas/
 AGENTS.md
 README.md
