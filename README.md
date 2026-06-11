@@ -1,17 +1,10 @@
 # orchestra-skills
 
-Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra](https://www.getorchestra.io/) data pipelines with an AI assistant. The workflows assume the [Orchestra MCP server](https://github.com/orchestra-hq/orchestra-mcp) is connected so the agent can list runs, fetch logs and artifacts, and retry pipelines from your workspace.
+Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra](https://www.getorchestra.io/) data pipelines with an AI assistant. The workflows assume [Orchestra's cloud MCP server](https://docs.getorchestra.io/docs/mcp) is connected so the agent can list runs, fetch logs and artifacts, and retry pipelines from your workspace.
 
 This repo is a **plugin marketplace**: the single `orchestra` plugin bundles every skill and installs into both Claude Code and Cursor from the manifests at the repo root (see [Install](#install-for-humans)).
 
 ## What is in this repo
-
-| Path | Purpose |
-|------|---------|
-| [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json) · [`.cursor-plugin/marketplace.json`](.cursor-plugin/marketplace.json) | Marketplace manifests Claude Code / Cursor read to discover the `orchestra` plugin |
-| [`skills/orchestra/`](skills/orchestra/) | The `orchestra` plugin bundle — its `plugin.json` manifests, the skills under `skills/`, and the shared `references/`. Single source of truth. |
-| [`skills/orchestra/references/orchestra/`](skills/orchestra/references/orchestra/) | Shared diagnosis, remediation, MCP, and API reference material (bundled so a marketplace install carries it along) |
-| [`AGENTS.md`](AGENTS.md) | Short orientation for coding agents working in this repository |
 
 ### Skills
 
@@ -25,25 +18,22 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 | [`orchestra-dbt-slim-ci-setup`](skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline. | _"Set up dbt Slim CI in Orchestra"_ |
 | [`run-snowflake-quality-tests`](skills/orchestra/skills/run-snowflake-quality-tests/SKILL.md) | Inspect Snowflake tables, then build and deploy a data-quality testing pipeline to Orchestra. | _"Run Snowflake data quality tests"_ |
 
-**To get going:** connect the [Orchestra MCP server](https://github.com/orchestra-hq/orchestra-mcp) (see [Install](#install-for-humans) below), install the `orchestra` plugin so the skills are discoverable by your client (see Install), then just ask. All pipeline skills are MCP-first — runs, logs, artifacts, retries, and validation go through MCP tools. The only documented REST exception is read-only pipeline YAML when MCP cannot return the full definition ([`api/rest-pipeline-yaml.md`](skills/orchestra/references/orchestra/api/rest-pipeline-yaml.md)).
+**To get going:** connect [Orchestra's cloud MCP server](https://docs.getorchestra.io/docs/mcp) (see [Install](#install-for-humans) below), install the `orchestra` plugin so the skills are discoverable by your client (see Install), then just ask.
 
 ### Reference library
 
 Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/references/orchestra/README.md). Highlights:
 
 - **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and an optional local fix-history template ([`knowledge-store.md`](skills/orchestra/references/orchestra/pipeline/knowledge-store.md))
-- **MCP** — server setup and tool quick reference
-- **API** — allowed read-only REST fallback for pipeline YAML
+- **MCP** — [cloud MCP](https://docs.getorchestra.io/docs/mcp) setup and tool quick reference
 
 ## Install for humans
 
 ### Prerequisites
 
-- Python 3.10+ and [`uv`](https://docs.astral.sh/uv/)
 - An Orchestra API key (Orchestra UI → Settings → API Keys)
-- A clone of [orchestra-mcp](https://github.com/orchestra-hq/orchestra-mcp) and MCP configuration (see [`mcp/setup.md`](skills/orchestra/references/orchestra/mcp/setup.md))
 
-1. **Connect the Orchestra MCP server.** Configure it (`~/.claude/mcp.json` for Claude Code, or Cursor MCP settings) using the setup guide above, with your `ORCHESTRA_API_KEY`. Restart/reload so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
+1. **Connect Orchestra's cloud MCP server.** Point your client at the hosted endpoint following the [cloud MCP docs](https://docs.getorchestra.io/docs/mcp) (`~/.claude/mcp.json` for Claude Code, or Cursor MCP settings) and authenticate with your `ORCHESTRA_API_KEY` — no local install required. Restart/reload so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
 2. **Install the `orchestra` plugin** so the skills are discoverable by your client:
    - **Claude Code** — add this repo as a marketplace, then install the plugin:
      ```
