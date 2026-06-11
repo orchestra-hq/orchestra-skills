@@ -1,0 +1,12 @@
+{
+  "name": "orchestra",
+  "description": "Skills for working with Orchestra data pipelines — diagnose and fix failed runs, triage with a merge gate, author pipeline YAML, set up dbt Slim CI, and run Snowflake data-quality tests. MCP-native.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Orchestra"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://www.getorchestra.io/",
+  "repository": "https://github.com/orchestra-hq/orchestra-skills",
+  "keywords": ["orchestra", "data-pipelines", "dbt", "slim-ci", "snowflake", "data-quality", "mcp"]
+}
