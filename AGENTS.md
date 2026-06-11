@@ -28,17 +28,15 @@ Skill `SKILL.md` files reference shared docs with paths relative to the skill fo
 | Past fixes and failure profile | `pipeline/knowledge-store.md` |
 | MCP install and config | `mcp/setup.md` |
 | MCP tool names and arguments | `mcp/tools-quick-ref.md` |
-| Allowed REST read fallback | `api/rest-pipeline-yaml.md` |
 
 ## Operating rules
 
-1. **MCP first** — Use Orchestra MCP for listing runs, task runs, logs, artifacts, operations, and retries. Do not call Orchestra REST for those operations.
-2. **REST exception** — Read-only `GET /pipelines/{alias_or_id}/yaml` only when MCP cannot return the full pipeline definition; see `api/rest-pipeline-yaml.md`.
-3. **Prerequisite** — If Orchestra MCP is not connected, follow `mcp/setup.md` with the user before deep diagnosis.
-4. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
-5. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
-6. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
-7. **Triage gate** — The triage skill must not merge to the default branch without explicit user approval (`merge`, `yes`, `approve`, and similar).
+1. **MCP only** — Use Orchestra MCP for all operations: listing runs, task runs, logs, artifacts, operations, retries, and reading a pipeline's full definition (`get_pipeline`). Do not make direct REST/HTTP calls to Orchestra.
+2. **Prerequisite** — If Orchestra MCP is not connected, follow `mcp/setup.md` with the user before deep diagnosis.
+3. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
+4. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
+5. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
+6. **Triage gate** — The triage skill must not merge to the default branch without explicit user approval (`merge`, `yes`, `approve`, and similar).
 
 ## Repository layout
 

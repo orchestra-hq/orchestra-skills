@@ -42,5 +42,5 @@ Do not use `update_pipeline` on Git-backed pipelines.
 
 ## Non-GitHub CI (follow-up)
 
-Trigger same pipeline via HTTP `POST .../pipelines/{id}/start` with `runInputs` or Orchestra CLI. Document only if user expands scope.
+Trigger the same pipeline via the `start_pipeline` MCP tool (with `run_inputs`) or the Orchestra CLI. Document only if user expands scope.
 

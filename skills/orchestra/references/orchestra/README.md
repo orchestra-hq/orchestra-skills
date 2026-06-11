@@ -20,10 +20,6 @@ Grouped by concern. Paths below are relative to `references/orchestra/` in this 
 | `mcp/setup.md` | Install and configure the Orchestra MCP server (`mcp.json`, API key) |
 | `mcp/tools-quick-ref.md` | MCP tool names, arguments, and usage notes |
 
-## API (REST exception only)
+These skills use Orchestra MCP tools only — read a pipeline's full definition with `get_pipeline`; there are no direct REST/HTTP calls to Orchestra.
 
-| File | Purpose |
-|------|---------|
-| `api/rest-pipeline-yaml.md` | Allowed **read-only** REST fallback: `GET /pipelines/{alias_or_id}/yaml` |
-
-There is **no separate knowledge store for MCP or REST**: operational memory is pipeline-centric. Connection or tooling notes belong in commits to this repo or your global Claude config — not in `pipeline/knowledge-store.md`.
+There is **no separate knowledge store for MCP**: operational memory is pipeline-centric. Connection or tooling notes belong in commits to this repo or your global Claude config — not in `pipeline/knowledge-store.md`.

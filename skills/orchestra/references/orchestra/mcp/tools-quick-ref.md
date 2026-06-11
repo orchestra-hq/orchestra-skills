@@ -2,8 +2,7 @@
 
 Tool map for Orchestra pipeline skills (`fix-orchestra-pipeline`, `triage-orchestra-pipeline`,
 `create-orchestra-pipeline`).
-Use these MCP tools for all operations unless the allowed REST read-only fallback applies — see
-`../api/rest-pipeline-yaml.md`.
+Use these Orchestra MCP tools for all operations.
 
 ## Querying failures
 
@@ -71,6 +70,16 @@ Use for:
 - matching by pipeline name/alias
 - checking pipeline metadata including `storageProvider`
 
+### `get_pipeline`
+Read-only. Fetch a single pipeline's full definition by selector. Provide exactly one selector:
+- `pipeline_id`, **or**
+- `alias`, **or**
+- `repository` + `yaml_path` (both required together)
+
+Optional: `version`, `branch`, `commit`.
+
+Use for reading the full stored pipeline definition (e.g. when `list_pipelines` metadata is not enough). For Git-backed pipelines, the repo YAML remains the source of truth for edits.
+
 ### `start_pipeline`
 Required arguments:
 - `alias_or_pipeline_id`
@@ -118,4 +127,4 @@ Returns the Orchestra lineage URL for a pipeline run.
 - Time window constraints still apply (typically 7-day metadata windows in practice).
 - Prefer batching calls (`list_*`) before deep downloads.
 - Git-backed pipelines cannot be edited with `update_pipeline`; provide a repo-level fix instead.
-- For the **only** permitted direct HTTP call (fetch pipeline YAML when MCP lacks it), see `../api/rest-pipeline-yaml.md`. No other REST usage in these skills.
+- These skills use Orchestra MCP tools only — no direct REST/HTTP calls to Orchestra.

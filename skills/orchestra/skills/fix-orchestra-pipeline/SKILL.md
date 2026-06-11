@@ -26,15 +26,12 @@ and follow the setup steps with the user before proceeding.
 The Orchestra API key must be configured in the MCP server. All MCP calls are scoped to the
 user's workspace.
 
-## MCP-first policy (single exception)
+## MCP-only policy
 
-Use Orchestra MCP tools for all operations in this skill. Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
+Use Orchestra MCP tools for all operations in this skill — including reading a pipeline's full
+definition with `get_pipeline`. Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
 
-The only allowed direct Orchestra REST call is **reading pipeline YAML** when needed and MCP
-cannot return the full definition. Details: `../../references/orchestra/api/rest-pipeline-yaml.md`.
-
-Do not use direct REST calls for listing runs, logs, artifacts, operations, retrying runs,
-or updating pipelines.
+Do not make direct REST/HTTP calls to Orchestra for any operation.
 
 ## Parsing user input
 
