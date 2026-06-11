@@ -3,7 +3,7 @@ name: run-snowflake-quality-tests
 description: examine the data we have inside snowflake and based on this, build and deploy a testing pipeline and deploy it to orchestra
 ---
 
-# Inspect Snowflake
+# Step 1: Inspect Snowflake
 
 Taking all tables for the database or the # tables from the user, inspect the snowflake using snowflake credentials in the environment.
 1. List tables. Identify if table is fact or dimension.
@@ -14,9 +14,9 @@ Taking all tables for the database or the # tables from the user, inspect the sn
 3c) Volume: for facts, identify counts over time to identify anomalies. Choose an appropriate time grain e.g. daily. Choose an appropriate threshold based on the data (e.g. 20% drop MoM)
 3d) Sensible values: for things like dates ensure no anomalous values (e.g. year 1900 or 2100). For prices, ensure no negative values.
 3e) uniqueness: for dims, check that the key is unique and not null
+It does not matter if the pipeline fails - the most important thing is the tests are scoped correctly. Make strong assertions about tests and prompt the user to validate these after running in Step 4.
 
-
-# Write the Pipeline
+# Step 2:Write the Pipeline
 
 A pipeline for a snowflake test in Orchestra looks a bit like this.
 ```yml
@@ -106,11 +106,11 @@ alerts:
 Build the pipeline and ensure all the tests run in groups i.e. this syntax condition: ${{ task_groups['not_null_tests'].all().status == 'COMPLETED' }}.
 Ensure an alert is added where appropriate.
 
-# Author the snowflake testing pipeline which is the Orchestra YAML
+# Step 3: Author the snowflake testing pipeline which is the Orchestra YAML
 
 Create a new branch for the pipeline using the git token, found in the environment variable. Push the yml to the branch. 
 
-### 5. Register the pipeline with Orchestra
+### Step 4: Register the pipeline with Orchestra
 Commit the YAML code to the feature branch and push. Then use the
 Orchestra MCP `import_pipeline` tool with the YAML contents to register it. The
 tool returns the pipeline UUID — save it (you need it for step 7 and for any
@@ -122,7 +122,7 @@ mcp__orchestramcp__import_pipeline(yaml="<contents of orchestra/<source>_to_moth
 
 If the pipeline already exists at the same alias, this updates it in place.
 
-###  Trigger on the feature branch and poll
+###  Step 5: Trigger on the feature branch and poll
 Trigger the pipeline against the branch from step 1, then poll until terminal.
 
 ```
