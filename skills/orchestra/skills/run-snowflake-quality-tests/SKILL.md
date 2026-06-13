@@ -1,94 +1,106 @@
 ---
 name: run-snowflake-quality-tests
-description: examine the data we have inside snowflake and based on this, build and deploy a testing pipeline and deploy it to orchestra
+description: Examines Snowflake data sources, infers appropriate data quality tests, builds a structured Orchestra YAML testing pipeline, and deploys and triggers it via Orchestra MCP tools. Use when the user asks about Snowflake data validation, data quality testing, pipeline deployment to Orchestra, orchestration of test workflows, data warehouse quality checks, or running Snowflake tests against fact and dimension tables.
 ---
 
 # Step 1: Inspect Snowflake
 
-Taking all tables for the database or the # tables from the user, inspect the snowflake using snowflake credentials in the environment.
-1. List tables. Identify if table is fact or dimension.
-2. For each table, get columns. Identify important columns (e.g. timestamps, IDs, important fields e.g. price, quantity)
-3. For each column, identify core tests. Core types:
-3a) Completeness: nulls. Assume a reasonable threshold for nulls (e.g. 0% for IDs, 5% for non-key fields)
-3b) Freshness: for timestamp columns, check that recent data is present (e.g. within the last day/week). Applies only to Facts
-3c) Volume: for facts, identify counts over time to identify anomalies. Choose an appropriate time grain e.g. daily. Choose an appropriate threshold based on the data (e.g. 20% drop MoM)
-3d) Sensible values: for things like dates ensure no anomalous values (e.g. year 1900 or 2100). For prices, ensure no negative values.
-3e) uniqueness: for dims, check that the key is unique and not null
-It does not matter if the pipeline fails - the most important thing is the tests are scoped correctly. Make strong assertions about tests and prompt the user to validate these after running in Step 4.
+Taking all tables for the database or the specific tables from the user, inspect Snowflake using Snowflake credentials in the environment.
 
-# Step 2:Write the Pipeline
+1. **List tables** — identify whether each table is a fact or dimension.
+2. **Get columns** — for each table, retrieve column names and types. Identify important columns (e.g. timestamps, IDs, key fields like price or quantity).
+3. **Identify core tests per column:**
+   - **3a) Completeness:** Null rate — 0% for IDs, 5% threshold for non-key fields.
+   - **3b) Freshness:** Timestamp columns on fact tables — within last day or week.
+   - **3c) Volume:** Row counts over time on facts — 20% drop MoM threshold.
+   - **3d) Sensible values:** Dates outside 2000–2030; negative prices.
+   - **3e) Uniqueness:** Primary key on dimensions — unique and not null.
 
-A pipeline for a snowflake test in Orchestra looks a bit like this.
+Use `INFORMATION_SCHEMA` queries to enumerate tables and columns:
+```sql
+-- List all tables in a schema
+SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+FROM <DATABASE>.INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = '<SCHEMA>';
+
+-- Get columns for a table
+SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+FROM <DATABASE>.INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = '<SCHEMA>' AND TABLE_NAME = '<TABLE>'
+ORDER BY ORDINAL_POSITION;
+
+-- Sample row count and null rate for a column
+SELECT
+  COUNT(*) AS total_rows,
+  SUM(CASE WHEN <COLUMN> IS NULL THEN 1 ELSE 0 END) AS null_count,
+  ROUND(100.0 * SUM(CASE WHEN <COLUMN> IS NULL THEN 1 ELSE 0 END) / COUNT(*), 2) AS null_pct
+FROM <DATABASE>.<SCHEMA>.<TABLE>;
+```
+
+Make strong assertions about the tests you propose, then prompt the user to validate them before proceeding.
+
+# Step 2: Write the Pipeline
+
+Build the Orchestra YAML pipeline ensuring:
+- All tests run in logical groups using: `condition: ${{ task_groups['<group_name>'].all().status == 'COMPLETED' }}`.
+- An alert block is included for failures.
+- The `connection` field references: `${{ ENV.SNOWFLAKE_CONNECTION }}`.
+
+The pattern for each task group is shown below. Extend it for every test category identified in Step 1, chaining groups via `depends_on`.
+
 ```yml
 version: v1
-name: 'Snowflake Timestamp Data Quality Tests #snowflake #dataquality'
+name: 'Snowflake Data Quality Tests #snowflake #dataquality'
 pipeline:
-  timestamp_not_null_tests:
+  not_null_tests:
     tasks:
-      check_timestamp_not_null:
+      check_not_null:
         integration: SNOWFLAKE
         integration_job: SNOWFLAKE_RUN_TEST
         parameters:
-          statement: 'select * from BIGQUERY_SAMPLE.${{ MATRIX.dq_inputs[''schema'']
-            }}.${{ MATRIX.dq_inputs[''table''] }}
-
+          statement: 'select * from <DATABASE>.${{ MATRIX.dq_inputs[''schema''] }}
+            .${{ MATRIX.dq_inputs[''table''] }}
             where ${{ MATRIX.dq_inputs[''column''] }} is null
-
             limit 100'
           error_threshold_expression: '> 0'
           warn_threshold_expression: '> 0'
         depends_on: []
-        name: Timestamp Not Null Check
+        name: Not Null Check
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on: []
     condition: ${{ task_groups['not_null_tests'].all().status == 'COMPLETED' }}
-    name: Timestamp Not Null Tests
+    name: Not Null Tests
     matrix:
       inputs:
         dq_inputs:
-        - schema: ORCHESTRA_METADATA
-          table: PIPELINE_RUNS
-          column: CREATED_AT
-        - schema: ORCHESTRA_METADATA
-          table: TASK_RUNS
-          column: CREATED_AT
-        - schema: PUBLIC
-          table: ISSUES
-          column: CREATED_AT
-  timestamp_year_bounds_tests:
+        - schema: <SCHEMA>
+          table: <TABLE>
+          column: <COLUMN>
+  year_bounds_tests:
     tasks:
-      check_timestamp_year_bounds:
+      check_year_bounds:
         integration: SNOWFLAKE
         integration_job: SNOWFLAKE_RUN_TEST
         parameters:
-          statement: 'select * from BIGQUERY_SAMPLE.${{ MATRIX.dq_inputs[''schema'']
-            }}.${{ MATRIX.dq_inputs[''table''] }}
-
+          statement: 'select * from <DATABASE>.${{ MATRIX.dq_inputs[''schema''] }}
+            .${{ MATRIX.dq_inputs[''table''] }}
             where year(${{ MATRIX.dq_inputs[''column''] }}) < 2000
-
             or year(${{ MATRIX.dq_inputs[''column''] }}) > 2030
-
             limit 100'
           error_threshold_expression: '> 0'
           warn_threshold_expression: '> 0'
         depends_on: []
-        name: Timestamp Anomalous Year Check
+        name: Anomalous Year Check
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on:
-    - timestamp_not_null_tests
-    name: Timestamp Year Bounds Tests
+    - not_null_tests
+    name: Year Bounds Tests
     matrix:
       inputs:
         dq_inputs:
-        - schema: ORCHESTRA_METADATA
-          table: PIPELINE_RUNS
-          column: CREATED_AT
-        - schema: ORCHESTRA_METADATA
-          table: TASK_RUNS
-          column: CREATED_AT
-        - schema: PUBLIC
-          table: ISSUES
-          column: CREATED_AT
+        - schema: <SCHEMA>
+          table: <TABLE>
+          column: <COLUMN>
 schedule:
 - name: Daily at 8am
   cron: 0 8 ? * MON-FRI *
@@ -103,52 +115,47 @@ alerts:
   - integration: SLACK
     destination: alert-testing
 ```
-Build the pipeline and ensure all the tests run in groups i.e. this syntax condition: ${{ task_groups['not_null_tests'].all().status == 'COMPLETED' }}.
-Ensure an alert is added where appropriate.
 
-# Step 3: Author the snowflake testing pipeline which is the Orchestra YAML
+**Validation checkpoint:** Validate the generated YAML (check syntax, verify test coverage matches Step 1 findings) and confirm the proposed test scope with the user before proceeding.
 
-Create a new branch for the pipeline using the git token, found in the environment variable. Push the yml to the branch. 
+# Step 3: Author the Snowflake Testing Pipeline YAML
 
-### Step 4: Register the pipeline with Orchestra
-Commit the YAML code to the feature branch and push. Then use the
-Orchestra MCP `import_pipeline` tool with the YAML contents to register it. The
-tool returns the pipeline UUID — save it (you need it for step 7 and for any
-future re-runs).
+Create a new feature branch using the Git token found in the environment variables. Push the generated `.yml` file to that branch.
+
+1. Use the Git token from the environment to authenticate.
+2. Create a new branch (e.g. `feature/snowflake-dq-tests`).
+3. Write the pipeline YAML to a file (e.g. `orchestra/snowflake_dq_tests.yml`).
+4. Commit and push the file to the feature branch.
+
+### Step 4: Register the Pipeline with Orchestra
+
+Use the Orchestra MCP `import_pipeline` tool with the YAML contents to register it. The tool returns the pipeline UUID — save it (needed for Step 5).
 
 ```
-mcp__orchestramcp__import_pipeline(yaml="<contents of orchestra/<source>_to_motherduck.yml>")
+mcp__orchestramcp__import_pipeline(yaml="<contents of orchestra/snowflake_dq_tests.yml>")
 ```
 
 If the pipeline already exists at the same alias, this updates it in place.
 
-###  Step 5: Trigger on the feature branch and poll
-Trigger the pipeline against the branch from step 1, then poll until terminal.
+### Step 5: Trigger on the Feature Branch and Poll
+
+Trigger the pipeline against the branch from Step 3, then poll until terminal.
 
 ```
 mcp__orchestramcp__start_pipeline(alias="<pipeline-uuid>", branch="<feature-branch>")
 mcp__orchestramcp__get_pipeline_run_status(pipeline_run_id="<run-uuid>")
 ```
 
-Poll `get_pipeline_run_status` until the status is not `RUNNING` or `CREATED`.
-Report the terminal status and surface the Orchestra UI link:
+Poll `get_pipeline_run_status` until the status is not `RUNNING` or `CREATED`. Report the terminal status and surface the Orchestra UI link:
 
 ```
 https://app.getorchestra.io/pipeline-runs/<run-uuid>/lineage
 ```
 
-On failure, call `list_task_runs` (filtered by the run UUID) to find the FAILED
-task, then `download_task_run_log` for its log. The most common causes:
-- `requirements.txt` missing the new extra (e.g. `dlt[motherduck]`) → the
-  `motherduck` destination import errors out. Fix step 4b and retrigger.
-- Env var name mismatch between the script and the connection's env config →
-  rename in `<source>_pipeline.py` to match the connection. Applies to credential
-  vars and `<SOURCE>_MD_STAGING_DATABASE` / `<SOURCE>_MD_PROD_DATABASE` /
-  `<SOURCE>_MD_DATASET`.
-- API rate-limit / 401 → token is missing from the connection's env config, not
-  a code bug.
-- Load partially corrupted an existing dataset → `RESTORE` from the snapshot
-  created in step 6, then fix the bug and re-run.
+On failure, call `list_task_runs` (filtered by the run UUID) to find the FAILED task, then `download_task_run_log` for its log. Common causes:
+- **Connection misconfiguration** — verify `SNOWFLAKE_CONNECTION` is set correctly and has access to the target schemas.
+- **SQL syntax error** — review the failing task's log, fix the SQL in the pipeline YAML, re-import, and retrigger.
+- **Threshold too strict** — if data legitimately exceeds the threshold, revisit Step 1 thresholds and update the YAML.
+- **Schema or table not found** — confirm names from Step 1 match exactly (Snowflake identifiers are case-sensitive in quoted contexts).
 
-Once the run is green on the feature branch, the staging database holds the
-fresh load. Prod is still untouched — promote it in step 8.
+Prompt the user to review the test results and confirm that the assertions raised match expectations before treating the pipeline as production-ready.
