@@ -49,10 +49,28 @@ the tool set is restricted to file tools, so no run can touch a real warehouse o
 This keeps the loop fast and reproducible while covering the part of the skill where the
 interesting reasoning happens — which tests to infer and how to shape the Orchestra YAML.
 
-## Running
+## Setup
 
-Requires the `claude` CLI on your PATH and `pyyaml` (`pip install -r evals/requirements.txt`,
-or just use the system `python3` if it already has pyyaml).
+You need two things on your machine:
+
+1. **The `claude` CLI** on your `PATH` — the runner drives it headlessly (`claude -p …`).
+   Check with `claude --version`; install/upgrade per the [Claude Code docs](https://docs.claude.com/en/docs/claude-code).
+   Be signed in (or have `ANTHROPIC_API_KEY` set) so non-interactive runs can authenticate.
+   No Orchestra MCP, Snowflake, or git credentials are required — runs are sandboxed to
+   file tools with MCP disabled.
+2. **`pyyaml`** for the grader. Either use a `python3` that already has it (e.g. the
+   system interpreter), or install into a venv:
+
+   ```bash
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r evals/requirements.txt
+   ```
+
+Run everything from the **repo root** so the relative paths in `runner.py` resolve.
+Each run spends tokens against your Claude account — the full suite is 3 cases × 2
+configurations = 6 `claude` invocations.
+
+## Running
 
 ```bash
 # Run every case, both configurations, into the next iteration dir
@@ -94,14 +112,42 @@ Each eval lists `assertions`. Two kinds:
 - **Free-text** assertions have only `text` and are recorded as `manual` (passed: null)
   for human or LLM review — use these for qualities that don't reduce to a code check.
 
-See [`grade.py`](grade.py) for the full list of `check` types and their arguments.
+Coded `check` types (see [`grade.py`](grade.py) for arguments):
+
+| check | what it verifies |
+|-------|------------------|
+| `valid_yaml` | output parses to a YAML mapping |
+| `yaml_eq` / `yaml_present` | a dotted path equals a value / exists |
+| `regex` | a pattern appears in the raw text (`min_count`, `ignore_case`) |
+| `min_task_groups` | `pipeline` has at least N groups |
+| `all_groups_have` | every group carries a given key (e.g. `condition`) |
+| `every_task` / `some_task` | a field equals a value across all / at least one task |
+| `alerts_status` | an alert fires on a given status (e.g. `FAILED`) |
+| `groups_chained` | at least one group has a non-empty `depends_on` |
+
 `grading.json` records PASS/FAIL plus concrete `evidence` per assertion; `benchmark.json`
-aggregates pass-rate / tokens / duration per configuration and the **delta** between
-them — that delta is the point of the exercise.
+aggregates pass-rate / tokens / duration per configuration and the **delta** between them.
 
 The `expected/golden_pipeline.yml` reference is **not** diffed mechanically (correct YAML
 has many valid shapes). It's the anchor for human review and the blind-LLM comparison the
 agentskills guide recommends for holistic quality.
+
+### Interpreting results
+
+The point of the exercise is the **delta** (with_skill − without_skill) in `benchmark.json`:
+
+- **Pass-rate delta > 0** — the skill is adding value; inspect which assertions pass with
+  it and fail without to see *what* convention it's enforcing.
+- **Pass-rate delta ≈ 0** — either the base model already handles this well (consider
+  dropping assertions that always pass in both configs), or the skill isn't helping yet.
+- **Token / duration delta** — what the skill costs. A higher pass rate for *fewer* tokens
+  is the ideal; a small quality gain for a large token increase may not be worth it.
+
+To improve the skill, feed the failed assertions, the `transcript.txt` of a weak run, and
+the current `SKILL.md` to an LLM and ask for targeted edits — then re-run into a fresh
+`iteration-N/` and compare. See the
+[agentskills iteration loop](https://agentskills.io/skill-creation/evaluating-skills) for
+the full method.
 
 ## Adding a suite
 
