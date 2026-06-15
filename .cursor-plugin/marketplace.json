@@ -1,13 +1,13 @@
 {
   "name": "orchestra-marketplace",
-  "description": "Agent skills for diagnosing, fixing, triaging, and authoring Orchestra data pipelines, plus dbt Slim CI setup and Snowflake quality tests.",
+  "description": "Agent skills for diagnosing, fixing, triaging, and authoring Orchestra data pipelines, plus dbt Slim CI setup, Snowflake quality tests, and best-practice account reviews.",
   "owner": {
     "name": "Orchestra"
   },
   "plugins": [
     {
       "name": "orchestra",
-      "description": "Skills for working with Orchestra data pipelines — diagnose and fix failed runs, triage with a merge gate, author pipeline YAML, set up dbt Slim CI, and run Snowflake data-quality tests. MCP-first.",
+      "description": "Skills for working with Orchestra data pipelines — diagnose and fix failed runs, triage with a merge gate, author pipeline YAML, set up dbt Slim CI, run Snowflake data-quality tests, and review a workspace against best practices. MCP-first.",
       "source": "./skills/orchestra"
     }
   ]
