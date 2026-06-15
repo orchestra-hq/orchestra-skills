@@ -1,0 +1,167 @@
+---
+name: review-orchestra-account
+description: >
+  Audit an Orchestra workspace/account against Orchestra's best practices and produce a
+  read-only health report — findings grouped by area, each tagged with severity, evidence,
+  and a fix recommendation, written to a markdown file plus a chat summary. Use whenever the
+  user wants an "account review", "workspace audit", "health check", "best-practice review",
+  "onboarding review", or asks "is my Orchestra set up correctly?", "what should I improve?",
+  "are we following best practices?", "review my pipelines", or "audit my workspace". Also
+  trigger when the user mentions reviewing pipeline design, environment/promotion setup,
+  Git/CI-CD coverage, alerting coverage, connections/secrets hygiene, concurrency, cost, or
+  RBAC across their Orchestra account. This skill only inspects and reports — it never edits
+  pipelines or changes settings.
+---
+
+# Review Orchestra Account
+
+Audit an Orchestra workspace against the conventions the Orchestra team recommends during
+onboarding and account reviews, then deliver a prioritised, evidence-backed report. This is
+a **read-only** review: it inspects pipelines, runs, and assets through the Orchestra MCP and
+writes a report file — it never mutates pipelines, settings, or runs. If the user wants
+something fixed, hand off to `create-orchestra-pipeline` or `fix-orchestra-pipeline`.
+
+The workspace is determined by the API key behind the connected Orchestra MCP server, so the
+review covers whatever workspace that key targets. If the user has multiple workspaces, remind
+them each one needs its own review (there are no cross-workspace resources).
+
+## References
+
+- `references/best-practices-checklist.md` — **the rubric.** Every check, what "good" looks
+  like, the MCP signal that detects a violation, its severity, and the doc link to cite. Read
+  this before evaluating — it's the heart of the skill. It has a table of contents; you can read
+  the sections relevant to the data you gathered rather than the whole file at once.
+- `../../references/orchestra/mcp/tools-quick-ref.md` — Orchestra MCP tool names and arguments.
+
+## Workflow
+
+### Step 1 — Confirm scope and probe capabilities
+
+Tell the user which workspace you'll review (the one the MCP key targets) and ask if they want
+the **full** review or a subset of areas (e.g. "just alerting and cost"). Default to full. For
+large workspaces (many pipelines), it's fine to offer to sample or focus on production pipelines
+first — reading every pipeline definition has a cost, so say so rather than silently truncating.
+
+**Check which Orchestra MCP tools are actually connected before you start.** Tool coverage varies
+by server: some deployments expose only the `list_*`/runtime tools, while a single-pipeline read
+tool (`get_pipeline`, or similarly named) may be absent. Every definition-level check — alerts,
+secrets, concurrency, MetaEngine, `set_outputs`, branching, unique IDs — needs that read tool. If
+it isn't present, say so up front: tell the user the review will be **metadata-only**, those checks
+will come back **Not assessed**, and the fix is to connect a server that exposes definition reads
+(e.g. the remote Orchestra MCP) — don't discover this halfway through and silently degrade.
+
+### Step 2 — Gather data (read-only)
+
+Pull the evidence before judging anything. Batch the `list_*` calls first, then read definitions.
+
+1. **Inventory** — `list_pipelines`. Capture for each pipeline: name, alias, `storageProvider`
+   (`GITHUB`/`GITLAB`/etc. = Git-backed; `ORCHESTRA` = UI-only), `paused`, `numTasks`, schedule,
+   sensors, webhook, and latest-run metadata. This list alone drives several checks (env-duplication
+   by naming, Git-backing, schedule cadence, pause state).
+2. **Definitions** — read each pipeline's full definition with the single-pipeline read tool (by
+   `alias` or `pipeline_id`). This is where most checks live: alerts, concurrency, MetaEngine/matrix,
+   task groups, `${{ ENV. }}` refs vs hardcoded secrets, branching conditions, inputs, triggers/
+   sensors, `set_outputs`. **Default scope for large workspaces: the live + Git-backed set** — every
+   unpaused, recently-run pipeline plus every Git-backed (`storageProvider != ORCHESTRA`) one, since
+   that's what a real audit hinges on. Skip dormant `TEST:`/demo-named pipelines unless asked, and
+   **say what you covered vs skipped**. If the read tool is absent (Step 1), skip this and mark the
+   definition-level checks Not assessed.
+3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window). Use this
+   to spot concurrency skips, over- or under-scheduling, and noisy failure rates. `list_task_runs`
+   /`list_operations` add integration-level detail (e.g. source-tool jobs, dbt models) when a check
+   needs it.
+4. **Assets** — `list_assets`. Assets with no Orchestra operation in 7+ days are a governance
+   signal that work may be running outside Orchestra; confirm with `list_operations` filtered to
+   the asset's integration before flagging.
+
+**Two data-shape traps, learned the hard way:**
+
+- **Big `list_*` outputs.** `list_pipelines` and `list_assets` can exceed the tool-output token
+  limit on real workspaces and get spilled to a file instead of returned inline. When that happens,
+  don't try to read the whole file into context — `jq` it. Probe shape first
+  (`jq '.result | type, length'`), then compute the signals you need with `jq`/scripts (counts by
+  `storageProvider`, `paused`, cron cadence, staleness) and only surface the aggregates. `list_assets`
+  is paginated (`page`/`page_size`/`total`) — note when you've only seen page 1 and treat it as a
+  sample.
+- **Nested fields arrive as JSON-encoded strings.** In `list_pipelines`, `schedule`, `sensors`,
+  `webhook`, and `triggerEvents` come back as *strings* like `"[]"` or `"{\"enabled\":true}"`, not
+  parsed arrays/objects. A naive "is it empty?" test counts `"[]"` as non-empty and reports every
+  pipeline as scheduled/sensored — a false positive. Parse them first (`jq 'fromjson'`) before
+  judging. This is exactly the kind of silent miscount to guard against.
+
+Field names also vary between the YAML form and the stored API form (e.g. `max_active` vs
+`maxActive`, `set_outputs` vs `setOutputs`). Match on the concept, not one exact spelling.
+
+### Step 3 — Evaluate against the checklist
+
+Work through `references/best-practices-checklist.md` against the data you gathered. For each
+violation, record: the check, the **specific** offending pipeline/task/field (evidence — names and
+values, not vague claims), the severity, and the recommendation with its doc link. A clean check is
+worth noting too — the report's value is partly the reassurance that the basics are covered.
+
+Be precise and avoid false positives. If you didn't gather the data a check needs (e.g. you sampled
+pipelines, or a 7-day window hid something), mark that check **Not assessed** rather than passing or
+failing it. A confident "I couldn't see this" beats a guess.
+
+### Step 4 — Note what MCP can't see
+
+Several conventions live in areas the MCP doesn't expose — RBAC roles and groups, IP restrictions,
+API-key rotation, the secrets-manager backend, deployment model, and whether source tools
+(Fivetran, Airbyte, etc.) are actually paused at the source. These can't be auto-checked. List them
+in the report under **Manual verification** as a short checklist the user runs in the UI, rather than
+asserting pass/fail. The checklist file marks these items explicitly.
+
+### Step 5 — Write the report and summarise
+
+Write the full report to `orchestra-account-review.md` (in the working directory unless the user
+names a path) using the template below, then give a short chat summary: the headline counts by
+severity, the top 3–5 things to fix first, and the path to the file.
+
+## Report structure
+
+Use this template:
+
+```markdown
+# Orchestra account review — <workspace name or "current workspace">
+
+_Reviewed <YYYY-MM-DD>. Read-only audit against Orchestra best practices._
+
+## Summary
+
+- Pipelines reviewed: <n of m> <(note any sampling)>
+- Findings: <H> High · <M> Medium · <L> Low · <X> Not assessed
+- Top priorities: <one line each, the 3–5 highest-impact fixes>
+
+## Findings by area
+
+### <Area, e.g. Pipeline design>
+| Severity | Finding | Evidence | Recommendation |
+|----------|---------|----------|----------------|
+| High | <what's wrong> | <pipeline/task/field + value> | <what to do> ([docs](<link>)) |
+
+<Repeat per area that has findings: Pipeline design · Environments & promotion ·
+Version control / Git & CI-CD · Connections & credentials · Alerting & observability ·
+Security & access · Performance & cost.>
+
+## What's working well
+- <clean checks worth calling out>
+
+## Manual verification (not visible to the MCP)
+- [ ] <RBAC / IP restrictions / secrets backend / API-key rotation / source-tool pausing>
+
+## Account-review checklist
+<The 8-point quick checklist from the best-practices doc, each marked ✅ / ⚠️ / ❌ / — (not assessed).>
+```
+
+## Severity guide
+
+- **High** — security/data-loss risk or a clear reliability hazard: hardcoded secrets or plain-text
+  sensitive env vars, production pipelines not Git-backed, no failure alerting on production, no
+  concurrency limit where overlapping runs would corrupt data.
+- **Medium** — meaningful cost, maintainability, or governance drift: one-pipeline-per-environment,
+  repeated tasks that should be a MetaEngine matrix, over-scheduling instead of sensors, alerts
+  defined in the UI rather than YAML, webhook alert endpoints with no auth.
+- **Low** — polish and best-practice nudges: heartbeat/failure alert-channel split, `LIMIT` on
+  SQL sensor checks, stale assets to bring under orchestration, `set_outputs` enabled where unused.
+
+Calibrate to impact and the user's stage — don't bury a High finding under a pile of Lows.
