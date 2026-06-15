@@ -122,9 +122,18 @@ score by counting `[MANUAL]` or **Not assessed** checks as passes — they're ex
 
 ### Step 6 — Write the report and summarise
 
-Write the full report to `orchestra-account-review.md` (in the working directory unless the user
-names a path) using the template below, then give a short chat summary: **the health score and band**,
-the headline counts by severity, the top 3–5 things to fix first, and the path to the file.
+Write the report to `orchestra-account-review.md` (in the working directory unless the user names a
+path) using the template below, then give a short chat summary: **the health score and band**, the
+top 3–5 fixes, and the path to the file.
+
+**Write for a customer who wants to act, not read.** Keep it tight and scannable — the value is the
+*ranked fix list*, not exhaustive prose. Concretely:
+- Lead with the score and the **Fix first** list — that's the part they'll act on.
+- One findings table, **real findings only**, sorted High → Low. Fold evidence into the finding line;
+  don't give it its own column. **Never add a row per "Not assessed" check** — collapse all of them
+  into the single coverage line at the end.
+- Cut anything that doesn't change what the reader does. No methodology dump, no per-area table
+  sprawl, no restating the same point in three sections. Aim for a page or so.
 
 ## Report structure
 
@@ -135,12 +144,7 @@ Use this template:
 
 _Reviewed <YYYY-MM-DD>. Read-only audit against Orchestra best practices._
 
-## Account health score
-
-# <NN> / 100 — <band emoji + label, e.g. 🟡 Needs attention>
-
-_Coverage: <a> of <b> assessable checks evaluated (<c>%). Excludes manual-only and not-assessed
-checks. <Add "Provisional — metadata-only" if a definition read tool was unavailable.>_
+## Health score: <NN>/100 — <band emoji + label, e.g. 🟡 Needs attention>
 
 | Area | Score | |
 |------|------:|--|
@@ -151,34 +155,31 @@ checks. <Add "Provisional — metadata-only" if a definition read tool was unava
 | Alerting & observability | <NN>/100 | <bar> |
 | Performance & cost | <NN>/100 | <bar> |
 
-<Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Omit an area row if it
-had no assessable checks; note that instead of scoring it 0.>
+_<a> of <b> checks assessed (<c>%). <Add "Provisional — metadata-only; definition checks need a
+server with `get_pipeline`." if applicable.>_
 
-## Summary
+<Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Drop an area row with no
+assessable checks rather than scoring it 0. Pipelines reviewed: <n of m>; note any sampling here.>
 
-- Pipelines reviewed: <n of m> <(note any sampling)>
-- Findings: <H> High · <M> Medium · <L> Low · <X> Not assessed
-- Top priorities: <one line each, the 3–5 highest-impact fixes>
+## Fix first
+1. **<headline fix>** — <impact in a few words; the concrete action>. ([docs](<link>))
+2. ...
+<The 3–5 highest-impact items. This is the report's payload — make each one do-able.>
 
-## Findings by area
+## Findings
+| Severity | Finding (with evidence) | Fix |
+|----------|-------------------------|-----|
+| High | <what's wrong + the specific pipeline/task/field + value> | <what to do> ([docs](<link>)) |
+<Real findings only, sorted High → Low. Skip clean and Not-assessed checks here.>
 
-### <Area, e.g. Pipeline design>
-| Severity | Finding | Evidence | Recommendation |
-|----------|---------|----------|----------------|
-| High | <what's wrong> | <pipeline/task/field + value> | <what to do> ([docs](<link>)) |
+## Working well
+- <2–4 clean checks worth the reassurance>
 
-<Repeat per area that has findings: Pipeline design · Environments & promotion ·
-Version control / Git & CI-CD · Connections & credentials · Alerting & observability ·
-Security & access · Performance & cost.>
+## Check manually (not visible to the MCP)
+- [ ] <RBAC · IP restrictions · secrets backend · API-key rotation · source-tool pausing>
 
-## What's working well
-- <clean checks worth calling out>
-
-## Manual verification (not visible to the MCP)
-- [ ] <RBAC / IP restrictions / secrets backend / API-key rotation / source-tool pausing>
-
-## Account-review checklist
-<The 8-point quick checklist from the best-practices doc, each marked ✅ / ⚠️ / ❌ / — (not assessed).>
+_Not assessed (<n> checks): <areas, e.g. alerting, secrets, concurrency> — needs pipeline
+definitions. <Drop this line entirely if coverage was full.>_
 ```
 
 ## Severity guide
