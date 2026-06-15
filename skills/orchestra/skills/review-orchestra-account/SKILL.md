@@ -111,11 +111,20 @@ API-key rotation, the secrets-manager backend, deployment model, and whether sou
 in the report under **Manual verification** as a short checklist the user runs in the UI, rather than
 asserting pass/fail. The checklist file marks these items explicitly.
 
-### Step 5 — Write the report and summarise
+### Step 5 — Score account health
+
+Turn the evaluation into a single **Account health score out of 100** plus per-area sub-scores, so
+the user has a headline number to track over time and a leaderboard of where to improve. Compute it
+with the **Scoring method** below — it's a weighted pass-rate over the checks you could actually
+assess, not a vibe. Report a **coverage** figure alongside it (how many assessable checks you
+evaluated) so a metadata-only review is honest about the score being provisional. Never inflate the
+score by counting `[MANUAL]` or **Not assessed** checks as passes — they're excluded, not free points.
+
+### Step 6 — Write the report and summarise
 
 Write the full report to `orchestra-account-review.md` (in the working directory unless the user
-names a path) using the template below, then give a short chat summary: the headline counts by
-severity, the top 3–5 things to fix first, and the path to the file.
+names a path) using the template below, then give a short chat summary: **the health score and band**,
+the headline counts by severity, the top 3–5 things to fix first, and the path to the file.
 
 ## Report structure
 
@@ -125,6 +134,25 @@ Use this template:
 # Orchestra account review — <workspace name or "current workspace">
 
 _Reviewed <YYYY-MM-DD>. Read-only audit against Orchestra best practices._
+
+## Account health score
+
+# <NN> / 100 — <band emoji + label, e.g. 🟡 Needs attention>
+
+_Coverage: <a> of <b> assessable checks evaluated (<c>%). Excludes manual-only and not-assessed
+checks. <Add "Provisional — metadata-only" if a definition read tool was unavailable.>_
+
+| Area | Score | |
+|------|------:|--|
+| Pipeline design & structure | <NN>/100 | <bar> |
+| Environments & promotion | <NN>/100 | <bar> |
+| Version control, Git & CI/CD | <NN>/100 | <bar> |
+| Connections & credentials | <NN>/100 | <bar> |
+| Alerting & observability | <NN>/100 | <bar> |
+| Performance & cost | <NN>/100 | <bar> |
+
+<Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Omit an area row if it
+had no assessable checks; note that instead of scoring it 0.>
 
 ## Summary
 
@@ -165,3 +193,31 @@ Security & access · Performance & cost.>
   SQL sensor checks, stale assets to bring under orchestration, `set_outputs` enabled where unused.
 
 Calibrate to impact and the user's stage — don't bury a High finding under a pile of Lows.
+
+## Scoring method
+
+The health score is a **severity-weighted pass-rate over the checks you actually assessed** — same
+inputs as the quick checklist, turned into a number. Compute it deterministically so the same
+workspace always scores the same:
+
+1. **Take the assessable checks.** Every non-`[MANUAL]` check in the rubric that you evaluated.
+   **Exclude** `[MANUAL]` checks and any you marked **Not assessed** — they're neither numerator nor
+   denominator. (`[MANUAL]` checks never count; a check is only assessable if you had the data.)
+2. **Weight each by severity:** High = 5, Medium = 3, Low = 1.
+3. **Credit each by outcome:** pass (✅) = full weight, partial (⚠️) = half weight, fail (❌) = 0.
+   A check fails once if it has any finding of its severity — don't multiply the penalty by the
+   number of offending pipelines (the evidence column already conveys breadth).
+4. **Score** = round( 100 × Σ(credit) ÷ Σ(weight of assessed checks) ).
+5. **Per-area sub-scores:** the same formula scoped to one area's assessed checks. Drop an area with
+   no assessable checks rather than scoring it 0.
+6. **Coverage** = assessed assessable checks ÷ total assessable checks, as a %. If coverage is low
+   (e.g. a metadata-only review where definition checks were all Not assessed), label the score
+   **Provisional** — the number reflects only what was visible.
+
+Bands for the headline label:
+
+- **90–100** 🟢 Excellent · **75–89** 🟢 Healthy · **60–74** 🟡 Needs attention ·
+  **40–59** 🟠 At risk · **0–39** 🔴 Critical
+
+Keep the score honest: it measures the *assessed* surface, not the whole account. A 95/100 at 40%
+coverage means "what I could see looks great, but I couldn't see most of it" — say exactly that.

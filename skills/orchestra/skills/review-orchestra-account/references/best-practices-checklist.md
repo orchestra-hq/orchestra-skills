@@ -265,7 +265,11 @@ gate. Docs: `/docs/mcp`, `/docs/integrations/orchestra/approval`.
 
 ## Account-review quick checklist
 
-Render this in the report, each marked ✅ pass / ⚠️ partial / ❌ fail / — not assessed:
+Render this in the report, each marked ✅ pass / ⚠️ partial / ❌ fail / — not assessed. These same
+pass/partial/fail outcomes feed the **Account health score** (see SKILL.md → Scoring method):
+severity-weight each assessed check (High 5 / Medium 3 / Low 1), credit pass=full, partial=half,
+fail=0, and score = 100 × Σcredit ÷ Σweight over assessed checks only (`[MANUAL]` and not-assessed
+excluded).
 
 1. One pipeline reused across environments, not one per environment. *(1.1, 2.1)*
 2. Repeated tasks consolidated into a MetaEngine matrix. *(1.3)*
