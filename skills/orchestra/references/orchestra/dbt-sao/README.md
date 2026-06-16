@@ -22,10 +22,14 @@ consumed.
 | `source-freshness.md` | dbt `freshness` / `loaded_at_field` / `loaded_at_query` schema, version placement, `filter` |
 | `build-after.md` | dbt model `config.freshness.build_after` schema (`count`, `period`, `updates_on`) |
 | `orchestra-task.md` | Enabling SAO on the Orchestra dbt Core task (Git-backed vs Orchestra-backed) |
-| `warehouses/snowflake.md` | Snowflake freshness specifics (`LAST_ALTERED`, profile) |
-| `warehouses/bigquery.md` | BigQuery freshness specifics (`TABLE_STORAGE`, batch flag, partition filter) |
-| `warehouses/databricks.md` | Databricks freshness specifics (`DESCRIBE HISTORY`, classic vs Fusion) |
-| `warehouses/motherduck.md` | MotherDuck / DuckDB — no metadata freshness; explicit field required |
+| `warehouses/snowflake.md` | Snowflake — explicit field required (`LAST_ALTERED` not used by SAO) |
+| `warehouses/bigquery.md` | BigQuery — explicit field required; partition `filter` for cost |
+| `warehouses/databricks.md` | Databricks — the one warehouse with metadata inference (`DESCRIBE HISTORY`) |
+| `warehouses/motherduck.md` | MotherDuck / DuckDB — not supported; explicit field required |
+| `warehouses/redshift.md` | Redshift — explicit field required |
+| `warehouses/fabric.md` | Microsoft Fabric (`dbt-fabric`) — explicit field required |
+| `warehouses/postgres.md` | PostgreSQL — explicit field required |
+| `warehouses/other.md` | Catch-all for unlisted adapters — assume no fallback, explicit field required |
 
 ## The one rule that decides everything per warehouse
 
@@ -48,8 +52,10 @@ omitted:
 | **Snowflake** | No Orchestra fallback | **Explicit `loaded_at_field` or `loaded_at_query` required** |
 | **MotherDuck / DuckDB** | Not supported | **Explicit `loaded_at_field` or `loaded_at_query` required** |
 | **BigQuery** | Not listed → no Orchestra fallback | **Explicit `loaded_at_field` or `loaded_at_query` required** |
-| Microsoft Fabric, PostgreSQL | No Orchestra fallback | Explicit required |
-| Other adapters | No fallback unless listed above | Explicit; or verify dbt's default for that warehouse |
+| **Microsoft Fabric** | No Orchestra fallback | Explicit required |
+| **PostgreSQL** | No Orchestra fallback | Explicit required |
+| **Redshift** | Not listed → no Orchestra fallback | Explicit required |
+| Other adapters (Trino, ClickHouse, Athena, …) | No fallback unless listed above | Explicit; or verify dbt's default for that warehouse |
 
 > Orchestra's own words: "For adapters without a registered fallback, if both `loaded_at`
 > settings are missing, Orchestra follows dbt's `FreshnessRunner` behaviour (which may surface as

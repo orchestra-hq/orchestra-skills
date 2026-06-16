@@ -51,8 +51,12 @@ Load these before editing — the warehouse file is the part most often wrong if
    - **MotherDuck/DuckDB** — metadata freshness **not supported**; an explicit `loaded_at_field`
      (or `loaded_at_query`) is **required**. If you can't find a load-timestamp column, ask which
      column marks load time — do not omit it.
+   - **Redshift, Microsoft Fabric, PostgreSQL** — no Orchestra fallback; explicit field required.
+   - **Any other warehouse** (Trino, ClickHouse, Athena, …) — assume no fallback; explicit field
+     required. Read `warehouses/other.md`.
 
-   In short: on everything except Databricks, give an explicit field.
+   In short: on everything except Databricks, give an explicit field. There is a `warehouses/*.md`
+   file for each warehouse above (plus `other.md` as the catch-all) — read the matching one.
 
 2. **Check the dbt version.** From `require-dbt-version` in `dbt_project.yml` or `dbt --version`.
    1.9+ → put `freshness` under `config:`; 1.10+ → `loaded_at_field` under `config:` too. If the
