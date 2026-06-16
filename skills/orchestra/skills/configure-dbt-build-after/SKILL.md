@@ -66,9 +66,12 @@ signal it consumes.
    - `all` — wait until *every* upstream is fresh (joins where a partial refresh would mislead).
    - `any` (default) — rebuild as soon as *any* upstream has new data.
 
-5. **Enable SAO on the Orchestra task.** Find the dbt Core task (`integration: DBT_CORE`,
-   `integration_job: DBT_CORE_EXECUTE`) and set `use_state_orchestration: true`, following
-   `orchestra-task.md` for the Git-backed vs Orchestra-backed path. If already enabled, note it.
+5. **Ensure SAO is enabled on the Orchestra task.** `use_state_orchestration: true` is the SAO
+   **master switch** — it makes Orchestra consume *all* SAO config (freshness and `build_after`),
+   not a `build_after`-specific setting. Find the dbt Core task (`integration: DBT_CORE`,
+   `integration_job: DBT_CORE_EXECUTE`) and make sure it's on, following `orchestra-task.md` for
+   the Git-backed vs Orchestra-backed path. If it's already enabled (e.g. source freshness was set
+   up first), just confirm it — don't re-toggle.
 
 6. **Hand off.** Report: models changed, SLA values + how they were chosen (usage-derived vs
    user-defined) and `updates_on` rationale, whether upstream freshness was present or still

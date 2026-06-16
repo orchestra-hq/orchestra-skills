@@ -74,11 +74,13 @@ Load these before editing — the warehouse file is the part most often wrong if
    `filter` for soft-deletes or partition pruning where it helps cost. Don't invent tight
    thresholds you can't justify — leave a marked placeholder and explain it if cadence is unknown.
 
-6. **Enable SAO on the Orchestra task.** Find the dbt Core task
-   (`integration: DBT_CORE`, `integration_job: DBT_CORE_EXECUTE`) and set
-   `use_state_orchestration: true`. Follow `orchestra-task.md` for the Git-backed (edit YAML +
-   commit) vs Orchestra-backed (validate + `update_pipeline`, falling back to `migrate_pipeline`
-   on a 422) distinction. If it's already enabled, note that and don't re-apply.
+6. **Ensure SAO is enabled on the Orchestra task.** `use_state_orchestration: true` is the SAO
+   **master switch** — it makes Orchestra consume *all* SAO config (freshness and `build_after`),
+   not a freshness-specific setting. Find the dbt Core task (`integration: DBT_CORE`,
+   `integration_job: DBT_CORE_EXECUTE`) and make sure it's on. Follow `orchestra-task.md` for the
+   Git-backed (edit YAML + commit) vs Orchestra-backed (validate + `update_pipeline`, falling back
+   to `migrate_pipeline` on a 422) distinction. If it's already enabled (e.g. `build_after` was set
+   up first), just confirm it — don't re-toggle.
 
 7. **Hand off.** Report: files changed, the freshness signal used per source (real column vs
    metadata query) and why, thresholds (and any placeholders to tune), whether SAO was newly

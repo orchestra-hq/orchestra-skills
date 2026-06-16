@@ -12,6 +12,14 @@ The task is `integration: DBT_CORE`, `integration_job: DBT_CORE_EXECUTE`. In the
 this is the **"Use state orchestration"** toggle in the dbt Core task's parameters. No package
 upgrade or extra command flags are needed — it works on plain `dbt build`.
 
+**It's the SAO master switch, not a per-feature setting.** `use_state_orchestration` turns
+state-aware orchestration on for the task as a whole — Orchestra then consumes *whatever* SAO
+config exists in the project: source freshness **and** `build_after` together. It is not specific
+to either one. So both the `configure-dbt-source-freshness` and `configure-dbt-build-after` skills
+just need it to be **on** (a shared prerequisite); neither "owns" it. If it's already enabled
+because the other half of SAO was set up first, that's expected — confirm and move on, don't toggle
+it per feature.
+
 > Not the same as Slim CI. Slim CI uses `state:modified+` and `--defer` via
 > `production_run_identifier` and does **not** require `use_state_orchestration`. SAO
 > (freshness / `build_after`) is a separate mechanism. Don't add `use_state_orchestration` to a
