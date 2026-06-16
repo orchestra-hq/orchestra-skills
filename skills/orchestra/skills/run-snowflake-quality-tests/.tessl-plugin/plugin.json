@@ -1,0 +1,9 @@
+{
+  "name": "orchestra-hq/run-snowflake-quality-tests",
+  "description": "Examines Snowflake data sources, infers appropriate data quality tests, builds a structured Orchestra YAML testing pipeline, and deploys and triggers it via Orchestra MCP tools. Use when the user asks about Snowflake data validation, data quality testing, pipeline deployment to Orchestra, orchestration of test workflows, data warehouse quality checks, or running Snowflake tests against fact and dimension tables.",
+  "private": true,
+  "skills": [
+    "."
+  ],
+  "version": "0.1.0"
+}
