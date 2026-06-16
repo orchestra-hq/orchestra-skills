@@ -42,23 +42,30 @@ Load these before editing — the warehouse file is the part most often wrong if
    — judge it by Orchestra SAO's matrix, not dbt's. Read the matching `warehouses/*.md`
    (`other.md` for anything unlisted).
 
-2. **Pick the freshness signal — accuracy first, then convenience:**
-   1. **Real load-timestamp column** → `loaded_at_field`. Best signal; prefer it whenever a source
-      has a clear load/sync column. (On a large/partitioned table, add a `filter` or use a bounded
-      `loaded_at_query` to keep the query cheap.)
+2. **Infer the freshness signal — actively, per source.** Default to *figuring it out*, not
+   asking. For each source table, work down this order and use the first that applies; only leave
+   freshness unset if the user told you to, or if you genuinely can't locate any usable signal:
+   1. **Find a real load-timestamp column** → `loaded_at_field`. Look first at the columns the
+      source already declares in YAML, then — if your client can run read-only warehouse queries —
+      list the table's columns (`information_schema.columns`, `describe table`, etc.) and pick the
+      best load/sync timestamp. Strong candidates: `loaded_at`, `_loaded_at`, `_synced_at`,
+      `_fivetran_synced`, `_airbyte_emitted_at`, `ingested_at`, `etl_loaded_at`, `dbt_loaded_at`.
+      Weaker fallbacks (event time, not load time): `updated_at`, `created_at` — usable, but
+      confirm with the user since they can lag the actual load. (Large/partitioned table → add a
+      `filter` or a bounded `loaded_at_query` for cost.)
    2. **No load column, but the warehouse exposes simple last-modified metadata** → author a
       **metadata `loaded_at_query`** so dbt reads it cheaply instead of scanning data. Available
       where simple: **Snowflake** (`INFORMATION_SCHEMA … LAST_ALTERED`) and **BigQuery**
-      (`__TABLES__.last_modified_time`) — see those warehouse files for the exact query. Warn the
-      user it reflects *any* change, not just loads, so it can over-report.
-   3. **Databricks only** → you may omit `loaded_at_field` entirely; Orchestra infers freshness via
+      (`__TABLES__.last_modified_time`) — see those warehouse files for the exact query. Confirm the
+      view/column is reachable; warn the user it reflects *any* change, not just loads.
+   3. **Databricks** → you may omit `loaded_at_field` entirely; Orchestra infers freshness via
       `DESCRIBE HISTORY`.
-   4. **Everywhere else** (MotherDuck/DuckDB, Redshift, Fabric, Postgres, most others) → metadata
-      is unsupported or not simple; an explicit `loaded_at_field` against a real column is required.
-      If you can't find one, ask the user which column marks load time — do not omit it.
+   4. **Nothing locatable** (MotherDuck/DuckDB, Redshift, Fabric, Postgres, others with no obvious
+      column and no simple metadata) → ask the user which column marks load time. Only leave that
+      source's freshness unset if they can't say or explicitly want it skipped — and call it out.
 
-   In short: prefer a real column; on Snowflake/BigQuery a metadata `loaded_at_query` is a fine
-   fallback when no column exists; only Databricks may omit the setting entirely.
+   Net: try to populate freshness for every source you can from warehouse metadata/columns; empty
+   is the exception (user opt-out or no signal found), not the default.
 
 3. **Check the dbt version.** From `require-dbt-version` in `dbt_project.yml` or `dbt --version`.
    1.9+ → put `freshness` under `config:`; 1.10+ → `loaded_at_field` under `config:` too. If the
@@ -100,10 +107,13 @@ SAO enabled, models below a stale source are skipped.
 
 ## Guardrails
 
-- Write config only — never run `dbt`, never `start_pipeline`.
+- Write config only for the pipeline/repo — never run `dbt`, never `start_pipeline`, never mutate
+  the warehouse. You **may** run **read-only** warehouse inspection (list columns, check a
+  last-modified metadata view) to infer the freshness signal — that's expected, not a violation.
 - Under Orchestra SAO, only **Databricks** can omit `loaded_at_field` (metadata inference). On
   Snowflake, BigQuery, MotherDuck/DuckDB and others, an explicit `loaded_at_field`/`loaded_at_query`
-  is required — don't leave it off.
+  is required — don't leave it off. Leave a source's freshness unset only on user opt-out or when no
+  load column / simple metadata can be located.
 - Match the project's existing dbt-version form and file conventions; don't reformat unrelated YAML.
 - Don't commit secrets; warehouse creds stay in the Orchestra dbt connection / env vars.
 - `use_state_orchestration` is SAO — not Slim CI. Don't conflate them.

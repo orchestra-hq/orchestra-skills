@@ -63,11 +63,17 @@ sources:
 
 ## Choosing how freshness is computed
 
-Decide in this order — accuracy first, then convenience:
+Be proactive: infer the signal from warehouse metadata for every source you can, and only leave
+freshness unset on user opt-out or when nothing usable can be located. Decide in this order —
+accuracy first, then convenience:
 
 1. **`loaded_at_field`** (a real load-timestamp column on the source) → a query finds
-   `max(<field>)`. The most accurate signal — "fresh" means new rows actually arrived. Prefer
-   this whenever the table has a clear load/sync timestamp.
+   `max(<field>)`. The most accurate signal — "fresh" means new rows actually arrived. Prefer this
+   whenever the table has a clear load/sync timestamp. Locate it from the source's declared columns
+   or by read-only warehouse inspection (`information_schema.columns`, `describe table`). Common
+   loader columns: `loaded_at`, `_loaded_at`, `_synced_at`, `_fivetran_synced`,
+   `_airbyte_emitted_at`, `ingested_at`, `etl_loaded_at`; `updated_at`/`created_at` are weaker
+   (event time — confirm with the user).
 2. **Metadata-derived `loaded_at_query`** → when there's no obvious load-timestamp column but the
    **warehouse exposes a last-modified time in a simple metadata view**, point a `loaded_at_query`
    at that metadata instead of scanning the data. This is cheap and needs no business column. It's
