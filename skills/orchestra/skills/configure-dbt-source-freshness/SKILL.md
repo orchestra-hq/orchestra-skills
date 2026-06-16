@@ -21,7 +21,8 @@ it does not run dbt or trigger pipelines. It explains how to verify instead.
 1. Freshness (`warn_after`/`error_after`, and an explicit `loaded_at_field`/`loaded_at_query`
    where the warehouse needs one) is added to the dbt sources YAML, correct for the warehouse.
 2. `use_state_orchestration: true` is set on the Orchestra dbt Core task (so the config is
-   actually consumed).
+   actually consumed). No `dbt source freshness` command is added to the pipeline — once SAO is on,
+   Orchestra runs the freshness check itself. This skill only authors the config.
 3. A handoff explains what changed, the warehouse-specific choice made, how to verify, and any
    placeholders the user must fill.
 
@@ -87,7 +88,9 @@ Load these before editing — the warehouse file is the part most often wrong if
    `integration_job: DBT_CORE_EXECUTE`) and make sure it's on. Follow `orchestra-task.md` for the
    Git-backed (edit YAML + commit) vs Orchestra-backed (validate + `update_pipeline`, falling back
    to `migrate_pipeline` on a 422) distinction. If it's already enabled (e.g. `build_after` was set
-   up first), just confirm it — don't re-toggle.
+   up first), just confirm it — don't re-toggle. **Don't touch the task's `commands`** — flipping
+   the toggle is all that's needed; the existing `dbt build` is fine. Orchestra runs the freshness
+   check for you, so do *not* prepend `dbt source freshness` or change the dbt commands.
 
 7. **Hand off.** Report: files changed, the freshness signal used per source (real column vs
    metadata query) and why, thresholds (and any placeholders to tune), whether SAO was newly
@@ -95,7 +98,8 @@ Load these before editing — the warehouse file is the part most often wrong if
 
 ## Verifying (don't run it for them)
 
-Tell the user how to confirm, rather than executing:
+Tell the user how to confirm, rather than executing. This is a **local sanity check**, not a
+pipeline step — don't add it to the Orchestra dbt task:
 
 ```bash
 dbt source freshness                                  # -> target/sources.json

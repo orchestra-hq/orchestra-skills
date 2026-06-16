@@ -1,9 +1,0 @@
-{
-  "name": "orchestra-hq/configure-dbt-build-after",
-  "description": "Configure dbt model build_after for Orchestra state-aware orchestration — author the config.freshness.build_after block (count, period, updates_on) on dbt models so Orchestra rebuilds a model only after a minimum SLA window AND when its upstream data is fresh, then ensure use_state_orchestration is enabled on the Orchestra dbt task. Use when asked to set up build_after, configure per-model rebuild SLAs, gate model rebuilds on upstream freshness, stop unnecessary dbt rebuilds, or set up state-aware orchestration in Orchestra. Trigger on phrases like \"configure build_after\", \"add build_after\", \"only rebuild when upstream is fresh\", \"per-model SLA\", \"updates_on any/all\", or \"stop rebuilding models that haven't changed\" in a dbt or Orchestra context. build_after is warehouse-agnostic (same config for Snowflake, BigQuery, Databricks, MotherDuck) but depends on source freshness being configured — the source/freshness-signal half is the separate configure-dbt-source-freshness skill.",
-  "private": true,
-  "skills": [
-    "."
-  ],
-  "version": "0.1.0"
-}
