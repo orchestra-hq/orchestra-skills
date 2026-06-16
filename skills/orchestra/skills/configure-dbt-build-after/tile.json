@@ -1,0 +1,10 @@
+{
+  "name": "orchestra-hq/configure-dbt-build-after",
+  "version": "0.1.0",
+  "summary": "Configure dbt model build_after for Orchestra state-aware orchestration — per-model rebuild SLAs (count/period/updates_on) gated on upstream freshness, then ensure use_state_orchestration is enabled on the Orchestra dbt task.",
+  "repository": "https://github.com/orchestra-hq/orchestra-skills",
+  "private": true,
+  "skills": {
+    "configure-dbt-build-after": { "path": "./SKILL.md" }
+  }
+}

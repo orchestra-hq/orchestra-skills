@@ -1,0 +1,10 @@
+{
+  "name": "orchestra-hq/configure-dbt-source-freshness",
+  "version": "0.1.0",
+  "summary": "Configure dbt source freshness for Orchestra state-aware orchestration — warehouse-correct loaded_at_field/loaded_at_query and warn_after/error_after thresholds in sources YAML, then enable use_state_orchestration on the Orchestra dbt task.",
+  "repository": "https://github.com/orchestra-hq/orchestra-skills",
+  "private": true,
+  "skills": {
+    "configure-dbt-source-freshness": { "path": "./SKILL.md" }
+  }
+}
