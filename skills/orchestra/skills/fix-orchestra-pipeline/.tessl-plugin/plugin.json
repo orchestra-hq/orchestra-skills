@@ -1,0 +1,9 @@
+{
+  "name": "orchestra-hq/fix-orchestra-pipeline",
+  "description": "Automatically diagnose and fix failed Orchestra data pipelines. Use this skill whenever a user mentions Orchestra pipeline failures, broken pipelines, pipeline errors, task failures, pipeline debugging, or wants to understand why an Orchestra pipeline run failed. Also trigger when the user says things like \"fix my pipeline\", \"what's broken\", \"why did my pipeline fail\", \"debug this run\", \"retry my pipeline\", or references Orchestra pipeline runs, task runs, or pipeline errors. This skill handles the full lifecycle: identify failures, fetch logs and artifacts, diagnose the root cause, apply fixes where possible, retry, and learn from past fixes. It supports all Orchestra integrations including dbt, Snowflake, Python, HTTP, Fivetran, Airbyte, and more. Trigger this skill even if the user just pastes an Orchestra error message, pipeline run URL, pipeline run link from the Orchestra UI, a UUID, a Slack alert, or a pipeline name/alias.",
+  "private": true,
+  "skills": [
+    "."
+  ],
+  "version": "0.1.0"
+}

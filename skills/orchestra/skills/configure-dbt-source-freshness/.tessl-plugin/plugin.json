@@ -1,0 +1,9 @@
+{
+  "name": "orchestra-hq/configure-dbt-source-freshness",
+  "description": "Configure dbt source freshness for Orchestra state-aware orchestration — author warn_after/error_after thresholds and loaded_at_field/loaded_at_query in a dbt project's sources YAML, getting the warehouse details right for Snowflake, BigQuery, Databricks, or MotherDuck/DuckDB, then enable use_state_orchestration on the Orchestra dbt task. Use when asked to set up dbt source freshness, configure freshness checks, detect stale sources, set up state-aware orchestration in Orchestra, or make Orchestra skip downstream models when upstream data hasn't changed. Trigger on phrases like \"add source freshness\", \"configure freshness\", \"set up state aware orchestration\", \"skip models when sources are stale\", \"loaded_at_field\", or \"warn_after/error_after\" in a dbt or Orchestra context. This is the source/freshness-signal half of state-aware orchestration; configuring per-model rebuild SLAs (build_after) is the separate configure-dbt-build-after skill.",
+  "private": true,
+  "skills": [
+    "."
+  ],
+  "version": "0.1.0"
+}

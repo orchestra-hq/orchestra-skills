@@ -1,0 +1,9 @@
+{
+  "name": "orchestra-hq/review-orchestra-account",
+  "description": "Audit an Orchestra workspace/account against Orchestra's best practices and produce a read-only health report — findings grouped by area, each tagged with severity, evidence, and a fix recommendation, written to a markdown file plus a chat summary. Use whenever the user wants an \"account review\", \"workspace audit\", \"health check\", \"best-practice review\", \"onboarding review\", or asks \"is my Orchestra set up correctly?\", \"what should I improve?\", \"are we following best practices?\", \"review my pipelines\", or \"audit my workspace\". Also trigger when the user mentions reviewing pipeline design, environment/promotion setup, Git/CI-CD coverage, alerting coverage, connections/secrets hygiene, concurrency, cost, or RBAC across their Orchestra account. This skill only inspects and reports — it never edits pipelines or changes settings.",
+  "private": true,
+  "skills": [
+    "."
+  ],
+  "version": "0.1.0"
+}
