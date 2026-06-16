@@ -32,6 +32,12 @@ config:
   loaded_at_query: "select max(loaded_at) from {{ this }} where loaded_at > now() - interval '7 days'"
 ```
 
+## Metadata-derived freshness — not simple here
+
+Postgres catalog stats (`pg_stat_user_tables.last_autovacuum`/`last_analyze`) track maintenance,
+not data loads, so there's no cheap, reliable last-load timestamp to derive freshness from. Use an
+explicit `loaded_at_field` against a real load-timestamp column; if none exists, ask the user.
+
 ## Timezone
 
 Postgres `timestamp` (without time zone) is assumed UTC; `timestamptz` carries a zone. If a column

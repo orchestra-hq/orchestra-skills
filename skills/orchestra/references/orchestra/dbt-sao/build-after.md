@@ -63,14 +63,49 @@ upstream — you don't have to annotate every intermediate model to get sensible
 
 ## Choosing values
 
-- **`period`/`count`** = the model's target SLA. A mart refreshed hourly → `count: 1, period: hour`.
-- **`updates_on: all`** for models that must reflect every upstream (e.g. a join across several
-  fact sources where a partial refresh would mislead). **`updates_on: any`** (default) for models
-  where any new upstream data is worth a rebuild.
+`updates_on` follows from the DAG: **`all`** for models that must reflect every upstream (e.g. a
+join across several fact sources where a partial refresh would mislead), **`any`** (default) for
+models where any new upstream data is worth a rebuild. You can read this off the model SQL.
 
-When the right SLA isn't obvious, ask or leave a marked placeholder and explain the trade-off,
-rather than inventing a number. An overly tight `build_after` rebuilds too often; too loose and
-data goes stale past its SLA.
+`count`/`period` is the model's **SLA** — and that's a business decision, not something to guess.
+Don't invent a number. Settle it one of two ways:
+
+### Approach A — derive the SLA from warehouse usage (opt-in)
+
+If the client can run read-only queries against the warehouse, estimate how often each model is
+actually consumed (or how often its upstreams refresh) and propose an SLA from that — e.g. a mart
+queried ~hourly → `count: 1, period: hour`. Representative starting queries (adapt names/permissions):
+
+- **Snowflake** — reads against the table over the last 7 days:
+  ```sql
+  select count(*) as reads_7d
+  from snowflake.account_usage.access_history,
+       lateral flatten(base_objects_accessed) o
+  where o.value:objectName::string = 'ANALYTICS.MARTS.FCT_ORDERS'
+    and query_start_time > dateadd(day, -7, current_timestamp());
+  ```
+- **BigQuery** — jobs that referenced the table:
+  ```sql
+  select count(*) as reads_7d
+  from `region-us`.INFORMATION_SCHEMA.JOBS, unnest(referenced_tables) rt
+  where rt.table_id = 'fct_orders' and creation_time > timestamp_sub(current_timestamp(), interval 7 day);
+  ```
+- **Databricks** — `system.access.audit` / query-history system tables filtered to the table.
+- **Redshift / Postgres / others** — query-history is harder/permission-gated; if it isn't cheap,
+  fall back to Approach B rather than spelunking.
+
+Turn the cadence into an SLA (busy hourly read pattern → hourly; daily reporting table → daily).
+**Always show the user the derived number and the evidence, and let them confirm or override** —
+usage is a proxy for the SLA, not the SLA itself.
+
+### Approach B — user-defined SLAs
+
+Ask the user for the SLA per model (or a default across the marts layer). This is the right path
+when warehouse querying isn't available/wanted, or when the SLA is a known business commitment.
+
+Default behaviour: offer both. If you can't query usage and the user hasn't given SLAs, **ask** —
+leave a clearly-marked placeholder only as a last resort, and explain the trade-off (too tight
+rebuilds needlessly; too loose breaches the SLA).
 
 ## Dependency on source freshness
 

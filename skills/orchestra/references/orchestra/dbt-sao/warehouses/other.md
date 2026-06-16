@@ -46,8 +46,14 @@ config:
 1. Identify a reliable load-timestamp column on each source (ask the user if unclear — don't guess).
 2. Set `loaded_at_field` (or a bounded `loaded_at_query` on large tables).
 3. Ensure the comparison is in UTC — cast/convert local timestamps inside the field.
-4. If you genuinely want to try metadata inference, confirm dbt's own behaviour for that adapter
-   first, and tell the user it is unverified under Orchestra SAO. Default to explicit.
+4. **No load column?** Check whether the warehouse exposes a *simple* last-modified time in a
+   metadata view (the way Snowflake has `LAST_ALTERED` and BigQuery has `__TABLES__.last_modified_time`).
+   If it does and the query is cheap, point a `loaded_at_query` at it — and warn the user it
+   reflects any change, not just loads. If metadata access is complex or permission-gated, don't —
+   fall back to asking for a real column.
+5. Only attempt warehouse-native metadata *inference* (omitting both settings) if you've confirmed
+   dbt's behaviour for that adapter; under Orchestra SAO only Databricks is guaranteed. Default to
+   an explicit field/query.
 
 Bottom line: outside Databricks, **always set an explicit `loaded_at_field`** for SAO unless you've
 verified the adapter behaves otherwise.

@@ -37,6 +37,25 @@ config:
   loaded_at_query: "select max(loaded_at) from {{ this }} where loaded_at > dateadd(day, -7, current_timestamp())"
 ```
 
+## Metadata-derived freshness (when there's no load-timestamp column)
+
+If a source has no obvious load/sync column, Snowflake exposes a last-modified time cheaply via
+`INFORMATION_SCHEMA.TABLES.LAST_ALTERED` — point `loaded_at_query` at it instead of scanning data:
+
+```yaml
+config:
+  freshness:
+    warn_after:  { count: 2, period: hour }
+    error_after: { count: 6, period: hour }
+  loaded_at_query: "select last_altered from analytics.information_schema.tables where table_schema = 'RAW' and table_name = 'ORDERS'"
+```
+
+Fill in the source's database (`<db>.information_schema.tables`), schema, and table; Snowflake
+identifiers are upper-case by default. **Caveat:** `LAST_ALTERED` bumps on *any* change (DDL,
+re-clustering, grants), not just loads — so it can over-report freshness. Use a real
+`loaded_at_field` when you need "fresh" to strictly mean new rows; use this when you just need a
+cheap "has it changed?" signal and no column exists.
+
 ## Timezone
 
 Snowflake `TIMESTAMP_NTZ` columns carry no zone — dbt assumes UTC. If the column is local time,

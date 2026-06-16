@@ -48,19 +48,28 @@ signal it consumes.
    user cares about refreshing on a cadence. Read a neighbouring model's config to match how the
    project configures models (inline `config:` vs `dbt_project.yml`).
 
-3. **Author `build_after`.** Set `count` + `period` to the model's target SLA (e.g. a mart
-   refreshed hourly → `count: 1, period: hour`). Choose `updates_on`:
+3. **Settle the SLA (`count`/`period`) — don't guess it.** The SLA is a business decision. Offer
+   the user two ways to set it (see `build-after.md` for queries and detail):
+   - **A — derive from warehouse usage (opt-in):** if your client can run read-only warehouse
+     queries, estimate how often each model is consumed (or how often its upstreams refresh) from
+     query/access history, propose an SLA from that cadence, and **show the user the number + the
+     evidence to confirm or override**. Read-only only — never mutate the warehouse.
+   - **B — user-defined:** ask the user for the SLA per model (or a marts-wide default).
+   Default to offering both; if neither usage data nor a user SLA is available, ask rather than
+   inventing a number. Leave a clearly-marked placeholder only as a last resort.
+
+4. **Author `build_after`.** Set `count` + `period` to the agreed SLA (e.g. hourly → `count: 1,
+   period: hour`). Choose `updates_on` from the model's DAG:
    - `all` — wait until *every* upstream is fresh (joins where a partial refresh would mislead).
    - `any` (default) — rebuild as soon as *any* upstream has new data.
-   When the right SLA isn't obvious, ask or leave a marked placeholder and explain the trade-off;
-   too tight rebuilds needlessly, too loose breaches the SLA.
 
-4. **Enable SAO on the Orchestra task.** Find the dbt Core task (`integration: DBT_CORE`,
+5. **Enable SAO on the Orchestra task.** Find the dbt Core task (`integration: DBT_CORE`,
    `integration_job: DBT_CORE_EXECUTE`) and set `use_state_orchestration: true`, following
    `orchestra-task.md` for the Git-backed vs Orchestra-backed path. If already enabled, note it.
 
-5. **Hand off.** Report: models changed, SLA values and `updates_on` rationale, whether upstream
-   freshness was present or still needed, whether SAO was newly enabled, and how to verify.
+6. **Hand off.** Report: models changed, SLA values + how they were chosen (usage-derived vs
+   user-defined) and `updates_on` rationale, whether upstream freshness was present or still
+   needed, whether SAO was newly enabled, and how to verify.
 
 ## Verifying (don't run it for them)
 
@@ -70,7 +79,9 @@ The user can inspect SAO decisions by setting `ORCHESTRA_DBT_DEBUG=true` on the 
 
 ## Guardrails
 
-- Write config only — never run `dbt`, never `start_pipeline`.
+- Write config only for the pipeline/repo — never run `dbt`, never `start_pipeline`, never mutate
+  the warehouse. You may run **read-only** usage/metadata queries to estimate SLAs *only* if the
+  user opts in and your client can query the warehouse; otherwise ask the user for the SLAs.
 - Don't author `build_after` without upstream source freshness — flag it as a dependency.
 - `count`/`period` are required; `updates_on` defaults to `any` — only set it when `all` is meant.
 - Match the project's config location (model YAML vs `dbt_project.yml`); don't reformat unrelated YAML.

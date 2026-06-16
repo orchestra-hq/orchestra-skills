@@ -45,6 +45,24 @@ config:
 A `loaded_at_query` with the partition bound baked in is an equally good way to cap cost on the
 big table.
 
+## Metadata-derived freshness (when there's no load-timestamp column)
+
+If a source has no obvious load column, BigQuery exposes a last-modified time cheaply via the
+dataset's hidden `__TABLES__` meta-table — point `loaded_at_query` at it instead of scanning data:
+
+```yaml
+config:
+  freshness:
+    warn_after:  { count: 6,  period: hour }
+    error_after: { count: 24, period: hour }
+  loaded_at_query: "select timestamp_millis(last_modified_time) from `my-gcp-project.raw_dataset.__TABLES__` where table_id = 'signups'"
+```
+
+Fill in the source's project, dataset, and `table_id`. (`INFORMATION_SCHEMA.TABLE_STORAGE.storage_last_modified_time`
+works too.) **Caveat:** `last_modified_time` reflects *any* modification, not just loads, so it can
+over-report freshness — use a real `loaded_at_field` when precision matters; use this when no
+column exists and you just need a cheap "has it changed?" signal.
+
 ## Timezone
 
 BigQuery `TIMESTAMP` is UTC; `DATETIME` has no zone. If using a `DATETIME`/local column, convert:

@@ -63,14 +63,27 @@ sources:
 
 ## Choosing how freshness is computed
 
-1. **`loaded_at_field`** → a query finds `max(<field>)`. Works on every warehouse — the safe
-   default for Orchestra SAO.
-2. **`loaded_at_query`** → you supply the SQL. Best for very large/high-frequency tables.
-3. **Omit both** → metadata inference. **Under Orchestra SAO this only works on Databricks**
-   (`DESCRIBE HISTORY`). On Snowflake, BigQuery, MotherDuck/DuckDB and others there is no Orchestra
-   fallback, so omitting both leaves SAO without a reliable freshness signal — provide an explicit
-   field instead. This is narrower than dbt's own metadata support; see the warehouse matrix in
-   `README.md` and the per-warehouse `warehouses/*.md` files.
+Decide in this order — accuracy first, then convenience:
+
+1. **`loaded_at_field`** (a real load-timestamp column on the source) → a query finds
+   `max(<field>)`. The most accurate signal — "fresh" means new rows actually arrived. Prefer
+   this whenever the table has a clear load/sync timestamp.
+2. **Metadata-derived `loaded_at_query`** → when there's no obvious load-timestamp column but the
+   **warehouse exposes a last-modified time in a simple metadata view**, point a `loaded_at_query`
+   at that metadata instead of scanning the data. This is cheap and needs no business column. It's
+   available where simple: **Snowflake** (`INFORMATION_SCHEMA … LAST_ALTERED`) and **BigQuery**
+   (`__TABLES__.last_modified_time`). Caveat: these reflect *any* table change (DDL, re-cluster),
+   so they can over-report freshness — fine as a "has it changed?" signal, less precise than a
+   real column. See the per-warehouse files for the exact query.
+3. **Omit both (warehouse-native metadata inference)** → **only Databricks** under Orchestra SAO
+   (`DESCRIBE HISTORY`). On every other warehouse there is no Orchestra fallback, so omitting both
+   leaves SAO without a signal — use option 1 or 2 instead.
+
+Where neither a load-timestamp column nor simple last-modified metadata exists
+(**Redshift, Microsoft Fabric, PostgreSQL, MotherDuck/DuckDB, most others**), you must supply an
+explicit `loaded_at_field`/`loaded_at_query` against a real column — ask the user which column
+marks load time rather than guessing. See the warehouse matrix in `README.md` and the per-warehouse
+`warehouses/*.md` files.
 
 ## Timezone correctness
 

@@ -37,49 +37,52 @@ Load these before editing — the warehouse file is the part most often wrong if
 ## Workflow
 
 1. **Detect the warehouse.** Read `profiles.yml` (the `type:` — `snowflake`, `bigquery`,
-   `databricks`, `duckdb`/MotherDuck) or ask. The warehouse decides whether you can omit
-   `loaded_at_field` or must supply one. This is the single most important decision, and it is
-   **narrower than dbt's own metadata support** — judge it by Orchestra SAO's matrix, not dbt's:
-   - **Databricks** — the *only* warehouse where Orchestra infers freshness from metadata
-     (`DESCRIBE HISTORY`). You may omit `loaded_at_field`; use an explicit field only when you
-     need "fresh" to strictly mean new rows.
-   - **Snowflake** — **explicit `loaded_at_field`/`loaded_at_query` required** (no Orchestra
-     fallback; `LAST_ALTERED` is not used by SAO and over-reports anyway).
-   - **BigQuery** — not in Orchestra's fallback table → **explicit field required** (dbt's
-     `TABLE_STORAGE` metadata is not used by SAO). On large partitioned tables add a partition
-     `filter` to keep the query cheap.
-   - **MotherDuck/DuckDB** — metadata freshness **not supported**; an explicit `loaded_at_field`
-     (or `loaded_at_query`) is **required**. If you can't find a load-timestamp column, ask which
-     column marks load time — do not omit it.
-   - **Redshift, Microsoft Fabric, PostgreSQL** — no Orchestra fallback; explicit field required.
-   - **Any other warehouse** (Trino, ClickHouse, Athena, …) — assume no fallback; explicit field
-     required. Read `warehouses/other.md`.
+   `databricks`, `duckdb`/MotherDuck, `redshift`, `fabric`, `postgres`) or ask. The warehouse
+   decides how freshness can be computed, and this is **narrower than dbt's own metadata support**
+   — judge it by Orchestra SAO's matrix, not dbt's. Read the matching `warehouses/*.md`
+   (`other.md` for anything unlisted).
 
-   In short: on everything except Databricks, give an explicit field. There is a `warehouses/*.md`
-   file for each warehouse above (plus `other.md` as the catch-all) — read the matching one.
+2. **Pick the freshness signal — accuracy first, then convenience:**
+   1. **Real load-timestamp column** → `loaded_at_field`. Best signal; prefer it whenever a source
+      has a clear load/sync column. (On a large/partitioned table, add a `filter` or use a bounded
+      `loaded_at_query` to keep the query cheap.)
+   2. **No load column, but the warehouse exposes simple last-modified metadata** → author a
+      **metadata `loaded_at_query`** so dbt reads it cheaply instead of scanning data. Available
+      where simple: **Snowflake** (`INFORMATION_SCHEMA … LAST_ALTERED`) and **BigQuery**
+      (`__TABLES__.last_modified_time`) — see those warehouse files for the exact query. Warn the
+      user it reflects *any* change, not just loads, so it can over-report.
+   3. **Databricks only** → you may omit `loaded_at_field` entirely; Orchestra infers freshness via
+      `DESCRIBE HISTORY`.
+   4. **Everywhere else** (MotherDuck/DuckDB, Redshift, Fabric, Postgres, most others) → metadata
+      is unsupported or not simple; an explicit `loaded_at_field` against a real column is required.
+      If you can't find one, ask the user which column marks load time — do not omit it.
 
-2. **Check the dbt version.** From `require-dbt-version` in `dbt_project.yml` or `dbt --version`.
+   In short: prefer a real column; on Snowflake/BigQuery a metadata `loaded_at_query` is a fine
+   fallback when no column exists; only Databricks may omit the setting entirely.
+
+3. **Check the dbt version.** From `require-dbt-version` in `dbt_project.yml` or `dbt --version`.
    1.9+ → put `freshness` under `config:`; 1.10+ → `loaded_at_field` under `config:` too. If the
    project already uses an older root-level form, stay consistent with it. (See the reference.)
 
-3. **Find the sources.** Locate existing `sources:` YAML (often `models/**/_sources.yml` or
+4. **Find the sources.** Locate existing `sources:` YAML (often `models/**/_sources.yml` or
    `models/**/src_*.yml`). If sources aren't defined yet, that's a prerequisite — define them or
    tell the user. Read a neighbouring source file to match the project's naming and layout.
 
-4. **Author freshness.** Add `warn_after`/`error_after` based on each source's real load cadence
-   plus headroom (see the reference for picking thresholds). Add the warehouse-appropriate
-   `loaded_at_field`/`loaded_at_query`. Add a `filter` for soft-deletes or partition pruning where
-   it helps cost. Don't invent tight thresholds you can't justify — leave a marked placeholder and
-   explain it if cadence is unknown.
+5. **Author freshness.** Add `warn_after`/`error_after` based on each source's real load cadence
+   plus headroom (see the reference for picking thresholds). Add the freshness signal chosen in
+   step 2 (`loaded_at_field`, a metadata `loaded_at_query`, or — Databricks only — neither). Add a
+   `filter` for soft-deletes or partition pruning where it helps cost. Don't invent tight
+   thresholds you can't justify — leave a marked placeholder and explain it if cadence is unknown.
 
-5. **Enable SAO on the Orchestra task.** Find the dbt Core task
+6. **Enable SAO on the Orchestra task.** Find the dbt Core task
    (`integration: DBT_CORE`, `integration_job: DBT_CORE_EXECUTE`) and set
    `use_state_orchestration: true`. Follow `orchestra-task.md` for the Git-backed (edit YAML +
    commit) vs Orchestra-backed (validate + `update_pipeline`, falling back to `migrate_pipeline`
    on a 422) distinction. If it's already enabled, note that and don't re-apply.
 
-6. **Hand off.** Report: files changed, the warehouse choice and why, thresholds (and any
-   placeholders to tune), whether SAO was newly enabled, and how to verify (next step).
+7. **Hand off.** Report: files changed, the freshness signal used per source (real column vs
+   metadata query) and why, thresholds (and any placeholders to tune), whether SAO was newly
+   enabled, and how to verify (next step).
 
 ## Verifying (don't run it for them)
 

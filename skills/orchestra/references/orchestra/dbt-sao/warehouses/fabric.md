@@ -34,6 +34,12 @@ config:
   loaded_at_query: "select max(loaded_at) from {{ this }} where loaded_at > dateadd(day, -7, sysutcdatetime())"
 ```
 
+## Metadata-derived freshness — not simple here
+
+Fabric's catalog views (`sys.tables.modify_date`, `sys.dm_*`) track schema changes, not data
+loads, so there's no cheap, reliable last-load timestamp to point a `loaded_at_query` at. Use an
+explicit `loaded_at_field` against a real load-timestamp column; if none exists, ask the user.
+
 ## Timezone
 
 T-SQL `datetime2` is zone-naive and assumed UTC; use `sysutcdatetime()` (not `getdate()`) when

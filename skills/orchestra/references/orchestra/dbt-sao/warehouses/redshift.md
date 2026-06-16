@@ -35,6 +35,13 @@ config:
   loaded_at_query: "select max(loaded_at) from {{ this }} where loaded_at > dateadd(day, -7, getdate())"
 ```
 
+## Metadata-derived freshness — not simple here
+
+Redshift has no single, cheap last-modified column (`SVV_TABLE_INFO` carries no load timestamp;
+`STL_INSERT`/`SYS_*` history is complex and permission-gated). Don't try to derive freshness from
+metadata — use an explicit `loaded_at_field` (or a bounded `loaded_at_query`) against a real
+load-timestamp column. If none exists, ask the user which column marks load time.
+
 ## Timezone
 
 Redshift `TIMESTAMP` is zone-naive and assumed UTC; `TIMESTAMPTZ` stores a zone. If a column is

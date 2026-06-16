@@ -49,13 +49,19 @@ omitted:
 | Warehouse | Orchestra SAO metadata fallback? | What to author |
 |-----------|----------------------------------|----------------|
 | **Databricks** | **Yes** — Orchestra runs `DESCRIBE HISTORY` on the source relation | May omit `loaded_at_field`; metadata inference works |
-| **Snowflake** | No Orchestra fallback | **Explicit `loaded_at_field` or `loaded_at_query` required** |
-| **MotherDuck / DuckDB** | Not supported | **Explicit `loaded_at_field` or `loaded_at_query` required** |
-| **BigQuery** | Not listed → no Orchestra fallback | **Explicit `loaded_at_field` or `loaded_at_query` required** |
-| **Microsoft Fabric** | No Orchestra fallback | Explicit required |
-| **PostgreSQL** | No Orchestra fallback | Explicit required |
-| **Redshift** | Not listed → no Orchestra fallback | Explicit required |
-| Other adapters (Trino, ClickHouse, Athena, …) | No fallback unless listed above | Explicit; or verify dbt's default for that warehouse |
+| **Snowflake** | No fallback, but metadata is queryable | Explicit `loaded_at_field`; **or** a metadata `loaded_at_query` on `INFORMATION_SCHEMA … LAST_ALTERED` when no load column exists |
+| **BigQuery** | No fallback, but metadata is queryable | Explicit `loaded_at_field`; **or** a metadata `loaded_at_query` on `__TABLES__.last_modified_time` when no load column exists |
+| **MotherDuck / DuckDB** | Not supported, no simple metadata | **Explicit `loaded_at_field`/`loaded_at_query` required** |
+| **Redshift** | No fallback, metadata not simple | **Explicit `loaded_at_field`/`loaded_at_query` required** |
+| **Microsoft Fabric** | No fallback, metadata not simple | **Explicit required** |
+| **PostgreSQL** | No fallback, metadata not simple | **Explicit required** |
+| Other adapters (Trino, ClickHouse, Athena, …) | No fallback unless listed above | Explicit; metadata `loaded_at_query` only if the warehouse exposes a simple last-modified view |
+
+"Metadata `loaded_at_query`" = point `loaded_at_query` at the warehouse's own last-modified
+metadata so dbt reads it cheaply instead of scanning data — handy when a source has no load
+column. It still satisfies SAO's "explicit query required" rule. Caveat: such metadata reflects
+*any* change, not just loads, so it can over-report freshness; a real `loaded_at_field` is more
+precise.
 
 > Orchestra's own words: "For adapters without a registered fallback, if both `loaded_at`
 > settings are missing, Orchestra follows dbt's `FreshnessRunner` behaviour (which may surface as
