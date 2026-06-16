@@ -12,6 +12,11 @@ The task is `integration: DBT_CORE`, `integration_job: DBT_CORE_EXECUTE`. In the
 this is the **"Use state orchestration"** toggle in the dbt Core task's parameters. No package
 upgrade or extra command flags are needed — it works on plain `dbt build`.
 
+**You don't run `dbt source freshness` in the pipeline.** With the toggle on, Orchestra runs the
+freshness check itself before the build and uses the result to make SAO skip decisions. Leave the
+task's `commands` as-is (`dbt build`); do **not** prepend `dbt source freshness` or chain it in.
+The freshness *config* in the dbt project is all you author — Orchestra does the running.
+
 **It's the SAO master switch, not a per-feature setting.** `use_state_orchestration` turns
 state-aware orchestration on for the task as a whole — Orchestra then consumes *whatever* SAO
 config exists in the project: source freshness **and** `build_after` together. It is not specific
