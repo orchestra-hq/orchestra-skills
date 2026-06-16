@@ -1,9 +1,0 @@
-{
-  "name": "orchestra-hq/create-orchestra-pipeline",
-  "description": "Create, validate, and remediate Orchestra pipeline YAML files. Use when asked to build a new pipeline, add tasks to an existing pipeline, fix pipeline validation errors, or author Orchestra workflow definitions from a description. Trigger on phrases like \"create a pipeline\", \"add a dbt task\", \"write orchestra yaml\", \"fix validate errors\", or when editing files under orchestra/ or similar pipeline directories.",
-  "private": true,
-  "skills": [
-    "."
-  ],
-  "version": "0.1.0"
-}

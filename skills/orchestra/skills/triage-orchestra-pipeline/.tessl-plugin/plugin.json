@@ -1,9 +1,0 @@
-{
-  "name": "orchestra-hq/triage-orchestra-pipeline",
-  "description": "Diagnose a failed Orchestra pipeline, open a fix PR, validate it on a branch run, then present a human-readable triage summary and STOP for user approval before merging. Use this when the user wants to review the fix before it goes to main — not for fully automated fixes. Trigger on phrases like \"triage my pipeline\", \"show me what's broken\", \"investigate but don't fix yet\", \"prepare a fix for review\", or when the user explicitly wants a review gate before applying changes. Also trigger when the user describes a symptom in a downstream system (\"dashboard looks wrong\", \"chart is stale\", \"dbt model has bad data\") even if no pipeline error exists — the skill will trace the symptom upstream.",
-  "private": true,
-  "skills": [
-    "."
-  ],
-  "version": "0.1.0"
-}

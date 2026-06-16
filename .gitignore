@@ -221,3 +221,6 @@ __marimo__/
 .claude/
 .cursor/
 scripts/vendor/
+
+# User MCP configuration file
+.mcp.json
