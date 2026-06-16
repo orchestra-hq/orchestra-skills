@@ -17,6 +17,8 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 | [`create-orchestra-pipeline`](skills/orchestra/skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
 | [`orchestra-dbt-slim-ci-setup`](skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline. | _"Set up dbt Slim CI in Orchestra"_ |
 | [`run-snowflake-quality-tests`](skills/orchestra/skills/run-snowflake-quality-tests/SKILL.md) | Inspect Snowflake tables, then build and deploy a data-quality testing pipeline to Orchestra. | _"Run Snowflake data quality tests"_ |
+| [`configure-dbt-source-freshness`](skills/orchestra/skills/configure-dbt-source-freshness/SKILL.md) | Author dbt source freshness (warehouse-correct `loaded_at_field`/thresholds) and enable `use_state_orchestration` so Orchestra skips downstream models when sources are unchanged. | _"Set up source freshness for state-aware orchestration"_ |
+| [`configure-dbt-build-after`](skills/orchestra/skills/configure-dbt-build-after/SKILL.md) | Author per-model `build_after` (SLA + upstream-freshness gating) so Orchestra rebuilds a model only when it's due and its data is fresh. | _"Make my marts state-aware — only rebuild when due and fresh"_ |
 
 **To get going:** connect [Orchestra's cloud MCP server](https://docs.getorchestra.io/docs/mcp) (see [Install](#install-for-humans) below), install the `orchestra` plugin so the skills are discoverable by your client (see Install), then just ask.
 
@@ -25,6 +27,7 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/references/orchestra/README.md). Highlights:
 
 - **Pipeline** — authoring schema + examples, failure classification, remediation playbooks, and an optional local fix-history template ([`knowledge-store.md`](skills/orchestra/references/orchestra/pipeline/knowledge-store.md))
+- **State-aware orchestration (dbt SAO)** — source-freshness and `build_after` schemas, enabling `use_state_orchestration`, and a per-warehouse freshness matrix for Snowflake, BigQuery, Databricks, and MotherDuck/DuckDB ([`dbt-sao/`](skills/orchestra/references/orchestra/dbt-sao/README.md))
 - **MCP** — [cloud MCP](https://docs.getorchestra.io/docs/mcp) setup and tool quick reference
 
 ## Install for humans
