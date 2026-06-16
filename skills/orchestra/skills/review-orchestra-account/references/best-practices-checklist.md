@@ -155,15 +155,15 @@ Good: secrets come from integration credentials or a key vault (AWS Secrets Mana
 Vault). Signal: in `get_pipeline`, literal-looking secrets in task params — values matching API-key/
 token/password/connection-string patterns (e.g. long high-entropy strings, `sk-`, `AKIA`, `xoxb-`,
 `postgres://user:pass@`) instead of `${{ ENV.* }}` or a connection ref. → Move to a secrets
-manager/credential. High severity — call out the exact task and key. Docs:
-`/docs/integrations/aws_secrets_manager`.
+manager/credential. High severity — call out the exact task and key **name** only; never record or
+report the secret value itself (not even a fragment). Docs: `/docs/integrations/aws_secrets_manager`.
 
 **4.4 Avoid plain-text env vars for sensitive values** — *High*
 Good: sensitive values use integration credentials or a key vault; env vars are for non-sensitive
 config only (they display in clear text). Signal: env-var names suggesting secrets (`*_KEY`,
 `*_SECRET`, `*_TOKEN`, `*_PASSWORD`, `*_PAT`) used as plain-text environment variables, especially in
-inline Python tasks. → Use a key vault / credential. Docs:
-`/docs/guides/configuration/running-python`.
+inline Python tasks. → Use a key vault / credential. Flag by env-var **name** only — never copy the
+value into notes or the report. Docs: `/docs/guides/configuration/running-python`.
 
 **4.5 Let Orchestra own the schedule** — *Medium* `[MANUAL]` (partial)
 Good: source tools (Airbyte, Stitch, Hightouch, Fivetran) set to manual/paused and triggered from
