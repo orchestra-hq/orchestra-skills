@@ -95,9 +95,17 @@ Field names also vary between the YAML form and the stored API form (e.g. `max_a
 ### Step 3 — Evaluate against the checklist
 
 Work through `references/best-practices-checklist.md` against the data you gathered. For each
-violation, record: the check, the **specific** offending pipeline/task/field (evidence — names and
-values, not vague claims), the severity, and the recommendation with its doc link. A clean check is
-worth noting too — the report's value is partly the reassurance that the basics are covered.
+violation, record: the check, the **specific** offending pipeline/task/field (evidence by
+location — pipeline → task → field/key name, not vague claims), the severity, and the recommendation
+with its doc link. A clean check is worth noting too — the report's value is partly the reassurance
+that the basics are covered.
+
+**Never reproduce a secret value.** For credential findings (e.g. checks 4.3/4.4 — a literal secret
+in a task param, or a sensitive value in a plain-text env var), cite only the location and the
+field/env-var name and state that it holds a literal secret. Do **not** copy the value, or any
+fragment of it, into your working notes or the report — not even a masked prefix. The location and
+name are enough to fix it; the value must never enter the context or conversation history. The same
+applies to any other field whose contents are themselves sensitive.
 
 Be precise and avoid false positives. If you didn't gather the data a check needs (e.g. you sampled
 pipelines, or a 7-day window hid something), mark that check **Not assessed** rather than passing or
@@ -169,8 +177,10 @@ assessable checks rather than scoring it 0. Pipelines reviewed: <n of m>; note a
 ## Findings
 | Severity | Finding (with evidence) | Fix |
 |----------|-------------------------|-----|
-| High | <what's wrong + the specific pipeline/task/field + value> | <what to do> ([docs](<link>)) |
-<Real findings only, sorted High → Low. Skip clean and Not-assessed checks here.>
+| High | <what's wrong + the specific pipeline/task/field; concrete value only if non-sensitive> | <what to do> ([docs](<link>)) |
+<Real findings only, sorted High → Low. Skip clean and Not-assessed checks here. For secret/
+credential findings, name the location and field only — never put a secret value (or fragment) in
+this table.>
 
 ## Working well
 - <2–4 clean checks worth the reassurance>
