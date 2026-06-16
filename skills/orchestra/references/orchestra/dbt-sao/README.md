@@ -15,6 +15,22 @@ Both depend on one Orchestra-side switch: `use_state_orchestration: true` on the
 (see [orchestra-task.md](orchestra-task.md)). Without it, the dbt config is authored but never
 consumed.
 
+## How these compose
+
+The two skills can run on their own or together — with one asymmetry:
+
+- **Source freshness — standalone.** Run `configure-dbt-source-freshness` by itself and you have a
+  complete SAO setup: Orchestra skips models below a stale source. It also turns SAO on.
+- **`build_after` — independent to add, but dependent on freshness to *work*.** Its "rebuild only
+  when upstream is **fresh**" half needs a freshness signal to read. You can author it alone (the
+  SLA/time-window part still works), but the freshness-gating part is inert until source freshness
+  exists — so `configure-dbt-build-after` checks for freshness first and tells the user to pair it
+  with `configure-dbt-source-freshness` if it's missing.
+- **Both together — the full picture.** Set up freshness first, then `build_after`.
+- **The SAO switch is shared.** `use_state_orchestration` is enabled by *whichever* skill you run
+  first; there is no separate "enable SAO" step, and the second skill just confirms it's on (see
+  [orchestra-task.md](orchestra-task.md)).
+
 ## Files
 
 | File | Purpose |
