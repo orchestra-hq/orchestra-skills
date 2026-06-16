@@ -1,6 +1,6 @@
 {
   "name": "orchestra-hq/orchestra-skills",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A curated collection of Agent Skills for working with Orchestra, for agents to effectively implement standards, common workflows, and manage pipelines.",
   "private": false,
   "docs": "README.md",
