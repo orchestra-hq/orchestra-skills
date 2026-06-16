@@ -48,15 +48,18 @@ signal it consumes.
    user cares about refreshing on a cadence. Read a neighbouring model's config to match how the
    project configures models (inline `config:` vs `dbt_project.yml`).
 
-3. **Settle the SLA (`count`/`period`) — don't guess it.** The SLA is a business decision. Offer
-   the user two ways to set it (see `build-after.md` for queries and detail):
-   - **A — derive from warehouse usage (opt-in):** if your client can run read-only warehouse
-     queries, estimate how often each model is consumed (or how often its upstreams refresh) from
-     query/access history, propose an SLA from that cadence, and **show the user the number + the
-     evidence to confirm or override**. Read-only only — never mutate the warehouse.
-   - **B — user-defined:** ask the user for the SLA per model (or a marts-wide default).
-   Default to offering both; if neither usage data nor a user SLA is available, ask rather than
-   inventing a number. Leave a clearly-marked placeholder only as a last resort.
+3. **Settle the SLA (`count`/`period`) — ask first, don't guess.** The SLA is a business decision,
+   and the user often already knows it. **Prompt the user before doing anything else:** do they
+   have a target SLA per model (or a marts-wide default) in mind, or would they like you to derive
+   one from warehouse usage? Two paths (see `build-after.md` for queries and detail):
+   - **B — user-defined (expect this first):** take the SLA the user gives you.
+   - **A — derive from warehouse usage:** only if the user asks for it *and* your client can run
+     read-only warehouse queries — estimate how often each model is consumed (or how often its
+     upstreams refresh) from query/access history, then **show the user the number + the evidence
+     to confirm or override**. Read-only only — never mutate the warehouse, and don't run the query
+     without the user opting in.
+   Never invent a number; if the user has no SLA and doesn't want the usage path, leave a
+   clearly-marked placeholder and explain the trade-off.
 
 4. **Author `build_after`.** Set `count` + `period` to the agreed SLA (e.g. hourly → `count: 1,
    period: hour`). Choose `updates_on` from the model's DAG:

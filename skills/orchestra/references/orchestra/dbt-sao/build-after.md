@@ -67,10 +67,12 @@ upstream — you don't have to annotate every intermediate model to get sensible
 join across several fact sources where a partial refresh would mislead), **`any`** (default) for
 models where any new upstream data is worth a rebuild. You can read this off the model SQL.
 
-`count`/`period` is the model's **SLA** — and that's a business decision, not something to guess.
-Don't invent a number. Settle it one of two ways:
+`count`/`period` is the model's **SLA** — a business decision, not something to guess. **Ask the
+user first**: they often already know the target (e.g. "marts must be no more than an hour stale").
+Only reach for warehouse usage if they don't know and want you to estimate it. Settle it one of
+two ways:
 
-### Approach A — derive the SLA from warehouse usage (opt-in)
+### Approach A — derive the SLA from warehouse usage (only if the user asks)
 
 If the client can run read-only queries against the warehouse, estimate how often each model is
 actually consumed (or how often its upstreams refresh) and propose an SLA from that — e.g. a mart
@@ -98,14 +100,14 @@ Turn the cadence into an SLA (busy hourly read pattern → hourly; daily reporti
 **Always show the user the derived number and the evidence, and let them confirm or override** —
 usage is a proxy for the SLA, not the SLA itself.
 
-### Approach B — user-defined SLAs
+### Approach B — user-defined SLAs (the default)
 
-Ask the user for the SLA per model (or a default across the marts layer). This is the right path
-when warehouse querying isn't available/wanted, or when the SLA is a known business commitment.
+Take the SLA the user gives you, per model or as a marts-wide default. This is the expected path —
+the SLA is usually a known business commitment, so prompt for it before considering Approach A.
 
-Default behaviour: offer both. If you can't query usage and the user hasn't given SLAs, **ask** —
-leave a clearly-marked placeholder only as a last resort, and explain the trade-off (too tight
-rebuilds needlessly; too loose breaches the SLA).
+Default behaviour: **ask first.** Only run a usage query if the user opts in. If the user has no
+SLA and doesn't want the usage path, leave a clearly-marked placeholder as a last resort and
+explain the trade-off (too tight rebuilds needlessly; too loose breaches the SLA).
 
 ## Dependency on source freshness
 
