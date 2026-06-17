@@ -12,6 +12,16 @@ Grouped by concern. Paths below are relative to `references/orchestra/` in this 
 | `pipeline/remediation-playbooks.md` | Action paths by error category |
 | `pipeline/knowledge-store.md` | Optional local fix-history template (ships empty); recall/record is deferred to your client's persistent memory |
 
+## State-aware orchestration (dbt SAO)
+
+| File | Purpose |
+|------|---------|
+| `dbt-sao/README.md` | Index + the per-warehouse freshness rule that decides everything |
+| `dbt-sao/source-freshness.md` | dbt `freshness` schema, version placement, `loaded_at_field`/`loaded_at_query` (`configure-dbt-source-freshness`) |
+| `dbt-sao/build-after.md` | dbt model `config.freshness.build_after` schema (`configure-dbt-build-after`) |
+| `dbt-sao/orchestra-task.md` | Enabling `use_state_orchestration` on the dbt Core task (Git- vs Orchestra-backed) |
+| `dbt-sao/warehouses/*.md` | Per-warehouse freshness specifics (Snowflake, BigQuery, Databricks, MotherDuck) |
+
 ## MCP (connecting & tool usage)
 
 | File | Purpose |
