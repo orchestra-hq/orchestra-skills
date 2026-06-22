@@ -4,7 +4,6 @@ description: >
   Diagnose and fix Python tasks running in Orchestra Pipelines. Succinct,
   API-first. Biased toward editing the script and re-running until it works,
   with additive-only schema changes to the destination.
-disable-model-invocation: true
 ---
 
 Diagnose → locate the script → check what it lands → fix → validate → confirm → merge/save. Narrate each step briefly, like a data engineer. Never print secrets/tokens.

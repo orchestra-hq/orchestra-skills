@@ -3,7 +3,6 @@ name: fix-pipeline-dbt-task
 description: >
   Diagnose and fix dbt Core jobs running in Orchestra Pipelines. Succinct,
   API-first workflow refined from real fixes.
-disable-model-invocation: true
 ---
 
 Diagnose → fix → validate on a branch → confirm → merge. Narrate each step briefly, like a data engineer. Never print secrets/tokens.
