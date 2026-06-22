@@ -1,5 +1,5 @@
 ---
-name: create-orchestra-pipeline
+name: create-orchestra-pipeline-v2
 description: >
   Create, validate, and remediate Orchestra pipeline YAML files. Use when asked to build a new
   pipeline, add tasks to an existing pipeline, fix pipeline validation errors, or author
