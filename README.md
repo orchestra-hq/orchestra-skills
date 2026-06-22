@@ -12,7 +12,10 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 | Skill | What it does | Try saying |
 |-------|--------------|------------|
-| [`fix-orchestra-pipeline`](skills/orchestra/skills/fix-orchestra-pipeline/SKILL.md) | Diagnose → fix → retry a failed pipeline end-to-end (logs, artifacts, root cause, PR, rerun). | _"Why did my pipeline fail?"_ — or paste a run URL, UUID, or error |
+| [`identify-pipeline-error`](skills/orchestra/skills/identify-pipeline-error/SKILL.md) | **Entry point for fixing anything.** Gets the pipeline run and task runs, identifies which task broke and why, then routes to the right fixer (or handles non-code causes itself). | _"Fix my pipeline"_ / _"what's broken?"_ — or paste a run URL, UUID, or error |
+| [`fix-pipeline-dbt-task`](skills/orchestra/skills/fix-pipeline-dbt-task/SKILL.md) | Fixes a dbt Core task once identified as a dbt code/config issue — reproduce, fix in repo, validate on a branch, confirm, merge. Usually invoked by `identify-pipeline-error`. | _"Fix the broken dbt task"_ |
+| [`fix-pipeline-python-task`](skills/orchestra/skills/fix-pipeline-python-task/SKILL.md) | Fixes a Python task once identified as a code / dependency / destination-schema issue — edit the script, additive-only schema changes, validate, confirm. Usually invoked by `identify-pipeline-error`. | _"Fix the broken python task"_ |
+| [`fix-orchestra-pipeline`](skills/orchestra/skills/fix-orchestra-pipeline/SKILL.md) | Fixes an Orchestra-platform/configuration issue (YAML/inputs/ordering/retry) or a repo code fix in an integration with no dedicated skill — apply fix, PR/poll, retry, confirm. Usually invoked by `identify-pipeline-error`. | _"The pipeline config is wrong, fix it"_ |
 | [`triage-orchestra-pipeline`](skills/orchestra/skills/triage-orchestra-pipeline/SKILL.md) | Same diagnosis, but opens a fix PR and validates it on a branch, then **stops for your approval** before merging. | _"Triage my pipeline but don't merge yet"_ |
 | [`review-orchestra-account`](skills/orchestra/skills/review-orchestra-account/SKILL.md) | Read-only audit of your Orchestra workspace against best practices — findings grouped by area with severity, evidence, and fixes, written to a report plus chat summary. Never edits anything. | _"Audit my Orchestra account / is my setup following best practices?"_ |
 | [`create-orchestra-pipeline`](skills/orchestra/skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
@@ -51,7 +54,7 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 
 ## Typical workflows
 
-**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. The fix skill parses the input, loads failed task runs, pulls logs and artifacts, classifies the failure, applies remediation, retries when appropriate, and optionally records the fix to your client's memory.
+**Failed run** — Paste a pipeline run URL, run UUID, pipeline name, or error snippet. `identify-pipeline-error` parses the input, loads the pipeline run and failed task runs, identifies the failing task and its cause, then routes to the right fixer: a dbt code issue → `fix-pipeline-dbt-task`, a Python code/schema issue → `fix-pipeline-python-task`, an Orchestra-platform/config issue → `fix-orchestra-pipeline`. Data, vendor/ingestion, auth, network, and other causes are reported with the right next action by `identify-pipeline-error` itself.
 
 **Author pipeline YAML** — Describe the desired stages/tasks and create a `version: v1` pipeline YAML. The authoring skill validates (via `orchestra-cli` or MCP) and remediates validation errors until clean.
 

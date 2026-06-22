@@ -1,11 +1,15 @@
 ---
 name: fix-pipeline-dbt-task
 description: >
-  Diagnose and fix dbt Core jobs running in Orchestra Pipelines. Succinct,
-  API-first workflow refined from real fixes.
+  Fix a dbt Core task in an Orchestra Pipeline once the failure has been identified as a dbt
+  code/config issue. Normally invoked by identify-pipeline-error after it classifies the cause;
+  it can also run standalone if the user points directly at a broken dbt task. Succinct,
+  API-first workflow refined from real fixes. Identification/classification lives in
+  identify-pipeline-error — this skill is the FIX half: reproduce → fix → validate on a branch →
+  confirm → merge.
 ---
 
-Diagnose → fix → validate on a branch → confirm → merge. Narrate each step briefly, like a data engineer. Never print secrets/tokens.
+Fix → validate on a branch → confirm → merge. Narrate each step briefly, like a data engineer. Never print secrets/tokens.
 
 ## 0. Access
 
@@ -14,32 +18,24 @@ If neither MCP nor a key is available, read `../../../references/orchestra/mcp/s
 
 Base: `https://app.getorchestra.io/api/engine/public` — header `Authorization: Bearer $ORCHESTRA_API_KEY`.
 
-## 1. Establish the failure (from a run ID / URL)
+## 1. Inputs from identify-pipeline-error
 
-```
-GET /pipeline_runs?pipeline_run_ids=<RID>          # run status, pipelineId, branch, commit
-GET /task_runs?pipeline_ids=<PID>&page_size=50     # find FAILED task; then filter results by pipelineRunId yourself
-```
-Gotchas: the `pipeline_run_ids` filter does **not** work on `/task_runs` — filter client-side. `/task_runs` returns a 7-day window.
+`identify-pipeline-error` hands you: the pipeline run ID (**RID**), pipeline ID (**PID**), the failed dbt **task run ID** (TRID), `integration=DBT_CORE`, the run `branch`/`commit`, the task's `taskParameters`, and the cause classification (a dbt **code/config** issue). Use them directly — don't re-run the identification.
 
-**Capture `taskParameters` exactly** — especially `branch`, `commands`, `project_dir`, `use_state_orchestration`. These are run inputs you must preserve on retry. Note the pipeline run's `branch` is where the *Orchestra YAML* lives; the dbt clone branch is a separate task param (commonly an input like `dbt_branch`).
+**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs?pipeline_run_ids=<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50` (filter to this RID client-side; the `pipeline_run_ids` filter does **not** work on `/task_runs`, 7-day window) to find the FAILED dbt task.
 
-Logs:
+**Capture `taskParameters` exactly** — especially `branch`, `commands`, `project_dir`, `use_state_orchestration`. These are run inputs you must preserve on retry. The pipeline run's `branch` is where the *Orchestra YAML* lives; the dbt clone branch is a separate task param (commonly an input like `dbt_branch`).
+
+Pull the logs you'll fix against:
 ```
 GET /pipeline_runs/<RID>/task_runs/<TRID>/logs                                  # list filenames
 GET /pipeline_runs/<RID>/task_runs/<TRID>/logs/download?filename=1/debug_task   # URL-encode spaces, e.g. 1/dbt%20run
 ```
 `debug_task` = `dbt debug` (config/YAML validation); `dbt run` / `dbt build` = compile + execution.
 
-## 2. Classify the cause
+## 2. Scope check — you're here to fix dbt code
 
-1. **Data** (DQ test / source freshness fails) → leave, notify owner, or adjust threshold. Don't edit data.
-2. **dbt code** (YAML syntax, bad `ref`/`source`, SQL identifier, missing column) → fix in repo. **Most common.**
-3. **Infra/timeout** → retry / bump compute.
-4. **Orchestra pipeline** --> fix ORchestra Pipeline if it is git-backed. Otherwise tell user to edit Orchestra pipeline.
-5. **upstream ingestion** → summarise; you usually can't fix from here.
-
-Source-freshness `ERROR STALE` lines are category 1 (data), not code — they rarely fail a `dbt run`; don't chase them unless they're the terminal error.
+You were routed here because the cause is a dbt **code/config** issue, so fix it in the repo. If while reproducing you find the real cause is **not** a code fix — a data-quality / source-freshness failure (don't edit data), an infra/timeout, an Orchestra-pipeline misconfig, or an upstream ingestion problem — **stop and hand back to `identify-pipeline-error`** rather than editing code. (Source-freshness `ERROR STALE` lines are a data issue, not code; they rarely fail a `dbt run` — don't chase them unless they're the terminal error.)
 
 ## 3. The reported error is usually just the FIRST bug
 

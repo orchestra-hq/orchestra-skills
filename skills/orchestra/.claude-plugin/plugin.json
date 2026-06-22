@@ -1,7 +1,7 @@
 {
   "name": "orchestra",
   "description": "Skills for working with Orchestra data pipelines — diagnose and fix failed runs, triage with a merge gate, author pipeline YAML, set up dbt Slim CI, configure dbt state-aware orchestration (source freshness and build_after), run Snowflake data-quality tests, and review a workspace against best practices. MCP-native.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": {
     "name": "Orchestra"
   },

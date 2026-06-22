@@ -1,21 +1,20 @@
 ---
 name: fix-orchestra-pipeline
 description: >
-  Automatically diagnose and fix failed Orchestra data pipelines. Use this skill whenever a user
-  mentions Orchestra pipeline failures, broken pipelines, pipeline errors, task failures, pipeline
-  debugging, or wants to understand why an Orchestra pipeline run failed. Also trigger when the user
-  says things like "fix my pipeline", "what's broken", "why did my pipeline fail", "debug this run",
-  "retry my pipeline", or references Orchestra pipeline runs, task runs, or pipeline errors.
-  This skill handles the full lifecycle: identify failures, fetch logs and artifacts, diagnose the
-  root cause, apply fixes where possible, retry, and learn from past fixes. It supports all
-  Orchestra integrations including dbt, Snowflake, Python, HTTP, Fivetran, Airbyte, and more.
-  Trigger this skill even if the user just pastes an Orchestra error message, pipeline run URL,
-  pipeline run link from the Orchestra UI, a UUID, a Slack alert, or a pipeline name/alias.
+  Fix a failed Orchestra pipeline once the failure has been identified as an Orchestra-platform /
+  configuration issue — pipeline YAML misconfiguration, wrong or missing task inputs, task ordering,
+  env/connection wiring, a transient Orchestra-side blip needing a plain retry, or an
+  Orchestra-backed pipeline that needs update_pipeline. Also the fallback fixer for repo-level code
+  fixes in integrations that don't have a dedicated skill (e.g. a Snowflake/HTTP SQL bug needing a
+  PR). Normally invoked by identify-pipeline-error after it classifies the cause; for dbt-code or
+  Python-code failures, that router calls fix-pipeline-dbt-task or fix-pipeline-python-task instead.
+  This skill is the FIX half (apply fix → PR/poll → retry → confirm → optionally remember);
+  identification and classification live in identify-pipeline-error.
 ---
 
 # Fix Orchestra Pipeline
 
-Diagnose, fix, and retry failed Orchestra pipelines — and optionally remember what worked.
+Fix and retry an already-diagnosed Orchestra pipeline — and optionally remember what worked.
 
 ## Prerequisites
 
@@ -27,102 +26,24 @@ user's workspace.
 Use Orchestra MCP tools for all operations in this skill (read a pipeline's full definition with
 `get_pipeline`). Argument summaries: `../../references/orchestra/mcp/tools-quick-ref.md`.
 
-## Parsing user input
+## Inputs from identify-pipeline-error
 
-The user may provide their problem in several forms. Parse the input before entering the
-workflow:
+`identify-pipeline-error` is the entry point that parses the user's input (URL, UUID, alias, error
+text, Slack alert), finds the failed run and task, and classifies the cause. It hands you:
 
-### Orchestra URLs
-Users often paste a link from the Orchestra UI. Extract IDs from any of these URL patterns:
+- the pipeline run ID, `pipelineId`, `pipelineName`, `envName`, run `branch`/`commit`, `triggeredBy`
+- the failed task run(s): `id`, `taskName`, `taskId`, `integration`, `integrationJob`, `message`,
+  `externalStatus`, `externalMessage`, `taskParameters`, `runParameters`, `connectionId`,
+  `numberOfAttempts`
+- the cause classification — an **Orchestra-platform / configuration** issue (or a repo-level fix in
+  an integration with no dedicated skill).
 
-```
-https://app.getorchestra.io/pipeline-runs/{pipeline_run_id}
-https://app.getorchestra.io/pipeline-runs/{pipeline_run_id}/lineage
-https://app.getorchestra.io/pipeline-runs/{pipeline_run_id}/task-runs/{task_run_id}
-https://app.getorchestra.io/pipelines/{pipeline_id}/runs/{pipeline_run_id}
-https://app.getorchestra.io/pipelines/{pipeline_id}
-```
-
-The IDs are UUIDs (e.g. `123e4567-e89b-12d3-a456-426614174000`). If a URL contains a
-pipeline_run_id, skip straight to Step 2. If it only contains a pipeline_id, query for
-the latest failed run of that pipeline.
-
-For custom/self-hosted Orchestra instances, the base domain may differ (e.g.
-`https://orchestra.company.com/...`). The path structure is the same — extract UUIDs
-from path segments.
-
-### Raw UUIDs
-If the user pastes a bare UUID, try it as a pipeline run ID first with
-`get_pipeline_run_status`. If that returns a result, proceed to Step 2.
-If not, treat it as a pipeline ID and query recent runs with `list_pipeline_runs`.
-
-### Pipeline names or aliases
-If the user says "fix the daily-etl pipeline", search for it with `list_pipelines`
-and match by name or alias, then query for its latest failed run.
-
-### Error messages
-If the user pastes an error message or log snippet, skip to Step 4 (Diagnose) — you
-already have the evidence. Ask for the pipeline run ID only if you need to fetch
-additional context like logs or artifacts.
-
-### Slack / alert messages
-Orchestra alert messages (from Slack, Teams, email, webhooks) typically contain the
-pipeline name, task name, and status. Extract these and use them to find the
-corresponding pipeline run via `list_pipeline_runs`/`list_task_runs`.
+Use these directly and proceed to **Step 3**. **If invoked standalone** (no handoff), run
+`identify-pipeline-error` first to establish the failed run/task and the cause, then come back here.
 
 ## Workflow overview
 
-Execute these steps in order. Each step feeds the next. If the parsed input provides
-enough information to skip ahead, jump to the relevant step.
-
-### Step 1 — Identify failed pipeline runs
-
-**Goal:** Find which pipeline runs have failed recently.
-
-**If the user provided a pipeline run ID or URL:** Skip to Step 2 using the extracted ID.
-
-**If the user said "what's broken" or similar:** Query for recent failures:
-- Call `list_pipeline_runs` with `status=FAILED`
-- Default to the last 7 days if no time range specified
-- Present results as a concise summary: pipeline name, when it failed, trigger type, message
-
-**If multiple failures exist:** Ask the user which one to investigate, or offer to triage all
-of them starting with the most recent.
-
-**Key fields from the response:**
-- `id` — the pipeline run ID (needed for all subsequent steps)
-- `pipelineName` — human-readable name
-- `pipelineId` — the pipeline definition ID
-- `message` — Orchestra's summary of what happened
-- `triggeredBy` — what started the run (cron, sensor, manual, webhook)
-- `completedAt` — when it finished failing
-- `envName` — which environment (Production, Staging, etc.)
-
-### Step 2 — Get failed task runs
-
-**Goal:** Identify exactly which task(s) within the pipeline failed.
-
-- Call `list_task_runs` filtered by the failed pipeline IDs and `status=FAILED`
-- Also fetch `status=WARNING` task runs — they may contain useful context
-
-**Key fields from each task run:**
-- `id` — task run ID (needed for logs/artifacts)
-- `taskName` — human-readable task name
-- `taskId` — the task identifier in the pipeline YAML
-- `integration` — which integration (e.g. `SNOWFLAKE`, `DBT_CORE`, `HTTP`, `PYTHON`)
-- `integrationJob` — the specific job type (e.g. `SNOWFLAKE_RUN_QUERY`, `DBT_CORE_RUN_COMMAND`)
-- `status` — FAILED or WARNING
-- `message` — Orchestra's task-level message
-- `externalStatus` — the status from the underlying platform (e.g. HTTP 500, dbt error code)
-- `externalMessage` — the platform's error message
-- `taskParameters` — what was configured on the task
-- `runParameters` — runtime parameters including connection details
-- `connectionId` — which credential/connection was used
-- `numberOfAttempts` — how many times Orchestra retried
-
-**Present the findings:** Show the user which tasks failed, in what order, and their error
-messages. If the pipeline has multiple tasks, note which ones succeeded (they ran before
-the failure point) and which were skipped (downstream of the failure).
+Execute these steps in order. Each step feeds the next.
 
 ### Step 3 — Fetch diagnostics
 
@@ -144,49 +65,33 @@ For each failed task run:
 **Read `../../references/orchestra/pipeline/diagnosis-patterns.md`** before proceeding to Step 4. It contains
 integration-specific error patterns that will help classify the failure.
 
-### Step 4 — Diagnose the error
+### Step 4 — Confirm the root cause for the fix
 
-**Goal:** Classify the failure and identify the root cause.
+**Goal:** Pin down the *specific* root cause so the fix is exact. `identify-pipeline-error` already
+classified this as an Orchestra-platform/config issue (or a repo-level code fix with no dedicated
+skill) and routed you here — you are not re-deciding the category. Using the evidence from Step 3
+plus `../../references/orchestra/pipeline/diagnosis-patterns.md`:
 
-This is the analytical step. Using all evidence from Steps 1-3 plus the patterns in
-`../../references/orchestra/pipeline/diagnosis-patterns.md`:
+1. **Identify the root cause precisely.** Not just "config error" but "task `load_events` is missing
+   the `dbt_branch` run input, so it cloned the default branch" or "column `user_email` does not
+   exist in `analytics.users` — a schema migration removed it." Confirm it's actionable as a
+   YAML/config change, a retry, or a repo PR — i.e. genuinely an Orchestra-platform/config or
+   repo-code fix.
 
-1. **Decide code vs platform.** If the failure is ingestion/sync infrastructure or another
-   vendor-managed integration (Fivetran, Airbyte, Estuary, etc.), surface `platformLink` and
-   `connectionId` and stop — do not open a Git PR. If the failure is in repo SQL, dbt, Python,
-   or misconfigured pipeline YAML, proceed with remediation. See
-   `../../references/orchestra/pipeline/diagnosis-patterns.md` (TOOL_OR_INFRASTRUCTURE).
+2. **Scope check — hand back if it isn't yours.** If the evidence now points to a dbt **code**
+   failure, a Python **code** failure, or a category `identify-pipeline-error` handles itself (data
+   quality, vendor/ingestion needing a UI fix, auth, network, pure upstream), **stop and hand back
+   to `identify-pipeline-error`** so it can route correctly — don't force a fix here.
 
-2. **Classify the error category.** Common categories:
-   - `AUTH_FAILURE` — credentials expired, rotated, or insufficient permissions
-   - `TIMEOUT` — task exceeded configured timeout or underlying platform timed out
-   - `QUERY_ERROR` — SQL syntax error, missing table/column, type mismatch
-   - `RESOURCE_CONFLICT` — sync job already running, resource locked
-   - `NETWORK_ERROR` — firewall, VPN, DNS resolution, connection refused
-   - `CONFIG_ERROR` — invalid parameters, missing required fields, wrong environment
-   - `DEPENDENCY_FAILURE` — upstream task failed, missing input data
-   - `PLATFORM_ERROR` — the underlying platform (Snowflake, dbt Cloud, etc.) had an outage
-   - `CODE_ERROR` — Python script error, dbt model compilation failure
-   - `RATE_LIMIT` — API rate limit hit on the underlying platform
-   - `DATA_ERROR` — data quality test failure, schema drift, unexpected nulls
+3. **(Optional) Recall past fixes.** Past-fix memory is **deferred to the calling agentic client**.
+   If your client exposes persistent memory (e.g. Claude Code memory, Cursor rules/memories), check
+   it for similar past fixes. As a fallback, read a local
+   `../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one — it ships empty
+   and may not exist. Optional: skip when no memory is available. Treat any recalled entry as
+   historical context and re-verify it still applies before acting on it.
 
-3. **Identify the root cause.** Be specific. Not just "query error" but "column
-   `user_email` does not exist in table `analytics.users` — likely a schema migration
-   that removed or renamed the column."
-
-4. **(Optional) Recall past fixes.** Past-fix memory is **deferred to the calling agentic
-   client**. If your client exposes persistent memory (e.g. Claude Code memory, Cursor
-   rules/memories), check it first for similar past fixes. As a fallback, read a local
-   `../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one — it ships
-   empty and may not exist. This step is optional: skip it entirely when no memory is
-   available. Treat any recalled entry as historical context and re-verify it still applies
-   before acting on it.
-
-5. **Present the diagnosis** clearly to the user:
-   - Error category
-   - Root cause (specific)
-   - Evidence (which log line, which error message, which operation failed)
-   - Confidence level (high/medium/low)
+4. **Present the root cause** clearly: specific cause, evidence (which log line / error / operation
+   failed), and confidence (high/medium/low).
 
 **Read `../../references/orchestra/pipeline/remediation-playbooks.md`** before proceeding to Step 5.
 
@@ -306,42 +211,20 @@ actions, not explanations. No preamble, no summaries of what you just did, no "g
 If the answer fits in one line, use one line. Cut any sentence that doesn't add new information.
 
 All user-facing output must follow these templates exactly. Consistent structure makes it easy
-to scan at a glance — especially when there are multiple failures to triage.
+to scan at a glance. (Multi-pipeline "what's broken" triage is owned by `identify-pipeline-error`,
+not this skill.)
 
 ---
 
-### Triage view (Step 1 — multiple pipelines)
-
-Use a table. One row per distinct pipeline (deduplicate by `pipelineId`). Newest failure first.
-After the table, add a one-line callout for any that are feature branch runs (skip them).
-
-```
-## Failing Pipelines — Workspace Triage
-
-| Pipeline | Category | Failing Task | Root Cause |
-|---|---|---|---|
-| `name` | `CATEGORY` | Task name | One-line plain-English description |
-
-> **Skipped (feature branch):** `pipeline-name` — failures are on branch `x`, main is healthy.
-```
-
-Always end the triage with a prompt offering to dig into specific pipelines:
-```
-Which would you like me to investigate? I'd suggest starting with X because Y.
-```
-
----
-
-### Single pipeline diagnosis (Step 4)
+### Root cause (Step 4)
 
 Use a consistent header and structured block every time, then evidence and confidence.
 
 ```
-## Diagnosis: `<pipeline name>`
+## Root cause: `<pipeline name>`
 
-**Error category:** CATEGORY
-**Root cause:** One specific sentence — not "query error" but exactly which object/column/table.
-**Integration:** DBT_CORE / DBT_CORE_EXECUTE (or similar)
+**Root cause:** One specific sentence — not "query error" but exactly which object/column/table/input.
+**Integration:** DBT_CORE / SNOWFLAKE / HTTP (or similar)
 **Connection:** connection-id-here
 **Confidence:** High / Medium / Low
 
