@@ -5,7 +5,6 @@ description: >
   hygiene, alerting coverage, security (SSO/RBAC), metadata/lineage, repeated
   tasks (MetaEngine), auto-fix agents, and hybrid-deployment fit — and emit a
   scored report with concrete, doc-linked recommendations.
-disable-model-invocation: true
 ---
 
 A **read-only** audit. Gather, don't change. Narrate briefly like a data engineer; never print secrets. End with a scorecard and prioritised recommendations, each with a docs link.

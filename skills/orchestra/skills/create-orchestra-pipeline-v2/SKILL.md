@@ -6,7 +6,6 @@ description: >
   Orchestra workflow definitions from a description. Trigger on phrases like "create a pipeline",
   "add a dbt task", "write orchestra yaml", "fix validate errors", or when editing files under
   orchestra/ or similar pipeline directories.
-disable-model-invocation: true
 ---
 
 # Create Orchestra Pipeline
