@@ -1,12 +1,15 @@
 ---
 name: fix-pipeline-python-task
 description: >
-  Diagnose and fix Python tasks running in Orchestra Pipelines. Succinct,
-  API-first. Biased toward editing the script and re-running until it works,
-  with additive-only schema changes to the destination.
+  Fix a Python task in an Orchestra Pipeline once the failure has been identified as a Python
+  code / dependency / destination-schema issue. Normally invoked by identify-pipeline-error after
+  it classifies the cause; it can also run standalone if the user points directly at a broken
+  Python task. Succinct, API-first. Biased toward editing the script and re-running until it works,
+  with additive-only schema changes to the destination. Identification/classification lives in
+  identify-pipeline-error — this skill is the FIX half.
 ---
 
-Diagnose → locate the script → check what it lands → fix → validate → confirm → merge/save. Narrate each step briefly, like a data engineer. Never print secrets/tokens.
+Locate the script → check what it lands → fix → validate → confirm → merge/save. Narrate each step briefly, like a data engineer. Never print secrets/tokens.
 
 ## 0. Access
 
@@ -15,30 +18,24 @@ If neither MCP nor an Orchestra key is available, read `../../../references/orch
 
 Base: `https://app.getorchestra.io/api/engine/public` — header `Authorization: Bearer $ORCHESTRA_API_KEY`.
 
-## 1. Establish the failure (from a run ID / URL)
+## 1. Inputs from identify-pipeline-error
 
-```
-GET /pipeline_runs?pipeline_run_ids=<RID>          # run status, pipelineId, branch, commit
-GET /task_runs?pipeline_ids=<PID>&page_size=50     # find the FAILED task; filter results by pipelineRunId yourself
-```
-Gotchas: `pipeline_run_ids` does **not** filter `/task_runs` — filter client-side. 7-day window.
+`identify-pipeline-error` hands you: the pipeline run ID (**RID**), pipeline ID (**PID**), the failed Python **task run ID** (TRID), `integration=PYTHON`, the run `branch`/`commit`, the task's `taskParameters`, and the cause classification (a Python **code / dependency / destination-schema** issue). Use them directly — don't re-run the identification.
+
+**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs?pipeline_run_ids=<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50` (filter to this RID client-side; `pipeline_run_ids` does **not** filter `/task_runs`, 7-day window) to find the FAILED Python task.
 
 **Capture `taskParameters` exactly** — `command`/`entrypoint`, `python_version`, `package_manager`, `requirements`, `branch`, `project_dir`, and any env/run inputs. Preserve them on every retry. The pipeline run's `branch` is where the *Orchestra YAML* lives; the script's source branch (if git-backed) is a separate task param.
 
-Logs:
+Pull the logs you'll fix against:
 ```
 GET /pipeline_runs/<RID>/task_runs/<TRID>/logs                                # list filenames
 GET /pipeline_runs/<RID>/task_runs/<TRID>/logs/download?filename=<file>       # URL-encode spaces
 ```
 Read the Python traceback bottom-up: the last exception line is the real error, not the first.
 
-## 2. Classify the cause
+## 2. Scope check — you're here to fix the script
 
-1. **Script code** (bad logic, wrong column/key, unhandled None, API change) → fix the script. **Most common.**
-2. **Dependency / env** (missing/incompatible package, wrong `python_version`) → fix `requirements`/version, re-run.
-3. **Data / schema mismatch** — the script writes a shape the destination rejects (new/renamed column, type change, NOT NULL, missing table). → see §3–4. **Very common for Python tasks.**
-4. **Infra/timeout/memory** → bump compute / retry.
-5. **Upstream** (source API down, empty extract) → summarise; often can't fix from here.
+You were routed here because the cause is a Python **code / dependency / destination-schema** issue — fix the script (and, additively, the destination shape, §4). If while reproducing you find the real cause is **not** that — an infra/timeout/memory problem, or a pure upstream failure (source API down, empty extract) you can't fix from here — **stop and hand back to `identify-pipeline-error`** rather than editing the script. Data/schema mismatches (the script writes a shape the destination rejects) **are** in scope: handle them additively in §3–4.
 
 ## 3. Locate the script — it may NOT be in git
 

@@ -7,7 +7,10 @@ This repository is documentation and workflow instructions for AI agents, not an
 | User intent | Skill | Path |
 |-------------|-------|------|
 | Author a new pipeline YAML | `create-orchestra-pipeline` | `skills/orchestra/skills/create-orchestra-pipeline/SKILL.md` |
-| Fix, retry, or explain a failed pipeline without a mandatory merge gate | `fix-orchestra-pipeline` | `skills/orchestra/skills/fix-orchestra-pipeline/SKILL.md` |
+| **Fix anything in a pipeline (entry point)** — identify the failing task and cause, then route | `identify-pipeline-error` | `skills/orchestra/skills/identify-pipeline-error/SKILL.md` |
+| Fix a dbt task already identified as a dbt code/config issue | `fix-pipeline-dbt-task` | `skills/orchestra/skills/fix-pipeline-dbt-task/SKILL.md` |
+| Fix a Python task already identified as a code/dependency/schema issue | `fix-pipeline-python-task` | `skills/orchestra/skills/fix-pipeline-python-task/SKILL.md` |
+| Fix an Orchestra-platform/config issue (or repo code fix with no dedicated skill); retry/explain a failure without a merge gate | `fix-orchestra-pipeline` | `skills/orchestra/skills/fix-orchestra-pipeline/SKILL.md` |
 | Prepare a fix on a branch, validate, summarize, and stop for approval | `triage-orchestra-pipeline` | `skills/orchestra/skills/triage-orchestra-pipeline/SKILL.md` |
 | Downstream symptom with no obvious pipeline error | `triage-orchestra-pipeline` (symptom-first path) | same |
 | Set up dbt Slim CI in Orchestra on an existing production pipeline | `orchestra-dbt-slim-ci-setup` | `skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md` |
