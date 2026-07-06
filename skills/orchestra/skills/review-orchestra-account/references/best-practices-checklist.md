@@ -86,6 +86,15 @@ Good: every task ID and task-group ID is unique. Signal: duplicate IDs in `get_p
 produce a pipeline that runs but 404s in the editor). → Rename to unique IDs. Docs:
 `/docs/core-concepts/pipelines/schema`, `/docs/faq`.
 
+**1.11 Metadata/lineage enabled on transformation tasks** — *Medium* `[MANUAL]` (partial)
+Good: dbt Core tasks produce/upload `manifest.json` + `run_results.json`; dbt Cloud and Coalesce jobs
+have metadata collection enabled on their integration/connection. Signal: `get_pipeline` shows a
+`DBT_CORE_EXECUTE` task with artifact upload / state orchestration off — that part is visible; whether
+a dbt Cloud/Coalesce connection has metadata collection enabled lives on the integration itself, so
+flag that half for manual confirmation. → Enable metadata collection; lineage, column-level impact,
+and the `fix-pipeline-*`/`triage-orchestra-pipeline` skills all depend on it. Docs:
+`/docs/guides/dbt-core/gha-setup`, `/docs/api`.
+
 ## 2. Environments and promotion
 
 **2.1 Don't run one pipeline per environment** — *Medium*
@@ -253,13 +262,29 @@ Good: backfills use the run-multiple-pipelines approach (one token/workspace, ra
 not ad-hoc loops. Not directly visible — flag if the user mentions backfill scripts. Docs:
 `/docs/guides/run-multiple-pipelines`.
 
+**7.6 Hybrid deployment fit for Python-heavy workloads** — *Low* `[MANUAL]` (partial)
+Good: accounts running a large or long-running share of Python compute evaluate hybrid deployment
+(compute in the customer's own environment, control plane in Orchestra) for cost, scale, and
+data-residency/security. Signal: sum recent `PYTHON` task-run durations — `list_task_runs` /
+`GET /task_runs?integration=PYTHON&page_size=200&time_from=<ISO>&time_to=<ISO>`, summing
+`completedAt - startedAt` and noting count, frequency, and max memory/cpu params. → If Python compute
+is a large/long share of runs, quantify it in the report (e.g. "Python tasks = X runs, Y total
+minutes/week") and recommend evaluating hybrid deployment and self-hosted tasks. Docs:
+`/docs/deployment-options/hybrid/`, `/docs/deployment-options/hybrid/architecture`,
+`/docs/core-concepts/tasks/self-hosted-tasks/`.
+
 ## 8. AI, agents and MCP — *Low* `[MANUAL]`
 
 Mostly configuration/usage guidance not exposed by MCP. If relevant: start from agentic workflow
 templates, use the Pipeline AI Agent iteratively (beta — review before publishing), add
 human-in-the-loop approvals (`ORCHESTRA APPROVAL` tasks) for production-affecting steps, and connect
 one MCP per workspace. Signal you *can* see: production-affecting agent/LLM tasks with no `APPROVAL`
-gate. Docs: `/docs/mcp`, `/docs/integrations/orchestra/approval`.
+gate. If the account has no auto-fix/triage flow set up, recommend one — the `identify-pipeline-error`
+→ `fix-pipeline-dbt-task`/`fix-pipeline-python-task`/`fix-orchestra-pipeline` and
+`triage-orchestra-pipeline` skills in this plugin (or an equivalent agentic pipeline) let common
+breakages self-heal or arrive pre-diagnosed. Docs: `/docs/mcp`,
+`/docs/integrations/orchestra/approval`, `/docs/core-concepts/pipelines/ai_agent`,
+`/docs/ai_agents`.
 
 ---
 

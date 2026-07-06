@@ -8,8 +8,9 @@ description: >
   "onboarding review", or asks "is my Orchestra set up correctly?", "what should I improve?",
   "are we following best practices?", "review my pipelines", or "audit my workspace". Also
   trigger when the user mentions reviewing pipeline design, environment/promotion setup,
-  Git/CI-CD coverage, alerting coverage, connections/secrets hygiene, concurrency, cost, or
-  RBAC across their Orchestra account. This skill only inspects and reports — it never edits
+  Git/CI-CD coverage, alerting coverage, connections/secrets hygiene, concurrency, cost, RBAC,
+  repeated tasks (MetaEngine), metadata/lineage, auto-fix agents, or hybrid-deployment fit
+  across their Orchestra account. This skill only inspects and reports — it never edits
   pipelines or changes settings.
 ---
 
@@ -34,6 +35,17 @@ them each one needs its own review (there are no cross-workspace resources).
 - `../../references/orchestra/mcp/tools-quick-ref.md` — Orchestra MCP tool names and arguments.
 
 ## Workflow
+
+### Step 0 — Access
+
+Use the Orchestra MCP if connected (`list_pipelines`, `get_pipeline`, `list_task_runs`, etc.). If it
+isn't, fall back to the public REST API with `$ORCHESTRA_API_KEY` (often already in the env); for
+reading git-backed pipeline YAMLs, `$GITHUB_TOKEN`. If neither MCP nor a key is available, point the
+user at the Orchestra MCP setup docs (https://docs.getorchestra.io/docs/mcp) or ask for an API key,
+then stop — recommend connecting the MCP regardless, since it also powers the fix/triage skills.
+
+REST base: `https://app.getorchestra.io/api/engine/public` — header
+`Authorization: Bearer $ORCHESTRA_API_KEY`.
 
 ### Step 1 — Confirm scope and probe capabilities
 
@@ -73,6 +85,10 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
 4. **Assets** — `list_assets`. Assets with no Orchestra operation in 7+ days are a governance
    signal that work may be running outside Orchestra; confirm with `list_operations` filtered to
    the asset's integration before flagging.
+5. **Python compute (opportunistic, for check 7.6)** — if Python tasks are a notable share of the
+   workspace, pull recent `PYTHON` task runs (`list_task_runs` / `GET /task_runs?integration=PYTHON&
+   page_size=200&time_from=<ISO>&time_to=<ISO>`) and sum `completedAt - startedAt`; note count,
+   frequency, and max memory/cpu params. Skip this if Python isn't materially used.
 
 **Two data-shape traps, learned the hard way:**
 
