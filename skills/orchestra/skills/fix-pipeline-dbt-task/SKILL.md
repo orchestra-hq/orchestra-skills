@@ -14,7 +14,7 @@ Fix → validate on a branch → confirm → merge. Narrate each step briefly, l
 ## 0. Access
 
 MCP is preferred but optional. If the Orchestra MCP tools aren't present, use the public REST API directly with `$ORCHESTRA_API_KEY` (check the env — it's often already set). For git, `$GITHUB_TOKEN` is usually set too.
-If neither MCP nor a key is available, read `../../../references/orchestra/mcp/setup.md` and stop.
+If neither MCP nor a key is available, point the user at the Orchestra MCP setup docs (https://docs.getorchestra.io/docs/mcp) or ask for an API key, then stop.
 
 Base: `https://app.getorchestra.io/api/engine/public` — header `Authorization: Bearer $ORCHESTRA_API_KEY`.
 
