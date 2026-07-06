@@ -1,6 +1,6 @@
 # Orchestra best-practices checklist (review rubric)
 
-The rubric for `review-orchestra-account`. Each check states what good looks like, the MCP signal
+The rubric for `account-health-check`. Each check states what good looks like, the MCP signal
 that detects a violation, a default severity, and the doc path to cite (prefix with the docs host,
 e.g. `https://docs.getorchestra.io`). Severities are defaults — adjust to real impact and the
 user's maturity. `[MANUAL]` marks checks the MCP can't see; surface those under **Manual

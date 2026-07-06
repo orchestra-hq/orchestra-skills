@@ -1,5 +1,5 @@
 ---
-name: review-orchestra-account
+name: account-health-check
 description: >
   Audit an Orchestra workspace/account against Orchestra's best practices and produce a
   read-only health report — findings grouped by area, each tagged with severity, evidence,
@@ -14,7 +14,7 @@ description: >
   pipelines or changes settings.
 ---
 
-# Review Orchestra Account
+# Account Health Check
 
 Audit an Orchestra workspace against the conventions the Orchestra team recommends during
 onboarding and account reviews, then deliver a prioritised, evidence-backed report. This is
