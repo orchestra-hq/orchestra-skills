@@ -170,20 +170,22 @@ _Reviewed <YYYY-MM-DD>. Read-only audit against Orchestra best practices._
 
 ## Health score: <NN>/100 — <band emoji + label, e.g. 🟡 Needs attention>
 
-| Area | Score | |
-|------|------:|--|
-| Pipeline design & structure | <NN>/100 | <bar> |
-| Environments & promotion | <NN>/100 | <bar> |
-| Version control, Git & CI/CD | <NN>/100 | <bar> |
-| Connections & credentials | <NN>/100 | <bar> |
-| Alerting & observability | <NN>/100 | <bar> |
-| Performance & cost | <NN>/100 | <bar> |
+| Area | | Score | |
+|------|--|------:|--|
+| Pipeline design & structure | 🟢/🟡/🔴 | <NN>/100 | <bar> |
+| Environments & promotion | 🟢/🟡/🔴 | <NN>/100 | <bar> |
+| Version control, Git & CI/CD | 🟢/🟡/🔴 | <NN>/100 | <bar> |
+| Connections & credentials | 🟢/🟡/🔴 | <NN>/100 | <bar> |
+| Alerting & observability | 🟢/🟡/🔴 | <NN>/100 | <bar> |
+| Performance & cost | 🟢/🟡/🔴 | <NN>/100 | <bar> |
 
 _<a> of <b> checks assessed (<c>%). <Add "Provisional — metadata-only; definition checks need a
 server with `get_pipeline`." if applicable.>_
 
-<Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Drop an area row with no
-assessable checks rather than scoring it 0. Pipelines reviewed: <n of m>; note any sampling here.>
+<Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Status dot is a quick-glance
+read of the same score: 🟢 ≥75, 🟡 60–74, 🔴 <60 — no extra computation, just a color on the number that's
+already there. Drop an area row with no assessable checks rather than scoring it 0. Pipelines reviewed:
+<n of m>; note any sampling here.>
 
 ## Fix first
 1. **<headline fix>** — <impact in a few words; the concrete action>. ([docs](<link>))
