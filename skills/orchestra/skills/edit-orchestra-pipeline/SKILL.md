@@ -17,9 +17,9 @@ Base information
 
 ### Links
 
-- `../../../references/orchestra/pipeline/yaml-authoring.md` — schema, integrations, variables, optional sections
-- `../../../references/orchestra/pipeline/examples.md` — multi-stage patterns (warehouse → LLM → messaging, agents)
-- `../../../references/orchestra/mcp/tools-quick-ref.md` — `validate_pipeline`, `create_pipeline`, `update_pipeline`
+- `../../references/orchestra/pipeline/yaml-authoring.md` — schema, integrations, variables, optional sections
+- `../../references/orchestra/pipeline/examples.md` — multi-stage patterns (warehouse → LLM → messaging, agents)
+- `../../references/orchestra/mcp/tools-quick-ref.md` — `validate_pipeline`, `create_pipeline`, `update_pipeline`
 - [Orchestra docs](https://docs.getorchestra.io) for integration parameters not covered in the reference
 
 ### Goal
