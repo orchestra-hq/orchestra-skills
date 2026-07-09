@@ -161,11 +161,14 @@ identities aren't fully exposed — flag for manual check. Docs:
 
 **4.3 Secrets in a secrets manager, never in task parameters** — *High*
 Good: secrets come from integration credentials or a key vault (AWS Secrets Manager / Azure Key
-Vault). Signal: in `get_pipeline`, literal-looking secrets in task params — values matching API-key/
-token/password/connection-string patterns (e.g. long high-entropy strings, `sk-`, `AKIA`, `xoxb-`,
-`postgres://user:pass@`) instead of `${{ ENV.* }}` or a connection ref. → Move to a secrets
-manager/credential. High severity — call out the exact task and key **name** only; never record or
-report the secret value itself (not even a fragment). Docs: `/docs/integrations/aws_secrets_manager`.
+Vault). Signal: in `get_pipeline`, **any literal value in a credential-bearing param** — connection
+strings, account/tenant ids, usernames, API keys, tokens, or passwords — that isn't `${{ ENV.* }}`
+or a connection ref. Pattern matches (long high-entropy strings, `sk-`, `AKIA`, `xoxb-`,
+`postgres://user:pass@`) are a high-confidence subset, not the whole check — don't let their absence
+wave through a hardcoded id or account name that's just as inappropriate inline. When in doubt about
+whether a literal is sensitive, flag it rather than pass it. → Move to a secrets manager/credential.
+High severity — call out the exact task and key **name** only; never record or report the value
+itself (not even a fragment). Docs: `/docs/integrations/aws_secrets_manager`.
 
 **4.4 Avoid plain-text env vars for sensitive values** — *High*
 Good: sensitive values use integration credentials or a key vault; env vars are for non-sensitive
@@ -273,18 +276,21 @@ minutes/week") and recommend evaluating hybrid deployment and self-hosted tasks.
 `/docs/deployment-options/hybrid/`, `/docs/deployment-options/hybrid/architecture`,
 `/docs/core-concepts/tasks/self-hosted-tasks/`.
 
-## 8. AI, agents and MCP — *Low* `[MANUAL]`
+## 8. AI, agents and MCP — *Low* `[MANUAL]` (partial)
 
-Mostly configuration/usage guidance not exposed by MCP. If relevant: start from agentic workflow
-templates, use the Pipeline AI Agent iteratively (beta — review before publishing), add
-human-in-the-loop approvals (`ORCHESTRA APPROVAL` tasks) for production-affecting steps, and connect
-one MCP per workspace. Signal you *can* see: production-affecting agent/LLM tasks with no `APPROVAL`
-gate. If the account has no auto-fix/triage flow set up, recommend one — the `identify-pipeline-error`
-→ `fix-pipeline-dbt-task`/`fix-pipeline-python-task`/`fix-orchestra-pipeline` and
-`triage-orchestra-pipeline` skills in this plugin (or an equivalent agentic pipeline) let common
-breakages self-heal or arrive pre-diagnosed. Docs: `/docs/mcp`,
-`/docs/integrations/orchestra/approval`, `/docs/core-concepts/pipelines/ai_agent`,
-`/docs/ai_agents`.
+**Recommend setting up an auto-fix/triage flow.** This is a standing recommendation, not a
+conditional one — unless the user confirms one is already in place, recommend the
+`identify-pipeline-error` → `fix-pipeline-dbt-task`/`fix-pipeline-python-task`/
+`fix-orchestra-pipeline` and `triage-orchestra-pipeline` skills in this plugin (or an equivalent
+agentic pipeline), so common breakages self-heal or arrive pre-diagnosed. Surface this in **Fix
+first** if the account has nothing like it. Docs: `/docs/mcp`, `/docs/ai_agents`.
+
+Other guidance if relevant: start from agentic workflow templates, use the Pipeline AI Agent
+iteratively (beta — review before publishing), add human-in-the-loop approvals
+(`ORCHESTRA APPROVAL` tasks) for production-affecting steps, and connect one MCP per workspace.
+Signal you *can* see: production-affecting agent/LLM tasks with no `APPROVAL` gate — this one is an
+actual finding, not just advisory. Docs: `/docs/integrations/orchestra/approval`,
+`/docs/core-concepts/pipelines/ai_agent`.
 
 ---
 

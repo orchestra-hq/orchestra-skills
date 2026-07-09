@@ -58,9 +58,13 @@ first — reading every pipeline definition has a cost, so say so rather than si
 by server: some deployments expose only the `list_*`/runtime tools, while a single-pipeline read
 tool (`get_pipeline`, or similarly named) may be absent. Every definition-level check — alerts,
 secrets, concurrency, MetaEngine, `set_outputs`, branching, unique IDs — needs that read tool. If
-it isn't present, say so up front: tell the user the review will be **metadata-only**, those checks
-will come back **Not assessed**, and the fix is to connect a server that exposes definition reads
-(e.g. the remote Orchestra MCP) — don't discover this halfway through and silently degrade.
+it isn't present, **don't jump straight to metadata-only** — fall back to the REST metadata API from
+Step 0 (`GET /pipelines/{alias}` with `$ORCHESTRA_API_KEY`) to pull full definitions directly; it
+doesn't depend on MCP tool coverage at all, only on having an API key. Only if that's also
+unavailable (no key, no REST access) does the review actually become **metadata-only** — say so up
+front, tell the user those checks will come back **Not assessed**, and note that connecting a
+server with definition reads (e.g. the remote Orchestra MCP) removes the need for the fallback.
+Don't discover this halfway through and silently degrade.
 
 ### Step 2 — Gather data (read-only)
 
@@ -76,8 +80,9 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
    sensors, `set_outputs`. **Default scope for large workspaces: the live + Git-backed set** — every
    unpaused, recently-run pipeline plus every Git-backed (`storageProvider != ORCHESTRA`) one, since
    that's what a real audit hinges on. Skip dormant `TEST:`/demo-named pipelines unless asked, and
-   **say what you covered vs skipped**. If the read tool is absent (Step 1), skip this and mark the
-   definition-level checks Not assessed.
+   **say what you covered vs skipped**. If the MCP read tool is absent, use the REST fallback
+   (Step 1) instead — only skip this step and mark the definition-level checks Not assessed if
+   neither the tool nor the REST fallback can reach pipeline definitions.
 3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window). Use this
    to spot concurrency skips, over- or under-scheduling, and noisy failure rates. `list_task_runs`
    /`list_operations` add integration-level detail (e.g. source-tool jobs, dbt models) when a check
@@ -179,8 +184,8 @@ _Reviewed <YYYY-MM-DD>. Read-only audit against Orchestra best practices._
 | Alerting & observability | 🟢/🟡/🔴 | <NN>/100 | <bar> |
 | Performance & cost | 🟢/🟡/🔴 | <NN>/100 | <bar> |
 
-_<a> of <b> checks assessed (<c>%). <Add "Provisional — metadata-only; definition checks need a
-server with `get_pipeline`." if applicable.>_
+_<a> of <b> checks assessed (<c>%). <Add "Provisional — metadata-only; neither the MCP nor the REST
+fallback could reach pipeline definitions." if applicable.>_
 
 <Render `<bar>` as a 10-cell meter, e.g. `██████████` filled to the score. Status dot is a quick-glance
 read of the same score: 🟢 ≥75, 🟡 60–74, 🔴 <60 — no extra computation, just a color on the number that's
