@@ -1,0 +1,51 @@
+{
+  "skill_name": "merge-duplicate-pipelines",
+  "evals": [
+    {
+      "id": 0,
+      "name": "env-suffix-pair",
+      "prompt": "See scratch eval_prompts.md#Eval-0 -- two pipelines, snowflake_sync_prod and snowflake_sync_staging, identical task graphs, differing only in connector_id/warehouse_identifier/connection/Slack message (hardcoded per environment).",
+      "expected_output": "Identifies the pair as a duplicate set caused by one-pipeline-per-environment, drafts a single consolidated pipeline using ${{ ENV.* }} for the environment-specific values (warehouse identifier, at minimum), and stops to ask which action to take rather than assuming one. Does not call any live Orchestra MCP tool.",
+      "expectations": [
+        "Explicitly identifies snowflake_sync_prod and snowflake_sync_staging as duplicates of each other",
+        "Names the cause as one-pipeline-per-environment / environment-suffix duplication (cites checklist 1.1 and/or 2.1, or equivalent language)",
+        "Drafts a single unified pipeline definition (not two)",
+        "The unified draft references at least one environment-specific value via ${{ ENV.* }} rather than hardcoding a value from either prod or staging",
+        "Does not hardcode a single Slack/dbt connection id from one environment into the unified draft",
+        "Explicitly asks the user which action to take (e.g. report only vs. create/PR vs. also pause originals) rather than picking one on its own",
+        "States or implies it made no live Orchestra MCP tool calls / took no destructive action against a real workspace",
+        "Does not propose deleting either original pipeline"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "conceptual-dup-with-distractors",
+      "prompt": "See scratch eval_prompts.md#Eval-1 -- four pipelines: acme_corp_etl and globex_analytics_refresh are conceptual duplicates (same task graph, different customer schema, completely unrelated names), plus marketing_attribution_pipeline and hr_data_warehouse_load which are genuinely unrelated pipelines that happen to also look like generic ETL.",
+      "expected_output": "Finds the Acme/Globex pair as a duplicate set despite the unrelated names (via structural similarity, not naming), proposes a MetaEngine matrix (or clearly considers one) keyed on the customer, and does NOT flag the Marketing Attribution or HR Data Warehouse pipelines as duplicates of anything.",
+      "expectations": [
+        "Identifies acme_corp_etl and globex_analytics_refresh as a duplicate/candidate set",
+        "Explicitly notes the match was found despite dissimilar pipeline names (structural, not naming-based)",
+        "Proposes a MetaEngine matrix keyed on customer (or clearly reasons about matrix vs. environment-overlay and picks matrix) as the consolidation pattern, citing checklist 1.3",
+        "Does NOT flag marketing_attribution_pipeline as a duplicate of any other pipeline in the set",
+        "Does NOT flag hr_data_warehouse_load as a duplicate of any other pipeline in the set",
+        "Asks the user which action to take before proposing to create/PR anything",
+        "Does not claim to have called live Orchestra MCP tools against a real workspace"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "partial-match-extra-task",
+      "prompt": "See scratch eval_prompts.md#Eval-2 -- orders_pipeline_prod and orders_pipeline_staging are near-identical except staging has an extra QA/reconciliation task group prod doesn't have. User is explicitly worried the extra step will get lost in a merge.",
+      "expected_output": "Identifies the pair as a duplicate set, drafts a consolidated pipeline that KEEPS the QA/reconciliation task (does not drop it), gates it with a condition (task-group level, per the schema) rather than running it everywhere unconditionally, and explicitly flags in its response that this task is conditional so the user can confirm the gating logic is correct.",
+      "expectations": [
+        "Identifies orders_pipeline_prod and orders_pipeline_staging as a duplicate set",
+        "The consolidated draft includes the QA/reconciliation task group -- does not silently drop it",
+        "The QA/reconciliation task group in the draft has a condition (gated on an environment or input value), not left to run unconditionally in every environment",
+        "Explicitly calls out to the user that this task is now conditional and asks them to confirm the gating logic rather than asserting it's correct",
+        "Also identifies and addresses the environment-specific hardcoded values (warehouse_identifier, connector_id, connection ids) via ${{ ENV.* }}, not just the extra task",
+        "Asks the user which action to take before proposing to create/PR anything",
+        "Does not claim to have called live Orchestra MCP tools against a real workspace"
+      ]
+    }
+  ]
+}
