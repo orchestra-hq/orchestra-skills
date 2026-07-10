@@ -70,7 +70,7 @@ README.md
 
 - Change skill workflows directly in `skills/orchestra/skills/*/SKILL.md` — there is a single skill tree, no generation step. Write skills client-agnostically: describe a capability ("if your client can schedule a wake-up…") rather than naming a specific tool.
 - Change shared playbooks and tool notes under `skills/orchestra/references/orchestra/`.
-- Adding a skill: create `skills/orchestra/skills/<name>/SKILL.md`; it is exposed automatically by the `orchestra` plugin (no manifest edit needed unless you add a new plugin). Bump the `version` in both `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`.
+- Adding a skill: create `skills/orchestra/skills/<name>/SKILL.md`; it is exposed automatically by the `orchestra` plugin (no manifest edit needed unless you add a new plugin). Bump the `version` in both `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add the skill's path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — `tessl-publish.yml` no longer auto-bumps this on every push (see PR #27), so it now needs the same manual bump as the other two manifests or Tessl publishing silently stops reflecting new skills.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.
 
