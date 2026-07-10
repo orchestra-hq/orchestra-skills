@@ -93,7 +93,12 @@ Per the classification:
 
 - **ENV-LABELED** → Pattern A (Environment overlay). Replace hardcoded env-specific values
   with `${{ ENV.VAR }}` using the same variable name across every variant. Tasks present in
-  only some variants become their own task group gated with `condition` (Pattern B).
+  only some variants become their own task group gated with `condition` (Pattern B). Name
+  the environments in the draft (schedule `environment:` pins, any `ENVIRONMENT_NAME`
+  reference) using the **real** names/IDs from Step 2's `list_environments` call whenever
+  that succeeded — don't guess a name like `prod`/`staging` when the real one was
+  available. Only fall back to a naming-pattern guess when Environments couldn't be
+  reached, and flag it explicitly as unconfirmed.
 - **CONCEPTUAL** → Pattern C (MetaEngine matrix) if the differing dimension is enumerable
   (customers, regions); otherwise pipeline inputs + a Pattern-B conditional group for the
   handful of variant-specific steps.
@@ -121,8 +126,15 @@ Then **ask the user which action to take for that specific set** — there is no
 3. **Do the above, and also pause the originals** once the new pipeline validates — pause
    only, never delete.
 4. **Skip this set.**
+5. **Also set up the missing Environments/variables** — only offer this when Step 2 found
+   a real gap (an Environment that doesn't exist, or a variable this draft needs that isn't
+   registered anywhere yet). Creating a brand-new Environment is comparatively safe; adding
+   a variable to one that already exists is not (it's a full-value-set replace, not a
+   merge) — see `references/detection-and-patterns.md` §7 for exactly when each is safe to
+   do versus when to leave it as a manual UI step instead.
 
-Every set gets its own answer; don't assume the same choice applies to all of them.
+Every set gets its own answer; don't assume the same choice applies to all of them. Option
+5 is additive to whichever of 1–4 was chosen, not a replacement for it.
 
 ### Step 6 — Execute the chosen action
 

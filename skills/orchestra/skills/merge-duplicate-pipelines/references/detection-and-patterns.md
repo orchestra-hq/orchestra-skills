@@ -139,12 +139,34 @@ checklist item 1.3 in `account-health-check` — cite it in the report.
 
 ## 7. Environments feature setup notes
 
-- `list_environments` / `get_environment` (MCP) show what's already configured. If the
-  account has **no** Environments set up at all, say so plainly in the consolidation
-  report — Pattern A requires setting them up first, and that's a manual prerequisite, not
-  something to route around with more pipeline-level conditionals.
-- `create_environment` / `update_environment` can add environment-scoped variable *names*
-  if MCP is connected; secret values always go in through the UI.
+- `list_environments` / `get_environment` (MCP) show what's already configured — use them
+  to get the **real** environment names and IDs rather than guessing from pipeline naming.
+  Prefer the real name in every draft (schedule `environment:` pins, `${{ ENV.* }}`
+  references in the report) whenever this call succeeded. Only fall back to a guess
+  inferred from the pipeline names (e.g. `prod`/`staging`) when Environments genuinely
+  couldn't be reached, and say plainly that it's a guess needing confirmation — don't
+  present a guessed name with the same confidence as a looked-up one.
+- If the account has **no** Environments set up at all, that's a real prerequisite gap —
+  say so plainly in the report. It's fine to *offer* to close it (see below), but it isn't
+  something to route around with more pipeline-level conditionals instead.
+- `create_environment` and `update_environment` both require actual **values**, not just
+  variable names — there's no "declare the name, fill in the value later" call. Their risk
+  profiles are very different, so treat them differently:
+  - **`create_environment` (an Environment that doesn't exist at all)** is comparatively
+    safe to offer, since there's nothing existing to overwrite. The values it needs are
+    usually already sitting in the original duplicate pipelines' hardcoded fields (e.g. a
+    literal `warehouse_identifier` or `connector_id`) — confirm the mapping with the user,
+    exclude anything connection/credential-shaped, and never invent a value that wasn't
+    already visible somewhere.
+  - **`update_environment` (adding a variable to an *existing* Environment)** replaces the
+    entire value set — it does **not** merge. Calling it with only the one new variable
+    would silently delete every other variable that environment (and whatever pipelines
+    depend on it) currently relies on. If you offer this at all: `get_environment` first to
+    read every existing value, add only the new one to that set, and pass any existing
+    `integration_credential`-typed value straight through unread rather than re-typing or
+    re-deriving it. If that doesn't feel safe for a given environment — e.g. you can't be
+    confident you've captured every existing value — leave it as a manual UI step and say
+    so, rather than risking a partial `update_environment` call.
 - A pipeline can run against different environments from different schedules or
   `start_pipeline` calls — that's the mechanism that replaces "one pipeline per
   environment" with "one pipeline, N environment-pinned triggers."
