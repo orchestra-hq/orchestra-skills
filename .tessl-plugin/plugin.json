@@ -1,6 +1,6 @@
 {
   "name": "orchestra-hq/orchestra-skills",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "A curated collection of Agent Skills for working with Orchestra, for agents to effectively implement standards, common workflows, and manage pipelines.",
   "private": false,
   "docs": "README.md",
@@ -10,6 +10,7 @@
     "skills/orchestra/skills/configure-dbt-source-freshness",
     "skills/orchestra/skills/create-orchestra-pipeline",
     "skills/orchestra/skills/fix-orchestra-pipeline",
+    "skills/orchestra/skills/merge-duplicate-pipelines",
     "skills/orchestra/skills/orchestra-dbt-slim-ci-setup",
     "skills/orchestra/skills/run-snowflake-quality-tests",
     "skills/orchestra/skills/triage-orchestra-pipeline"
