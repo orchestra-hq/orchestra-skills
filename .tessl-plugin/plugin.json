@@ -10,6 +10,7 @@
     "skills/orchestra/skills/configure-dbt-source-freshness",
     "skills/orchestra/skills/create-orchestra-pipeline",
     "skills/orchestra/skills/fix-orchestra-pipeline",
+    "skills/orchestra/skills/merge-duplicate-pipelines",
     "skills/orchestra/skills/orchestra-dbt-slim-ci-setup",
     "skills/orchestra/skills/run-snowflake-quality-tests",
     "skills/orchestra/skills/triage-orchestra-pipeline"
