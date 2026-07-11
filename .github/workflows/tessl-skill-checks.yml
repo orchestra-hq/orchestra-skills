@@ -1,0 +1,102 @@
+name: Tessl Skill Checks
+
+# Runs the Tessl skill checks used before `tessl plugin publish` (see tessl-publish.yml):
+#   - `tessl skill lint` validates the whole plugin package (deterministic, structural) and
+#     gates the PR.
+#   - `tessl review run quality` runs an LLM-judged quality review per modified skill. This is
+#     informational only (posted to the job summary, never fails the check) because:
+#       1. Its score is non-deterministic run-to-run.
+#       2. It packs each skill folder as an independent bundle and can't see this repo's shared
+#          `references/orchestra/` docs (see AGENTS.md), so skills that use them get structurally
+#          lower "actionability"/"progressive disclosure" scores regardless of actual quality.
+#          This is a known limitation of Tessl's bundler (it doesn't resolve cross-skill
+#          references), not a defect in the skills — we deliberately keep one shared source of
+#          truth under references/orchestra/ rather than duplicating content per skill.
+
+on:
+  pull_request:
+    paths:
+      - 'skills/orchestra/skills/**'
+      - 'skills/orchestra/references/orchestra/**'
+      - '.tessl-plugin/plugin.json'
+      - 'tessl.json'
+      - '.tesslignore'
+
+concurrency:
+  group: tessl-skill-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint plugin
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+      - run: tessl skill lint .
+
+  detect-changed-skills:
+    name: Detect modified skills
+    runs-on: ubuntu-latest
+    outputs:
+      skills: ${{ steps.detect.outputs.skills }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: detect
+        run: |
+          git diff --name-only \
+              "${{ github.event.pull_request.base.sha }}" \
+              "${{ github.event.pull_request.head.sha }}" \
+              -- skills/orchestra/skills/ \
+            | awk -F/ 'NF >= 4 { print $4 }' \
+            | sort -u \
+            | while read -r skill; do
+                [ -d "skills/orchestra/skills/$skill" ] && echo "$skill"
+              done > changed_skills.txt
+
+          echo "Modified skills:"
+          cat changed_skills.txt || true
+
+          json=$(jq -R -s -c 'split("\n") | map(select(length > 0))' changed_skills.txt)
+          echo "skills=$json" >> "$GITHUB_OUTPUT"
+
+  review-changed-skills:
+    name: Review ${{ matrix.skill }}
+    needs: detect-changed-skills
+    if: needs.detect-changed-skills.outputs.skills != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        skill: ${{ fromJson(needs.detect-changed-skills.outputs.skills) }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+
+      - name: Run quality review (informational only — does not fail this check)
+        continue-on-error: true
+        run: |
+          {
+            echo "## Tessl quality review: \`${{ matrix.skill }}\`"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          tessl review run quality \
+              "skills/orchestra/skills/${{ matrix.skill }}" \
+              --workspace "${{ vars.TESSL_WORKSPACE || 'orchestra-hq' }}" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
