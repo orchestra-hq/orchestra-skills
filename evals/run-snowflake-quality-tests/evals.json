@@ -1,12 +1,12 @@
 {
   "skill_name": "run-snowflake-quality-tests",
-  "description": "Given a Snowflake table inventory, the skill should author an Orchestra v1 data-quality pipeline YAML: one SNOWFLAKE_RUN_TEST task per inferred check, grouped by category, groups gated on a completion condition and chained via depends_on, connection via ${{ ENV.SNOWFLAKE_CONNECTION }}, and a failure alert.",
+  "description": "Given a Snowflake table inventory, the skill should author an Orchestra v1 data-quality pipeline YAML: one SNOWFLAKE_RUN_TEST task per inferred check, grouped by category, groups sequenced via depends_on, connection via ${{ ENV.SNOWFLAKE_CONNECTION }}, and a failure alert.",
   "output_file": "pipeline.yml",
   "evals": [
     {
       "id": "ecommerce-full",
       "prompt": "Here's an inventory of my Snowflake tables (see files/analytics_inventory.md). I want data quality tests on them. Build the Orchestra data-quality testing pipeline YAML and write it to pipeline.yml in the current directory. Don't run anything against Snowflake, don't push to git, and don't deploy — just produce the YAML file.",
-      "expected_output": "An Orchestra v1 pipeline YAML covering both tables: completeness/not-null on the ID columns, uniqueness on the dimension primary key, and freshness on the fact timestamp, organised into task groups that are chained with depends_on and gated on completion conditions, with a failure alert.",
+      "expected_output": "An Orchestra v1 pipeline YAML covering both tables: completeness/not-null on the ID columns, uniqueness on the dimension primary key, and freshness on the fact timestamp, organised into task groups that are sequenced with depends_on, with a failure alert.",
       "files": ["analytics_inventory.md"],
       "assertions": [
         { "text": "Output is a valid YAML document", "check": "valid_yaml" },
@@ -14,8 +14,6 @@
         { "text": "Every task uses the SNOWFLAKE integration", "check": "every_task", "field": "integration", "equals": "SNOWFLAKE" },
         { "text": "Every task runs the SNOWFLAKE_RUN_TEST job", "check": "every_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
         { "text": "Tasks connect via ${{ ENV.SNOWFLAKE_CONNECTION }}", "check": "regex", "pattern": "ENV\\.SNOWFLAKE_CONNECTION" },
-        { "text": "Every task group has a completion condition", "check": "all_groups_have", "key": "condition" },
-        { "text": "Group conditions gate on .all().status == 'COMPLETED'", "check": "regex", "pattern": "\\.all\\(\\)\\.status\\s*==\\s*'COMPLETED'" },
         { "text": "At least three test task groups are present", "check": "min_task_groups", "min": 3 },
         { "text": "Test tasks define an error_threshold_expression", "check": "regex", "pattern": "error_threshold_expression" },
         { "text": "Task groups are chained via depends_on", "check": "groups_chained" },
@@ -30,15 +28,15 @@
     {
       "id": "single-fact-freshness",
       "prompt": "I have one Snowflake fact table described in files/orders_only.md. It's append-only and should never go stale, and the IDs must never be null. Write me an Orchestra data quality pipeline (YAML) that checks freshness and ID completeness on it. Save it to pipeline.yml here. Generate the YAML only — no live queries, no deploy.",
-      "expected_output": "An Orchestra v1 pipeline YAML for SALES.CORE.FCT_TRANSACTIONS with at least a freshness check on TXN_TS and a not-null check on TRANSACTION_ID / ACCOUNT_ID, each as a SNOWFLAKE_RUN_TEST task in a gated group, with a failure alert.",
+      "expected_output": "An Orchestra v1 pipeline YAML for SALES.CORE.FCT_TRANSACTIONS with at least a freshness check on TXN_TS and a not-null check on TRANSACTION_ID / ACCOUNT_ID, each as a SNOWFLAKE_RUN_TEST task in a sequenced group, with a failure alert.",
       "files": ["orders_only.md"],
       "assertions": [
         { "text": "Output is a valid YAML document", "check": "valid_yaml" },
         { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
         { "text": "Every task runs the SNOWFLAKE_RUN_TEST job", "check": "every_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
         { "text": "Tasks connect via ${{ ENV.SNOWFLAKE_CONNECTION }}", "check": "regex", "pattern": "ENV\\.SNOWFLAKE_CONNECTION" },
-        { "text": "Every task group has a completion condition", "check": "all_groups_have", "key": "condition" },
         { "text": "At least two test task groups are present", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on", "check": "groups_chained" },
         { "text": "Includes a not-null check (queries for IS NULL)", "check": "regex", "pattern": "is\\s+null", "ignore_case": true },
         { "text": "Targets FCT_TRANSACTIONS", "check": "regex", "pattern": "FCT_TRANSACTIONS", "ignore_case": true },
         { "text": "A failure alert is configured", "check": "alerts_status", "status": "FAILED" },
@@ -49,14 +47,14 @@
     {
       "id": "dim-products-sensible-values",
       "prompt": "can you set up some quality checks for my products dimension in snowflake? details are in files/dim_products.md. prices shouldnt be negative and the launch dates are sometimes garbage. give me the orchestra yaml in pipeline.yml — just the file, dont run or deploy anything",
-      "expected_output": "An Orchestra v1 pipeline YAML for RETAIL.DWH.DIM_PRODUCTS with a non-negative price check on LIST_PRICE, a year-bounds / sensible-date check on LAUNCH_DATE, and a uniqueness check on the primary key, each a gated SNOWFLAKE_RUN_TEST task with a failure alert.",
+      "expected_output": "An Orchestra v1 pipeline YAML for RETAIL.DWH.DIM_PRODUCTS with a non-negative price check on LIST_PRICE, a year-bounds / sensible-date check on LAUNCH_DATE, and a uniqueness check on the primary key, each a sequenced SNOWFLAKE_RUN_TEST task with a failure alert.",
       "files": ["dim_products.md"],
       "assertions": [
         { "text": "Output is a valid YAML document", "check": "valid_yaml" },
         { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
         { "text": "Every task runs the SNOWFLAKE_RUN_TEST job", "check": "every_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
         { "text": "Tasks connect via ${{ ENV.SNOWFLAKE_CONNECTION }}", "check": "regex", "pattern": "ENV\\.SNOWFLAKE_CONNECTION" },
-        { "text": "Every task group has a completion condition", "check": "all_groups_have", "key": "condition" },
+        { "text": "Task groups are chained via depends_on", "check": "groups_chained" },
         { "text": "Includes a negative-price guard on LIST_PRICE (queries for < 0)", "check": "regex", "pattern": "<\\s*0" },
         { "text": "Targets DIM_PRODUCTS", "check": "regex", "pattern": "DIM_PRODUCTS", "ignore_case": true },
         { "text": "A failure alert is configured", "check": "alerts_status", "status": "FAILED" },

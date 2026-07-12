@@ -24,7 +24,6 @@ pipeline:
         name: Not Null Check
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on: []
-    condition: ${{ task_groups['not_null_tests'].all().status == 'COMPLETED' }}
     name: Not Null Tests
     matrix:
       inputs:
@@ -57,7 +56,6 @@ pipeline:
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on:
     - not_null_tests
-    condition: ${{ task_groups['uniqueness_tests'].all().status == 'COMPLETED' }}
     name: Uniqueness Tests
     matrix:
       inputs:
@@ -81,7 +79,6 @@ pipeline:
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on:
     - not_null_tests
-    condition: ${{ task_groups['freshness_tests'].all().status == 'COMPLETED' }}
     name: Freshness Tests
     matrix:
       inputs:

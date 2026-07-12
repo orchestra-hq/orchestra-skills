@@ -42,7 +42,8 @@ Make strong assertions about the tests you propose, then prompt the user to vali
 # Step 2: Write the Pipeline
 
 Build the Orchestra YAML pipeline ensuring:
-- All tests run in logical groups using: `condition: ${{ task_groups['<group_name>'].all().status == 'COMPLETED' }}`.
+- Tests are organised into logical groups, one per test category.
+- Groups are sequenced via `depends_on` (a group only starts once the groups it lists have completed) — never gate a group on its own status.
 - An alert block is included for failures.
 - The `connection` field references: `${{ ENV.SNOWFLAKE_CONNECTION }}`.
 
@@ -68,7 +69,6 @@ pipeline:
         name: Not Null Check
         connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
     depends_on: []
-    condition: ${{ task_groups['not_null_tests'].all().status == 'COMPLETED' }}
     name: Not Null Tests
     matrix:
       inputs:
