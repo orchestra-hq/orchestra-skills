@@ -16,6 +16,7 @@
         { "text": "Tasks connect via ${{ ENV.SNOWFLAKE_CONNECTION }}", "check": "regex", "pattern": "ENV\\.SNOWFLAKE_CONNECTION" },
         { "text": "At least three test task groups are present", "check": "min_task_groups", "min": 3 },
         { "text": "Test tasks define an error_threshold_expression", "check": "regex", "pattern": "error_threshold_expression" },
+        { "text": "Uses a graduated (non-zero) tolerance on at least one non-critical check, e.g. 5% null-rate or 20% volume-drop, rather than treating every check as a strict >0 failure", "check": "regex", "pattern": "error_threshold_expression:\\s*'>\\s*[1-9]" },
         { "text": "Task groups are chained via depends_on", "check": "groups_chained" },
         { "text": "A failure alert is configured", "check": "alerts_status", "status": "FAILED" },
         { "text": "Includes a not-null / completeness check (queries for IS NULL)", "check": "regex", "pattern": "is\\s+null", "ignore_case": true },
