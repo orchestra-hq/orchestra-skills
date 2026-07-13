@@ -42,7 +42,8 @@
         { "text": "Targets FCT_TRANSACTIONS", "check": "regex", "pattern": "FCT_TRANSACTIONS", "ignore_case": true },
         { "text": "A failure alert is configured", "check": "alerts_status", "status": "FAILED" },
         { "text": "Includes a freshness check on TXN_TS (e.g. max(TXN_TS) within a recent window)" },
-        { "text": "Does not invent checks the user did not ask for and the schema does not motivate" }
+        { "text": "Does not invent checks the user did not ask for and the schema does not motivate" },
+        { "text": "Schedule cadence matches the freshness need (sub-daily/hourly, not a fixed once-daily cron), given the table receives new rows every few minutes and 'should never go stale'", "check": "regex", "pattern": "(?i)(cron:\\s*\\S+\\s+\\*(?:/\\d+)?(?:\\s|$))|hourly" }
       ]
     },
     {
@@ -60,7 +61,8 @@
         { "text": "Targets DIM_PRODUCTS", "check": "regex", "pattern": "DIM_PRODUCTS", "ignore_case": true },
         { "text": "A failure alert is configured", "check": "alerts_status", "status": "FAILED" },
         { "text": "Includes a sensible-date / year-bounds check on LAUNCH_DATE" },
-        { "text": "Includes a uniqueness check on the primary key (PRODUCT_SK or PRODUCT_ID)" }
+        { "text": "Includes a uniqueness check on the primary key (PRODUCT_SK or PRODUCT_ID)" },
+        { "text": "Uniqueness/completeness checks are scoped to the actual primary key (PRODUCT_SK, the surrogate key) rather than duplicated across every key-like column (e.g. also PRODUCT_ID) beyond what the schema motivates" }
       ]
     }
   ]
