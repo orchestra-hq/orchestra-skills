@@ -51,11 +51,23 @@ skills/
     .claude-plugin/plugin.json
     .cursor-plugin/plugin.json
     skills/
-      create-orchestra-pipeline/
+      identify-pipeline-error/          # diagnose & fix
+      fix-pipeline-dbt-task/
+      fix-pipeline-python-task/
       fix-orchestra-pipeline/
       triage-orchestra-pipeline/
-      orchestra-dbt-slim-ci-setup/
-      run-snowflake-quality-tests/
+      create-orchestra-pipeline/        # author & maintain
+      edit-orchestra-pipeline/
+      merge-duplicate-pipelines/
+      account-health-check/             # account health & governance
+      orchestra-dbt-slim-ci-setup/      # dbt state-aware orchestration
+      configure-dbt-source-freshness/
+      configure-dbt-build-after/
+      run-snowflake-quality-tests/      # data-quality testing
+      write-snowflake-dq-tests/
+      write-bigquery-dq-tests/
+      write-clickhouse-dq-tests/
+      write-databricks-dq-tests/
     references/
       orchestra/            # shared docs, bundled with the plugin
         README.md
