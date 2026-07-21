@@ -57,14 +57,12 @@ skills/
       fix-orchestra-pipeline/
       triage-orchestra-pipeline/
       create-orchestra-pipeline/        # author & maintain
-      edit-orchestra-pipeline/
       merge-duplicate-pipelines/
       account-health-check/             # account health & governance
       orchestra-dbt-slim-ci-setup/      # dbt state-aware orchestration
       configure-dbt-source-freshness/
       configure-dbt-build-after/
-      run-snowflake-quality-tests/      # data-quality testing
-      write-snowflake-dq-tests/
+      write-snowflake-dq-tests/         # data-quality testing
       write-bigquery-dq-tests/
       write-clickhouse-dq-tests/
       write-databricks-dq-tests/

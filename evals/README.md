@@ -10,7 +10,7 @@ The design follows the [agentskills.io eval guide](https://agentskills.io/skill-
 `benchmark.json`, iteration directories) and borrows the scenario/runner layout from
 [dbt-labs/dbt-agent-skills](https://github.com/dbt-labs/dbt-agent-skills/tree/main/evals).
 
-Currently wired up for **`run-snowflake-quality-tests`** only. Adding more skills is a
+Currently wired up for **`write-snowflake-dq-tests`** only. Adding more skills is a
 matter of dropping a new suite directory next to it (see [Adding a suite](#adding-a-suite)).
 
 ## Layout
@@ -22,13 +22,13 @@ evals/
 ├── runner.py                       # drives `claude -p` with/without the skill
 ├── grade.py                        # code-grades generated YAML against assertions
 ├── .workspace/                     # run outputs (git-ignored)
-│   └── run-snowflake-quality-tests/
+│   └── write-snowflake-dq-tests/
 │       └── iteration-1/
 │           ├── <eval-id>/
 │           │   ├── with_skill/    { files/, pipeline.yml, timing.json, grading.json, transcript.txt }
 │           │   └── without_skill/ { ... }
 │           └── benchmark.json
-└── run-snowflake-quality-tests/    # the suite (checked in)
+└── write-snowflake-dq-tests/    # the suite (checked in)
     ├── evals.json                  # test cases: prompt, expected_output, files, assertions
     ├── files/                      # input fixtures fed to the agent
     └── expected/golden_pipeline.yml# reference output for human / blind-LLM comparison
@@ -39,7 +39,7 @@ evals/
 
 ## Scope: YAML generation only
 
-`run-snowflake-quality-tests` end-to-end queries live Snowflake, pushes a git branch,
+`write-snowflake-dq-tests` end-to-end queries live Snowflake, pushes a git branch,
 and deploys via the Orchestra MCP server — none of which is deterministic or cheap to
 run in a loop. The harness deliberately exercises only the **pipeline-YAML authoring
 step** (Step 2 of the skill): the agent is handed a fixture *table inventory* and asked
@@ -74,16 +74,16 @@ configurations = 6 `claude` invocations.
 
 ```bash
 # Run every case, both configurations, into the next iteration dir
-python3 evals/runner.py run-snowflake-quality-tests
+python3 evals/runner.py write-snowflake-dq-tests
 
 # One case only / pick configurations / pin a model / reuse an iteration number
-python3 evals/runner.py run-snowflake-quality-tests --only ecommerce-full
-python3 evals/runner.py run-snowflake-quality-tests --configs with_skill
-python3 evals/runner.py run-snowflake-quality-tests --model claude-opus-4-8 --iteration 3
+python3 evals/runner.py write-snowflake-dq-tests --only ecommerce-full
+python3 evals/runner.py write-snowflake-dq-tests --configs with_skill
+python3 evals/runner.py write-snowflake-dq-tests --model claude-opus-4-8 --iteration 3
 
 # Grade the latest iteration (or a specific one) and write benchmark.json
-python3 evals/grade.py run-snowflake-quality-tests
-python3 evals/grade.py run-snowflake-quality-tests --iteration 1
+python3 evals/grade.py write-snowflake-dq-tests
+python3 evals/grade.py write-snowflake-dq-tests --iteration 1
 ```
 
 `runner.py` auto-grades each iteration when it finishes, so the usual loop is just the
@@ -96,8 +96,9 @@ For each eval and each configuration the runner:
 
 1. creates `…/<eval-id>/<config>/` and copies the case's `files` into `…/files/`,
 2. shells out to `claude -p` in that directory with MCP disabled and only file tools
-   allowed — for `with_skill` the skill's `SKILL.md` is injected via
-   `--append-system-prompt`; `without_skill` gets the bare prompt,
+   allowed — for `with_skill` the skill's `SKILL.md`, plus the content of any
+   `../../references/...` files it links to, is injected via `--append-system-prompt`;
+   `without_skill` gets the bare prompt,
 3. captures `total_tokens` / `duration_ms` / `total_cost_usd` into `timing.json` and the
    final assistant message into `transcript.txt`,
 4. expects the agent to have written `pipeline.yml`.

@@ -120,7 +120,9 @@ matrix:
     - conn_2
 ```
 
-Reference matrix values in task parameters as `${{ MATRIX.connectors }}`.
+Reference matrix values in task parameters as `${{ MATRIX.connectors }}`. Matrix tasks run in
+parallel by default; add `sequential: true` under `matrix` to run them one after another instead
+(e.g. to chain repeated linear flows without hand-writing a task per repetition).
 
 ## Validation
 
