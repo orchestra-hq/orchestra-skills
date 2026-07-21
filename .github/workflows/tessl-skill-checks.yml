@@ -60,6 +60,7 @@ jobs:
             | sort -u \
             | while read -r skill; do
                 [ -d "skills/orchestra/skills/$skill" ] && echo "$skill"
+                true
               done > changed_skills.txt
 
           echo "Modified skills:"
