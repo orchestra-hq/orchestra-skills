@@ -4,10 +4,12 @@
 For each eval case and each configuration the runner creates an isolated run directory,
 copies the case fixtures into ./files/, and invokes `claude -p` there with MCP servers
 disabled and only file tools allowed (so a run can never touch a live warehouse, repo,
-or Orchestra). For `with_skill`, the skill's SKILL.md is injected via
---append-system-prompt; `without_skill` is the bare prompt — that pair is the baseline
-comparison. Token/duration/cost are captured to timing.json; the final assistant
-message to transcript.txt. The iteration is graded on completion (see grade.py).
+or Orchestra). For `with_skill`, the skill's SKILL.md — plus the content of any
+`../../references/...` files it links to, since those live outside the sandboxed run
+directory the agent can't otherwise reach — is injected via --append-system-prompt;
+`without_skill` is the bare prompt — that pair is the baseline comparison. Token/duration/
+cost are captured to timing.json; the final assistant message to transcript.txt. The
+iteration is graded on completion (see grade.py).
 
 Usage:
     python3 evals/runner.py <suite> [--only ID] [--configs with_skill,without_skill]
@@ -18,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -28,6 +31,8 @@ REPO_ROOT = EVALS_DIR.parent
 SKILLS_ROOT = REPO_ROOT / "skills" / "orchestra" / "skills"
 CONFIGS = ("with_skill", "without_skill")
 
+REFERENCE_LINK_RE = re.compile(r"`(\.\./\.\./references/[^`]+\.md)`")
+
 WITH_SKILL_PREAMBLE = (
     "You have been given a Skill below. Follow its instructions to complete the user's "
     "task. Apply only the parts relevant to authoring the pipeline YAML — the environment "
@@ -36,12 +41,26 @@ WITH_SKILL_PREAMBLE = (
     "----- BEGIN SKILL: {name} -----\n{body}\n----- END SKILL -----"
 )
 
+REFERENCE_BLOCK = "\n\n----- BEGIN REFERENCE: {path} -----\n{body}\n----- END REFERENCE -----"
+
 
 def skill_body(suite: str) -> str:
-    skill_md = SKILLS_ROOT / suite / "SKILL.md"
+    skill_dir = SKILLS_ROOT / suite
+    skill_md = skill_dir / "SKILL.md"
     if not skill_md.exists():
         sys.exit(f"SKILL.md not found at {skill_md} — suite must match the skill directory name.")
-    return skill_md.read_text()
+    text = skill_md.read_text()
+
+    seen = set()
+    for rel in REFERENCE_LINK_RE.findall(text):
+        ref_path = (skill_dir / rel).resolve()
+        if ref_path in seen:
+            continue
+        seen.add(ref_path)
+        if not ref_path.exists():
+            sys.exit(f"SKILL.md links to missing reference: {ref_path}")
+        text += REFERENCE_BLOCK.format(path=ref_path.relative_to(REPO_ROOT), body=ref_path.read_text())
+    return text
 
 
 def next_iteration(workspace: Path) -> int:

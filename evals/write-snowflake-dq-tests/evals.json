@@ -1,5 +1,5 @@
 {
-  "skill_name": "run-snowflake-quality-tests",
+  "skill_name": "write-snowflake-dq-tests",
   "description": "Given a Snowflake table inventory, the skill should author an Orchestra v1 data-quality pipeline YAML: one SNOWFLAKE_RUN_TEST task per inferred check, grouped by category, groups sequenced via depends_on, connection via ${{ ENV.SNOWFLAKE_CONNECTION }}, and a failure alert.",
   "output_file": "pipeline.yml",
   "evals": [

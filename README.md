@@ -24,8 +24,7 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 | Skill | What it does | Try saying |
 |-------|--------------|------------|
-| [`create-orchestra-pipeline`](skills/orchestra/skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
-| [`edit-orchestra-pipeline`](skills/orchestra/skills/edit-orchestra-pipeline/SKILL.md) | Create or edit, validate, and remediate a `version: v1` pipeline YAML from a description. | _"Add a dbt task to my existing pipeline"_ |
+| [`create-orchestra-pipeline`](skills/orchestra/skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description; also handles edits to an existing pipeline. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
 | [`merge-duplicate-pipelines`](skills/orchestra/skills/merge-duplicate-pipelines/SKILL.md) | Finds pipelines that are the same process duplicated per environment or conceptually (per customer/region), drafts a consolidated pipeline using Environment overlays/inputs/matrices, and asks per duplicate set before creating, PR-ing, or pausing anything. | _"Why do I have three copies of this pipeline? Consolidate them."_ |
 
 #### Account health & governance
@@ -46,7 +45,6 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 | Skill | What it does | Try saying |
 |-------|--------------|------------|
-| [`run-snowflake-quality-tests`](skills/orchestra/skills/run-snowflake-quality-tests/SKILL.md) | Inspect Snowflake tables, then build and deploy a data-quality testing pipeline to Orchestra. | _"Run Snowflake data quality tests"_ |
 | [`write-snowflake-dq-tests`](skills/orchestra/skills/write-snowflake-dq-tests/SKILL.md) | Profile Snowflake data, design tests that fit what each column actually means, then build and deploy a DQ testing pipeline to Orchestra. | _"Write data quality tests for my Snowflake tables"_ |
 | [`write-bigquery-dq-tests`](skills/orchestra/skills/write-bigquery-dq-tests/SKILL.md) | Same profile-then-test workflow as above, for BigQuery. | _"Write data quality tests for my BigQuery tables"_ |
 | [`write-clickhouse-dq-tests`](skills/orchestra/skills/write-clickhouse-dq-tests/SKILL.md) | Same profile-then-test workflow as above, for ClickHouse. | _"Write data quality tests for my ClickHouse tables"_ |
@@ -95,7 +93,7 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 - Skills live under [`skills/orchestra/skills/`](skills/orchestra/skills/) and shared Orchestra material under [`skills/orchestra/references/orchestra/`](skills/orchestra/references/orchestra/), all inside the single `orchestra` plugin bundle. There is a single skill tree — no generated copies to keep in sync.
 - To add a skill, create `skills/orchestra/skills/<skill-name>/SKILL.md` with `name` + `description` frontmatter, put any supporting `references/`/`templates/` in the same folder, and add it to the relevant category table under [Skills](#skills). The `orchestra` plugin exposes it automatically — bump the `version` in `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add its path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — this isn't auto-generated, so a skill left out here silently stops showing up in Tessl's published listing. CI (`Validate Skills`) checks the frontmatter, that `SKILL.md` stays under ~500 lines, and that the manifests are valid JSON. Write skills to be client-agnostic — describe capabilities (e.g. "if your client can schedule a wake-up…") rather than naming a specific tool.
 - Recording fixes is optional and deferred to your client's persistent memory — never commit workspace-specific fix history. Extend [`pipeline/diagnosis-patterns.md`](skills/orchestra/references/orchestra/pipeline/diagnosis-patterns.md) only with generic, reusable patterns.
-- **Evals.** Skill evals live under [`evals/`](evals/) — an eval-driven harness that runs a skill with and without it via the headless `claude` CLI and grades the output. Currently wired up for `run-snowflake-quality-tests`. See [`evals/README.md`](evals/README.md) for setup and how to run, grade, and add a suite.
+- **Evals.** Skill evals live under [`evals/`](evals/) — an eval-driven harness that runs a skill with and without it via the headless `claude` CLI and grades the output. Currently wired up for `write-snowflake-dq-tests`. See [`evals/README.md`](evals/README.md) for setup and how to run, grade, and add a suite.
 - Do not commit API keys, `.env` files, or other secrets.
 
 Agents editing this repo should follow [`AGENTS.md`](AGENTS.md).
