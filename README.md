@@ -26,6 +26,7 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 |-------|--------------|------------|
 | [`create-orchestra-pipeline`](skills/orchestra/skills/create-orchestra-pipeline/SKILL.md) | Author, validate, and remediate a `version: v1` pipeline YAML from a description; also handles edits to an existing pipeline. | _"Create a pipeline that runs dbt then loads Snowflake"_ |
 | [`merge-duplicate-pipelines`](skills/orchestra/skills/merge-duplicate-pipelines/SKILL.md) | Finds pipelines that are the same process duplicated per environment or conceptually (per customer/region), drafts a consolidated pipeline using Environment overlays/inputs/matrices, and asks per duplicate set before creating, PR-ing, or pausing anything. | _"Why do I have three copies of this pipeline? Consolidate them."_ |
+| [`build-data-reconciliation-pipeline`](skills/orchestra/skills/build-data-reconciliation-pipeline/SKILL.md) | Builds a pipeline using Orchestra's native Data Reconciliation tasks to prove two systems (Snowflake/SQL Server/Databricks) match — a full validation check for migration cutover, plus an optional scheduled cursor-field drift monitor afterward. | _"Make sure our Snowflake-to-Databricks migration matches before we cut over."_ |
 
 #### Account health & governance
 
