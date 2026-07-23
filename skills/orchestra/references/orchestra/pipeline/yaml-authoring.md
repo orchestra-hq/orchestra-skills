@@ -72,7 +72,11 @@ pipeline:
 
 ## Optional top-level sections
 
-**Schedule (Quartz cron — six fields):**
+**Schedule (six-field cron, minute-first — not standard seconds-first Quartz):**
+`minute hour day-of-month month day-of-week [year]`, e.g. `0 8 ? * * *` = 8:00am daily. Confirmed
+empirically against `validate_pipeline` — an out-of-range value in field 1 errors as "Invalid
+minute value," field 2 as "Invalid hour value," not seconds/minutes as a literal Quartz reading
+would suggest.
 
 ```yaml
 schedule:
@@ -145,7 +149,7 @@ validate without a local CLI install.
 | Unknown parameter | Remove or rename to match the integration schema |
 | Invalid `depends_on` reference | Referenced ID must exist at the correct level (task vs task group) |
 | YAML syntax error | Fix indentation, quoting, or structure |
-| Invalid cron expression | Quartz format: `0 8 ? * * *` (six fields, not five) |
+| Invalid cron expression | Six fields, minute-first: `0 8 ? * * *` (not seconds-first Quartz) |
 
 Re-run validation after each fix until the output is clean.
 
