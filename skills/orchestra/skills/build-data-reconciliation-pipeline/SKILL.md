@@ -1,21 +1,18 @@
 ---
 name: build-data-reconciliation-pipeline
 description: >
-  Builds Orchestra pipeline YAML that uses the native ORCHESTRA Data Reconciliation tasks
-  (DATA_RECONCILIATION_MANUAL_QUERY and DATA_RECONCILIATION_CURSOR_FIELD) to prove two data
-  stores actually match — the "did the migration really land correctly" check between a
-  source and a destination integration (SNOWFLAKE, SQL_SERVER, DATABRICKS, in any pairing,
-  including the same engine twice, e.g. one Snowflake account to another). Use whenever the
+  Builds Orchestra pipeline YAML using the native Data Reconciliation tasks
+  (DATA_RECONCILIATION_MANUAL_QUERY, DATA_RECONCILIATION_CURSOR_FIELD) to prove two data
+  stores match — the "did the migration land correctly" check between a source and
+  destination integration (SNOWFLAKE, SQL_SERVER, DATABRICKS, any pairing). Use whenever the
   user wants to compare, validate, or reconcile data across two systems for a migration,
   replatform, cutover, or CDC/replication setup — phrases like "make sure the migration
-  matches", "reconcile Snowflake and Databricks", "compare these tables between source and
-  target", "validate the cutover", "did we lose any rows moving to the new warehouse", "set
-  up drift monitoring between old and new", or any mention of Orchestra's Data
-  Reconciliation / DataRec feature. Produces both a one-off full-match validation pipeline
-  for cutover day and, when wanted, an ongoing cursor-field drift monitor to run on a
-  schedule afterward. Don't reach for the generic create-orchestra-pipeline skill for this —
-  the Data Reconciliation task types have sharp edges (single-scalar query results,
-  thresholds that silently no-op if omitted) that this skill's references cover in depth.
+  matches", "reconcile Snowflake and Databricks", "validate the cutover", "did we lose any
+  rows moving to the new warehouse", "set up drift monitoring", or any mention of Data
+  Reconciliation / DataRec. Produces a one-off full-match validation pipeline plus,
+  optionally, an ongoing cursor-field drift monitor. Don't use create-orchestra-pipeline for
+  this — Data Reconciliation tasks have sharp edges (single-scalar results, thresholds that
+  silently no-op if omitted) covered in this skill's references.
 ---
 
 # Build Data Reconciliation Pipeline
