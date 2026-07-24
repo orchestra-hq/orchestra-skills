@@ -87,12 +87,22 @@ column name.
 
 ### Step 3 — Build the migration-validation pipeline (manual query)
 
-One task group for row counts, matrixed over every table in scope; one task group for
-column-level aggregates, matrixed over every table+column+metric check. Use
-`query-templates.md` for the actual SQL per engine, and set an explicit
-`error_threshold_expression` on **every** task — omitting it means the task always succeeds
-regardless of the actual difference, which defeats the entire point of the pipeline. Default
-to `!= 0` (exact match) unless the user has told you some tolerance is legitimate.
+Three task groups, standard: row counts (matrixed over every table in scope), column-level
+aggregates (matrixed over every table+column+metric check), and **schema parity** — do all
+three by default, not just the first two. Two ingestion/migration tools rarely produce
+byte-identical schemas (loader-metadata columns, renamed or retyped columns), and a passing
+row-count + content check says nothing about that — this was discovered the hard way
+reconciling a dlt-loaded table against a natively-loaded one, where schema drift went
+unchecked for several runs. See `query-templates.md`'s "Schema / column parity" section for the
+per-engine fingerprint query, and note it defaults to **warn, not error** — schema drift on
+loader-added columns is often expected and benign, so only escalate to an error threshold if
+the user has explicitly said the two schemas must match exactly.
+
+Use `query-templates.md` for the actual SQL per engine, and set an explicit
+`error_threshold_expression` on every row-count/content task — omitting it means the task
+always succeeds regardless of the actual difference, which defeats the entire point of the
+pipeline. Default to `!= 0` (exact match) unless the user has told you some tolerance is
+legitimate.
 
 Don't try to cram a whole table's comparison into one task: a `DATA_RECONCILIATION_MANUAL_QUERY`
 task's queries must each return a single scalar, so "compare table X" is really "one row-count

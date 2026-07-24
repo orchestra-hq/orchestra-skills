@@ -112,6 +112,30 @@ pipeline:
           source_table: RAW.PUBLIC.ORDERS
           destination_table: prod.sales.orders
           column: created_at
+  schema_checks:
+    tasks:
+      check_schema_parity:
+        integration: ORCHESTRA
+        integration_job: DATA_RECONCILIATION_MANUAL_QUERY
+        parameters:
+          source_integration: SNOWFLAKE
+          destination_integration: DATABRICKS
+          source_query: >
+            SELECT BITXOR_AGG(HASH(COLUMN_NAME || ':' || DATA_TYPE)) FROM RAW.INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'PUBLIC' AND TABLE_NAME = 'ORDERS'
+            AND COLUMN_NAME IN ('ID', 'TOTAL_AMOUNT', 'CREATED_AT')
+          destination_query: >
+            SELECT bit_xor(hash(concat(column_name, ':', data_type))) FROM prod.information_schema.columns
+            WHERE table_schema = 'sales' AND table_name = 'orders'
+            AND column_name IN ('id', 'total_amount', 'created_at')
+          warn_threshold_expression: '!= 0'   # warn-only: error_threshold_expression deliberately omitted
+                                               # -- both default to null on this task type, see
+                                               # query-templates.md's threshold-asymmetry note
+        depends_on: []
+        name: 'Schema parity — orders'
+    depends_on:
+    - row_count_checks
+    name: 'Schema Checks'
 alerts:
 - name: Reconciliation Failure
   statuses: [FAILED, WARNING]
@@ -128,6 +152,13 @@ entry; only the table/column values are templated. Splitting into `column_sum_ch
 timestamp-lag check tolerates a minute of drift — each group's `error_threshold_expression` is a
 plain hardcoded literal. Add another sibling group any time a new check needs a threshold policy
 that doesn't already have a group.
+
+`schema_checks` only covers the columns actually named in `COLUMN_NAME IN (...)` on each side —
+here `orders`' three business columns, not `customers` and not every column Databricks/Snowflake
+happen to hold. It's deliberately warn-only (`warn_threshold_expression` set, no
+`error_threshold_expression` at all) since a schema difference in this kind of cross-tool
+migration is common and often benign — see `query-templates.md`'s "Schema / column parity"
+section for why, and for the per-engine fingerprint queries.
 
 ### Same-engine variant (e.g. Snowflake account to Snowflake account)
 
@@ -225,6 +256,10 @@ Validated schema-clean against the live `validate_pipeline` API. Same threshold-
 rule applies here too — row counts are exact-match, sums tolerate a dollar, timestamps tolerate
 a minute, and `Column Sum Checks`/`Column Timestamp Checks` both depend on `Row Count Checks` so
 the cheap check fails fast before the heavier aggregate queries run.
+
+Add a `Schema Checks` group here too, same shape as the cross-engine example above — since both
+sides are Snowflake, `source_query`/`destination_query` use identical `BITXOR_AGG(HASH(...))`
+SQL on both sides, no dialect translation needed, same as every other check in this variant.
 
 ## Pattern 2 — cursor field, matrixed over tables, for the ongoing monitor
 
