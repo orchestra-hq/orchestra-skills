@@ -77,6 +77,72 @@ order-independence — XOR-ing a set of values in any order produces the same re
 ever growing in magnitude, so it structurally can't overflow. Reach for whichever bitwise
 aggregate the engine provides before reaching for `SUM` on a hash column.
 
+## Schema / column parity — a check kind, not just an authoring step
+
+Two ingestion tools loading "the same data" rarely produce identical schemas: extra
+lineage/loader-metadata columns (dlt's `_dlt_load_id`/`_dlt_id`), split "variant" columns,
+renamed or retyped columns. A row-count and content check can pass cleanly while the schema
+has already drifted underneath it — this was discovered the hard way reconciling a
+dlt-loaded Google Sheets table against a natively-loaded one (see
+`unsupported-engine-fallback.md`'s same-connection example). Treat schema parity as its own
+check, not something eyeballed once while writing the content query.
+
+`DATA_RECONCILIATION_MANUAL_QUERY` can't join across connections, so reduce the column list to
+a single-scalar fingerprint the same way as the row checksum above: hash `column_name` +
+`data_type` for the columns actually expected to match on both sides (ask the user which
+columns those are — this must be the *shared* business columns, not every column a loader
+happens to add), XOR-aggregate for order independence, and compare source vs destination as
+one number.
+
+- Snowflake: `SELECT BITXOR_AGG(HASH(COLUMN_NAME || ':' || DATA_TYPE)) FROM
+  INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '<SCHEMA>' AND TABLE_NAME = '<TABLE>' AND
+  COLUMN_NAME IN (<expected columns>)`
+- SQL Server (no `BITXOR_AGG`; `CHECKSUM_AGG` is the equivalent order-independent aggregate):
+  `SELECT CHECKSUM_AGG(CHECKSUM(COLUMN_NAME + ':' + DATA_TYPE)) FROM
+  INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '<Schema>' AND TABLE_NAME = '<Table>' AND
+  COLUMN_NAME IN (<expected columns>)`
+- Databricks: `SELECT bit_xor(hash(concat(column_name, ':', data_type))) FROM
+  information_schema.columns WHERE table_schema = '<schema>' AND table_name = '<table>' AND
+  column_name IN (<expected columns>)`
+- BigQuery: `SELECT bit_xor(farm_fingerprint(concat(column_name, ':', data_type))) FROM
+  <dataset>.INFORMATION_SCHEMA.COLUMNS WHERE table_name = '<table>' AND column_name IN
+  (<expected columns>)`
+
+The column list is itself a query-shape input that varies per table pair, unlike every other
+check above — that's a legitimate exception to "don't precompute the query string," the same
+one `unsupported-engine-fallback.md` already carves out for bespoke content-comparison joins.
+
+When both sides live in the **same** connection (the BigQuery same-connection fallback
+pattern, or any engine where source and destination share one connection), prefer a direct
+`LEFT JOIN` between the two sides' `INFORMATION_SCHEMA.COLUMNS` over the hash — it's one query
+instead of two, and it tells you *which* column differs instead of just yes/no. See
+`unsupported-engine-fallback.md` for the worked example. Reach for the hash-fingerprint form
+above only when source and destination are genuinely different connections, i.e. whenever
+`DATA_RECONCILIATION_MANUAL_QUERY`'s one-query-per-side constraint applies. Both forms
+(`GCP_BQ_RUN_TEST` running the join, `DATA_RECONCILIATION_MANUAL_QUERY` running the two
+hashes) validate schema-clean against `validate_pipeline` — the join form hasn't been run
+against live BigQuery data, so spot-check its output once before trusting it in a real
+pipeline, same caveat as the fallback doc's `OUTPUTS['results']` note.
+
+**Default to warn, not error.** Unlike row-count or content drift, a schema mismatch on
+loader-added columns is often expected and benign (that's the entire premise above), so
+failing the pipeline on it produces alert fatigue rather than a real finding. The two task
+types differ in how "warn only" is actually expressed, and it is easy to get backwards:
+
+- `DATA_RECONCILIATION_MANUAL_QUERY` (native path): `error_threshold_expression` and
+  `warn_threshold_expression` both default to `null` — see "Threshold expressions" below. So
+  warn-only here is simply: set `warn_threshold_expression: '!= 0'` and **omit**
+  `error_threshold_expression` entirely.
+- `GCP_BQ_RUN_TEST` (the BigQuery fallback path): both thresholds default to `'> 0'` if
+  omitted, so leaving `error_threshold_expression` unset still fails the task on any drift.
+  Warn-only here requires explicitly setting it to something the check can never reach (e.g.
+  `'> 999999'`) — omitting it does **not** give warn-only, it gives error-on-any-drift, the
+  opposite of what's wanted.
+
+Only escalate to an error threshold if the user has explicitly said the two schemas must
+match exactly (e.g. reconciling two loads from the same tool, where any drift really is a
+bug).
+
 ## Why epoch-seconds for timestamps
 
 Per Orchestra's docs, `error_threshold_expression`/`warn_threshold_expression` are only

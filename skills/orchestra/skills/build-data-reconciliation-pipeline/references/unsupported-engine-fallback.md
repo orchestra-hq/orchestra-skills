@@ -165,6 +165,70 @@ overflow this section just fixed for BigQuery applies to any 64-bit hash summed 
 XOR'd), and most engines have *some* row- or aggregate-level hash function — reach for whichever
 is native rather than assuming BigQuery's function names apply elsewhere.
 
+### Add a schema-parity check as its own task, not just an authoring-time read
+
+Row count and content parity above only prove the columns *checked* agree — they say nothing
+about the columns *not* checked, and two ingestion tools loading "the same data" almost never
+produce identical schemas (dlt's `_dlt_load_id`/`_dlt_id` lineage columns, named-range metadata,
+variant columns). Add a dedicated `schema_parity` task group, matrixed the same way as the row
+count/content group above, rather than leaving schema drift as something only caught by eyeballing
+the DDL once while writing the content query — that's exactly how the underlying incident this
+section is built from went unnoticed for several runs.
+
+```yaml
+  schema_parity:
+    tasks:
+      check_schema_parity:
+        integration: GCP_BIG_QUERY
+        integration_job: GCP_BQ_RUN_TEST
+        parameters:
+          # Only the shared business columns are checked -- dlt's own lineage/metadata columns
+          # are out of scope by design, see the row/content parity task above.
+          query: >
+            select 1 from
+            (select column_name, data_type from `${{ MATRIX.table_checks[''destination_dataset''] }}`.INFORMATION_SCHEMA.COLUMNS
+             where table_name = '${{ MATRIX.table_checks[''destination_table''] }}'
+               and column_name in ('email', 'company', 'title')) as expected
+            left join
+            (select column_name, data_type from `${{ MATRIX.table_checks[''source_dataset''] }}`.INFORMATION_SCHEMA.COLUMNS
+             where table_name = '${{ MATRIX.table_checks[''source_table''] }}') as src
+            using (column_name)
+            where src.column_name is null or src.data_type != expected.data_type
+          enable_drive_scope: false
+          error_threshold_expression: '> 999999'   # unreachably high on purpose -- see below
+          warn_threshold_expression: '> 0'
+        depends_on: []
+        name: "Schema parity (email, company, title) — ${{ MATRIX.table_checks[''label''] }}"
+        connection: ${{ ENV.GCP_BIG_QUERY_CONNECTION }}
+    depends_on:
+    - table_row_count_parity
+    condition: ${{ task_groups['table_row_count_parity'].all().status == 'COMPLETED' }}
+    name: 'Schema Parity'
+    matrix:
+      inputs:
+        table_checks:
+        - label: 'sheet_1_dlt_range vs linkedin'
+          source_dataset: google_sheets_data
+          source_table: sheet_1_dlt_range
+          destination_dataset: gsheets_leads
+          destination_table: linkedin
+```
+
+Validated schema-clean against the live `validate_pipeline` API; the join query itself hasn't
+been run against live BigQuery data, so spot-check it once before trusting it, same caveat as
+this doc's `OUTPUTS['results']` note above. `error_threshold_expression: '> 999999'` is
+deliberate, not a placeholder — `GCP_BQ_RUN_TEST` defaults **both** thresholds to `'> 0'` if
+omitted (unlike `DATA_RECONCILIATION_MANUAL_QUERY`, whose thresholds default to `null` — see
+`query-templates.md`'s threshold-asymmetry note), so simply leaving `error_threshold_expression`
+out still fails the pipeline on any schema drift. Setting it unreachably high is how you get
+warn-only behavior on this task type. Only tighten it to a reachable value if the user has
+confirmed the two schemas must match exactly.
+
+When source and destination sit in genuinely different connections (so a same-connection
+`LEFT JOIN` isn't possible), use the hash-fingerprint form from `query-templates.md`'s "Schema /
+column parity" section instead, through the same two-query-plus-Python-diff pattern as the row
+count check earlier in this doc.
+
 ### Prefer a per-row join over an aggregate fingerprint when a natural key exists
 
 The aggregate fingerprint above answers "do these tables match, yes or no" but not "which
@@ -201,6 +265,10 @@ Fivetran):
   next to a formatted date string) versus genuine content drift, and it's the user's call, not
   yours, whether an found artifact should be normalized away or kept as a real mismatch —
   they may deliberately want maximum visibility over a quieter but noisier-signal-free check.
+  That one-time profiling step is about writing the comparison correctly; it isn't a substitute
+  for an ongoing check. Add a dedicated `schema_parity` task group (see above) so this doesn't
+  regress silently on a future load — profiling once and never checking again is exactly what
+  let a schema drift ship unnoticed in the incident this section is drawn from.
   Because the column mapping is genuinely bespoke per schema pair, this content-comparison query
   is a case where writing one query per pair (not matrixed) is the right call — see
   `pipeline-patterns.md`'s parameterization guidance for why that's the exception, not the rule.
