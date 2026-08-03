@@ -3,11 +3,14 @@
 
 Coded assertions (those carrying a `check`) are graded mechanically and reliably.
 Free-text assertions (only `text`) are recorded as `manual` (passed=null) for human
-or LLM review. Writes a grading.json next to each run's output and an aggregated
-benchmark.json for the iteration.
+review, unless `--llm-judge` is passed, in which case an LLM judge grades them
+against the run's transcript (and output file, if the suite has one). Writes a
+grading.json next to each run's output and an aggregated benchmark.json for the
+iteration.
 
 Usage:
     python3 evals/grade.py <suite> [--iteration N] [--configs with_skill,without_skill]
+                                    [--llm-judge] [--judge-model claude-haiku-4-5]
 """
 from __future__ import annotations
 
@@ -25,9 +28,15 @@ except ModuleNotFoundError:
 
 EVALS_DIR = Path(__file__).resolve().parent
 CONFIGS = ("with_skill", "without_skill")
+DEFAULT_JUDGE_MODEL = "claude-haiku-4-5"
 
 
 # --- helpers ---------------------------------------------------------------
+
+def normalize_assertion(a) -> dict:
+    """Accept either a plain string or an object with at least `text`."""
+    return {"text": a} if isinstance(a, str) else a
+
 
 def iter_tasks(pipeline: dict):
     """Yield every task dict across all groups of a parsed pipeline."""
@@ -141,8 +150,9 @@ CHECKS = {
 
 # --- grading ---------------------------------------------------------------
 
-def grade_output(assertions, output_path: Path) -> dict:
-    raw = output_path.read_text() if output_path.exists() else ""
+def grade_output(assertions, output_path: Path | None, transcript_path: Path | None,
+                  case: dict | None = None, judge_client=None, judge_model: str | None = None) -> dict:
+    raw = output_path.read_text() if output_path and output_path.exists() else ""
     doc = None
     if raw:
         try:
@@ -153,16 +163,19 @@ def grade_output(assertions, output_path: Path) -> dict:
         else:
             raw_err = None
     else:
-        raw_err = "output file not found"
+        raw_err = "output file not found" if output_path else None
+
+    transcript = transcript_path.read_text() if transcript_path and transcript_path.exists() else ""
 
     results = []
-    coded_pass = coded_total = manual = 0
+    coded_pass = coded_total = 0
+    llm_pass = llm_total = 0
+    manual = []  # assertions with no check and no judge — filled in below
+
     for a in assertions:
         check = a.get("check")
         if not check:
-            results.append({"text": a["text"], "passed": None, "graded_by": "manual",
-                            "evidence": "free-text assertion — review by hand or LLM"})
-            manual += 1
+            manual.append(a)
             continue
         fn = CHECKS.get(check)
         if fn is None:
@@ -182,30 +195,75 @@ def grade_output(assertions, output_path: Path) -> dict:
         coded_total += 1
         coded_pass += int(bool(passed))
 
+    if manual and judge_client is not None and case is not None:
+        import judge as judge_mod
+        try:
+            verdicts = judge_mod.judge_run(
+                judge_client, judge_model or DEFAULT_JUDGE_MODEL,
+                prompt=case.get("prompt", ""), expected_output=case.get("expected_output", ""),
+                transcript=transcript, output_text=raw, assertions=manual,
+            )
+        except Exception as e:
+            verdicts = None
+            judge_error = str(e)
+        if verdicts is not None:
+            by_index = {v["index"]: v for v in verdicts}
+            for i, a in enumerate(manual):
+                v = by_index.get(i)
+                if v is None:
+                    results.append({"text": a["text"], "passed": None, "graded_by": "manual",
+                                    "evidence": "judge did not return a verdict for this assertion"})
+                    continue
+                results.append({"text": a["text"], "passed": bool(v["passed"]), "graded_by": "llm",
+                                "evidence": v.get("rationale", "")})
+                llm_total += 1
+                llm_pass += int(bool(v["passed"]))
+        else:
+            for a in manual:
+                results.append({"text": a["text"], "passed": None, "graded_by": "manual",
+                                "evidence": f"judge call failed: {judge_error}"})
+    else:
+        for a in manual:
+            results.append({"text": a["text"], "passed": None, "graded_by": "manual",
+                            "evidence": "free-text assertion — review by hand or LLM"})
+
+    total = coded_total + llm_total
+    passed_total = coded_pass + llm_pass
     return {
         "assertion_results": results,
         "summary": {
-            "passed": coded_pass,
-            "failed": coded_total - coded_pass,
+            "passed": passed_total,
+            "failed": total - passed_total,
             "coded_total": coded_total,
-            "manual": manual,
-            "pass_rate": round(coded_pass / coded_total, 4) if coded_total else None,
+            "llm_total": llm_total,
+            "manual": len(manual) - llm_total,
+            "pass_rate": round(passed_total / total, 4) if total else None,
         },
     }
 
 
-def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
+def grade_iteration(suite: str, iteration_dir: Path, configs,
+                     llm_judge: bool = False, judge_model: str | None = None) -> dict:
     evals = json.loads((EVALS_DIR / suite / "evals.json").read_text())
-    output_file = evals.get("output_file", "pipeline.yml")
+    output_file = evals.get("output_file")
     by_config = {c: [] for c in configs}
 
+    judge_client = None
+    if llm_judge:
+        import anthropic
+        judge_client = anthropic.Anthropic()
+
     for case in evals["evals"]:
+        assertions = [normalize_assertion(a) for a in case["assertions"]]
         case_dir = iteration_dir / case["id"]
         for config in configs:
             run_dir = case_dir / config
             if not run_dir.exists():
                 continue
-            grading = grade_output(case["assertions"], run_dir / output_file)
+            output_path = run_dir / output_file if output_file else None
+            transcript_path = run_dir / "transcript.txt"
+            grading = grade_output(assertions, output_path, transcript_path,
+                                    case=case, judge_client=judge_client, judge_model=judge_model)
             (run_dir / "grading.json").write_text(json.dumps(grading, indent=2) + "\n")
             timing = {}
             tpath = run_dir / "timing.json"
@@ -216,12 +274,13 @@ def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
                 "pass_rate": grading["summary"]["pass_rate"],
                 "passed": grading["summary"]["passed"],
                 "coded_total": grading["summary"]["coded_total"],
+                "llm_total": grading["summary"]["llm_total"],
                 "manual": grading["summary"]["manual"],
                 "tokens": timing.get("total_tokens"),
                 "duration_ms": timing.get("duration_ms"),
             })
             print(f"  {case['id']:<28} {config:<14} "
-                  f"{grading['summary']['passed']}/{grading['summary']['coded_total']} coded "
+                  f"{grading['summary']['passed']}/{grading['summary']['coded_total'] + grading['summary']['llm_total']} graded "
                   f"(+{grading['summary']['manual']} manual)")
 
     def agg(rows, key):
@@ -270,6 +329,10 @@ def main():
     ap.add_argument("--iteration", type=int, help="iteration number (default: latest)")
     ap.add_argument("--configs", default=",".join(CONFIGS),
                     help="comma-separated configs to grade")
+    ap.add_argument("--llm-judge", action="store_true",
+                    help="grade free-text assertions with an LLM judge instead of leaving them manual")
+    ap.add_argument("--judge-model", default=DEFAULT_JUDGE_MODEL,
+                    help=f"model for the LLM judge (default: {DEFAULT_JUDGE_MODEL})")
     args = ap.parse_args()
 
     workspace = EVALS_DIR / ".workspace" / args.suite
@@ -281,8 +344,9 @@ def main():
         sys.exit(f"No iteration to grade under {workspace} — run the runner first.")
 
     configs = [c.strip() for c in args.configs.split(",") if c.strip()]
-    print(f"Grading {args.suite} / {iteration_dir.name}")
-    benchmark = grade_iteration(args.suite, iteration_dir, configs)
+    print(f"Grading {args.suite} / {iteration_dir.name}" + (" (LLM judge on)" if args.llm_judge else ""))
+    benchmark = grade_iteration(args.suite, iteration_dir, configs,
+                                 llm_judge=args.llm_judge, judge_model=args.judge_model)
 
     print("\nbenchmark.json:")
     print(json.dumps(benchmark.get("run_summary", {}), indent=2, default=str))

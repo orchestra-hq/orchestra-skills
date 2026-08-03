@@ -31,13 +31,17 @@ REPO_ROOT = EVALS_DIR.parent
 SKILLS_ROOT = REPO_ROOT / "skills" / "orchestra" / "skills"
 CONFIGS = ("with_skill", "without_skill")
 
-REFERENCE_LINK_RE = re.compile(r"`(\.\./\.\./references/[^`]+\.md)`")
+REFERENCE_LINK_RE = re.compile(r"`((?:\.\./\.\./)?references/[^`]+\.md)`")
+
+DEFAULT_SANDBOX_NOTE = (
+    "Apply only the parts relevant to authoring the pipeline YAML — the environment "
+    "has no Snowflake, git, or Orchestra access, so do not attempt to inspect a live "
+    "warehouse, push a branch, or deploy; produce the YAML file the task asks for."
+)
 
 WITH_SKILL_PREAMBLE = (
     "You have been given a Skill below. Follow its instructions to complete the user's "
-    "task. Apply only the parts relevant to authoring the pipeline YAML — the environment "
-    "has no Snowflake, git, or Orchestra access, so do not attempt to inspect a live "
-    "warehouse, push a branch, or deploy; produce the YAML file the task asks for.\n\n"
+    "task. {sandbox_note}\n\n"
     "----- BEGIN SKILL: {name} -----\n{body}\n----- END SKILL -----"
 )
 
@@ -71,8 +75,8 @@ def next_iteration(workspace: Path) -> int:
 
 
 def run_one(case: dict, config: str, run_dir: Path, suite_dir: Path,
-            skill_text: str | None, output_file: str, model: str | None,
-            max_turns: int) -> None:
+            skill_text: str | None, output_file: str | None, model: str | None,
+            max_turns: int, sandbox_note: str) -> None:
     files_dir = run_dir / "files"
     files_dir.mkdir(parents=True, exist_ok=True)
     for fname in case.get("files", []):
@@ -93,7 +97,8 @@ def run_one(case: dict, config: str, run_dir: Path, suite_dir: Path,
         cmd += ["--model", model]
     if skill_text is not None:
         cmd += ["--append-system-prompt",
-                WITH_SKILL_PREAMBLE.format(name=case.get("_suite", ""), body=skill_text)]
+                WITH_SKILL_PREAMBLE.format(name=case.get("_suite", ""), body=skill_text,
+                                            sandbox_note=sandbox_note)]
 
     print(f"  → {case['id']:<28} {config:<14} running…", flush=True)
     proc = subprocess.run(cmd, cwd=run_dir, capture_output=True, text=True)
@@ -125,9 +130,12 @@ def run_one(case: dict, config: str, run_dir: Path, suite_dir: Path,
     (run_dir / "timing.json").write_text(json.dumps(timing, indent=2) + "\n")
     (run_dir / "transcript.txt").write_text(result.get("result", ""))
 
-    produced = run_dir / output_file
-    print(f"    done · {total_tokens} tok · {result.get('duration_ms')}ms · "
-          + ("wrote " + output_file if produced.exists() else "NO " + output_file))
+    if output_file:
+        produced = run_dir / output_file
+        status = "wrote " + output_file if produced.exists() else "NO " + output_file
+    else:
+        status = "response-graded (no output_file configured)"
+    print(f"    done · {total_tokens} tok · {result.get('duration_ms')}ms · {status}")
 
 
 def main():
@@ -140,6 +148,10 @@ def main():
     ap.add_argument("--model", help="pin a model, e.g. claude-opus-4-8")
     ap.add_argument("--max-turns", type=int, default=30)
     ap.add_argument("--no-grade", action="store_true", help="skip grading after runs")
+    ap.add_argument("--llm-judge", action="store_true",
+                    help="grade free-text assertions with an LLM judge instead of leaving them manual")
+    ap.add_argument("--judge-model", default=None,
+                    help="model for the LLM judge (default: grade.py's DEFAULT_JUDGE_MODEL)")
     args = ap.parse_args()
 
     suite_dir = EVALS_DIR / args.suite
@@ -147,7 +159,8 @@ def main():
     if not evals_path.exists():
         sys.exit(f"No suite at {evals_path}")
     evals = json.loads(evals_path.read_text())
-    output_file = evals.get("output_file", "pipeline.yml")
+    output_file = evals.get("output_file")
+    sandbox_note = evals.get("sandbox_note", DEFAULT_SANDBOX_NOTE)
     configs = [c.strip() for c in args.configs.split(",") if c.strip()]
     cases = [c for c in evals["evals"] if not args.only or c["id"] == args.only]
     if not cases:
@@ -166,7 +179,8 @@ def main():
             run_dir.mkdir(parents=True, exist_ok=True)
             run_one(case, config, run_dir, suite_dir,
                     skill_text=body if config == "with_skill" else None,
-                    output_file=output_file, model=args.model, max_turns=args.max_turns)
+                    output_file=output_file, model=args.model, max_turns=args.max_turns,
+                    sandbox_note=sandbox_note)
 
     if args.no_grade:
         print(f"\nRuns complete. Grade with: python3 evals/grade.py {args.suite} --iteration {it}")
@@ -174,7 +188,9 @@ def main():
 
     print("\nGrading…")
     import grade
-    grade.grade_iteration(args.suite, iteration_dir, configs)
+    grade.grade_iteration(args.suite, iteration_dir, configs,
+                           llm_judge=args.llm_judge,
+                           judge_model=args.judge_model or grade.DEFAULT_JUDGE_MODEL)
     print(f"\nDone. Outputs under {iteration_dir}")
 
 

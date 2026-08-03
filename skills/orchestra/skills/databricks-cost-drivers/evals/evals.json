@@ -1,62 +1,63 @@
 {
   "skill_name": "databricks-cost-drivers",
+  "sandbox_note": "You have no Orchestra MCP access here, so you cannot call list_pipeline_runs or any other live tool. A fixture file stands in for that data — read it and do the analysis against it directly. Follow the skill's instructions on how to shape the ranked output; don't claim to have called a live tool you don't have access to.",
   "evals": [
     {
       "id": 0,
       "name": "top-spenders-default-window",
-      "prompt": "What's costing the most in Databricks right now?",
-      "expected_output": "Since no window was given, defaults to the last 30 days, pulls Databricks-task run data via Orchestra MCP tools (list_pipeline_runs plus task/operation detail), and returns a ranked table of the top 10 jobs/pipelines by cost or cost-proxy with % of total spend and trend vs the prior period, followed by 2-3 sentences on anything trending up sharply.",
-      "files": [],
+      "prompt": "What's costing the most in Databricks right now? I don't have Orchestra MCP hooked up in this environment, so here's a dump of the last 10 weeks of pipeline run data instead (files/pipeline_runs.json) -- treat 2026-08-02 as the most recent date. Use it to do the analysis.",
+      "expected_output": "Since no window was given, defaults to roughly the last 30 days (the most recent ~4 weekly snapshots: 2026-07-13 through 2026-08-02), computes a duration x cluster-size cost-proxy per pipeline from the fixture, and returns a ranked table of the top jobs by cost-proxy with % of total spend and trend vs the prior period, followed by 2-3 sentences flagging adhoc_backfill_job's sharp recent jump.",
+      "files": ["pipeline_runs.json"],
       "assertions": [
-        "Defaults to a 30-day lookback window since the user did not specify one",
-        "Uses Orchestra MCP tools (e.g. list_pipeline_runs) to gather real run data rather than estimating or guessing durations/costs",
-        "Returns a ranked table with columns for job/pipeline, avg cost or cost-proxy, % of total spend, and trend vs prior period",
-        "Limits the ranked table to the top 10",
-        "States explicitly whether figures are exact billing-system figures or a duration-based cost-proxy, rather than presenting a proxy as an exact dollar cost",
+        "Scopes the analysis to roughly the last 30 days of the fixture (the most recent ~4 weekly rows per pipeline) rather than the full 10-week history undifferentiated",
+        "Computes a cost-proxy from duration_minutes x cluster_node_count (or an equivalent metadata-based formula) per pipeline_name",
+        "Ranks nightly_full_refresh at or near the top given its consistently high duration x node count",
+        "Returns a ranked table with columns for pipeline/job, cost or cost-proxy, and trend vs the prior period",
+        "States explicitly that the figures are a duration-based cost-proxy, not an exact billed dollar amount",
         "Does not recommend specific fixes (e.g. rightsizing, cluster changes) -- points to the cluster-review/job-optimisation skills instead",
-        "Follows with a short (2-3 sentence) narrative on anything trending up sharply, not just the bare table"
+        "Follows with a short (2-3 sentence) narrative flagging adhoc_backfill_job's sharp jump on 2026-08-02 relative to its flat prior history"
       ]
     },
     {
       "id": 1,
       "name": "weekly-trend-review",
-      "prompt": "Give me this week's Databricks cost review -- I want to know what's trending up compared to last week.",
-      "expected_output": "Scopes the review to the requested weekly window, computes each top job's trend against the prior window of the same length (up/down/flat with %), and clearly separates 'still a top spender' jobs from ones that are newly trending up.",
-      "files": [],
+      "prompt": "Give me this week's Databricks cost review -- I want to know what's trending up compared to last week. No Orchestra MCP connected here, so use this fixture instead (files/pipeline_runs.json); the most recent row per pipeline (2026-08-02) is this week, and the row before that (2026-07-27) is last week.",
+      "expected_output": "Scopes the review to the 2026-08-02 vs 2026-07-27 rows, computes each pipeline's trend between those two weeks (up/down/flat with %), and clearly separates nightly_full_refresh (still a top spender, flat week-over-week) from adhoc_backfill_job (newly trending up sharply this week).",
+      "files": ["pipeline_runs.json"],
       "assertions": [
-        "Uses a window matching 'this week' (7 days) rather than silently defaulting to 30 days when the user specified weekly",
-        "Computes trend vs the prior window of the same length (not vs an arbitrary or unstated baseline)",
-        "Reports trend direction and percentage, not just up/down without magnitude",
-        "Distinguishes jobs that are consistently large spenders from jobs that are newly trending up this week",
-        "Uses Orchestra MCP tools to gather actual run data rather than estimating figures"
+        "Compares the 2026-08-02 row to the 2026-07-27 row per pipeline rather than averaging across the full 10-week fixture",
+        "Reports adhoc_backfill_job's week-over-week jump with a specific percentage or multiple, not just 'up'",
+        "Reports nightly_full_refresh as flat/unchanged week-over-week rather than flagging it as trending",
+        "Distinguishes jobs that are consistently large spenders (nightly_full_refresh) from jobs newly trending up this week (adhoc_backfill_job)",
+        "Computes the cost-proxy from the fixture's duration_minutes and cluster_node_count rather than estimating or inventing figures"
       ]
     },
     {
       "id": 2,
       "name": "anomaly-vs-driver-distinction",
-      "prompt": "One of our jobs is always our biggest Databricks cost -- that's expected. But I have a feeling something else spiked recently. Can you check?",
-      "expected_output": "Ranks the top spenders as usual but explicitly separates 'expected top spender, not anomalous' from a distinct anomaly flag: any job whose cost/duration jumped materially more than its own historical volatility would suggest, calling that out separately from the top-N listing and pointing to the cluster-review/job-optimisation skills for a fix.",
-      "files": [],
+      "prompt": "One of our jobs is always our biggest Databricks cost -- that's expected. But I have a feeling something else spiked recently. Can you check? No Orchestra MCP here, so use this fixture (files/pipeline_runs.json); 2026-08-02 is the most recent date.",
+      "expected_output": "Ranks the top spenders and identifies nightly_full_refresh as the expected, consistently-largest job (not anomalous), while separately flagging adhoc_backfill_job's 2026-08-02 jump as the anomaly -- a job whose cost/duration jumped far beyond its own flat 9-week history, not just a top-N-by-rank observation -- and points to the cluster-review/job-optimisation skills for a fix.",
+      "files": ["pipeline_runs.json"],
       "assertions": [
-        "Does not flag the consistently-largest job as anomalous just because it is the top spender",
-        "Identifies anomalies based on a job's jump relative to its own historical volatility, not just absolute cost rank",
-        "Presents the anomaly flag separately from the top-10 ranked table rather than conflating the two",
+        "Does not flag nightly_full_refresh as anomalous just because it is a top spender -- its history is flat",
+        "Identifies adhoc_backfill_job's 2026-08-02 spike as the anomaly, based on the jump relative to its own flat prior 9 weeks, not just absolute cost rank",
+        "Presents the anomaly flag separately from the top-spenders ranking rather than conflating the two",
         "Points to the cluster-review or job-optimisation skills for remediation rather than attempting to fix the anomaly itself",
-        "Uses real run data via Orchestra MCP tools rather than guessing which job spiked"
+        "Computes the comparison from the fixture's actual duration_minutes/cluster_node_count history rather than guessing which job spiked"
       ]
     },
     {
       "id": 3,
       "name": "no-exact-dbu-cost-available",
-      "prompt": "Which Databricks jobs are costing us the most? We don't have a Databricks SQL/system-tables integration connected, just Orchestra.",
-      "expected_output": "Falls back to a duration x cluster-size cost-proxy score per job since exact DBU $ cost isn't available from Orchestra metadata alone, clearly labels the ranking as a proxy rather than a billed dollar figure, and does not claim access to system.billing.usage that isn't actually connected.",
-      "files": [],
+      "prompt": "Which Databricks jobs are costing us the most? We don't have a Databricks SQL/system-tables integration connected, just Orchestra -- and no MCP access in this environment either, so here's a run-data fixture instead (files/pipeline_runs.json).",
+      "expected_output": "Falls back to a duration x cluster-size cost-proxy score per pipeline since the fixture has no dollar/billing field and no system-tables integration is available, clearly labels the ranking as a proxy rather than a billed dollar figure, and does not claim to query system.billing.usage or system.billing.list_prices.",
+      "files": ["pipeline_runs.json"],
       "assertions": [
-        "Uses duration x cluster-size (or an equivalent metadata-based proxy) as the ranking basis since no billing system-tables integration is available",
+        "Uses duration_minutes x cluster_node_count (or an equivalent metadata-based proxy) as the ranking basis since the fixture has no dollar/cost field",
         "Clearly labels the figures as a cost-proxy, not an exact billed dollar amount",
         "Does not claim to query system.billing.usage or system.billing.list_prices when the user said that integration isn't connected",
         "Does not fabricate a specific dollar cost figure to fill the gap",
-        "Still produces a usable ranked top-10 list based on the available proxy metadata"
+        "Still produces a usable ranked list covering all 10 pipelines present in the fixture, ordered by the proxy score"
       ]
     }
   ]

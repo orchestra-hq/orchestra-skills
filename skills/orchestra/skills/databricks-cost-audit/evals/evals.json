@@ -1,5 +1,6 @@
 {
   "skill_name": "databricks-cost-audit",
+  "sandbox_note": "You have no Bash tool and no live Databricks credentials or system-tables access here, so you cannot actually run scripts/audit.py or connect to a warehouse. Follow the skill's instructions to determine what you would do and say -- which flags you'd use, what you'd ask for, how you'd report the result -- and respond as you normally would. Do not claim to have executed anything you can't actually run in this environment.",
   "evals": [
     {
       "id": 0,

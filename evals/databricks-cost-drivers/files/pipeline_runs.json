@@ -1,0 +1,902 @@
+[
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "nightly_full_refresh",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 180,
+    "cluster_node_count": 12,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "hourly_incremental_load",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 90,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "customer_360_dbt_build",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 45,
+    "cluster_node_count": 6,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 10,
+    "cluster_node_count": 2,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "adhoc_backfill_job",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 220,
+    "cluster_node_count": 16,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "ml_feature_pipeline",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 60,
+    "cluster_node_count": 8,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "marketing_attribution_etl",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 30,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-06-01",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 70,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-06-08",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 73,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-06-15",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 76,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-06-22",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 79,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-06-29",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 82,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-07-06",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 85,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-07-13",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 88,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-07-20",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 91,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-07-27",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 94,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "clickstream_dlt_pipeline",
+    "run_date": "2026-08-02",
+    "integration": "DELTA_LIVE_TABLES",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 97,
+    "cluster_node_count": 10,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "finance_reconciliation_job",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 25,
+    "cluster_node_count": 3,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "warehouse_sync_job",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_WORKFLOWS",
+    "cluster_type": "job_cluster",
+    "duration_minutes": 20,
+    "cluster_node_count": 4,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-06-01",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-06-08",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-06-15",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-06-22",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "FAILED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-06-29",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-07-06",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-07-13",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-07-20",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "FAILED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-07-27",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  },
+  {
+    "pipeline_name": "experimental_notebook_job",
+    "run_date": "2026-08-02",
+    "integration": "DATABRICKS_JOBS",
+    "cluster_type": "all_purpose",
+    "duration_minutes": 5,
+    "cluster_node_count": 1,
+    "status": "SUCCEEDED"
+  }
+]
