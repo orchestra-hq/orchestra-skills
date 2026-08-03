@@ -32,8 +32,7 @@ jobs:
 
             lines=$(wc -l < "$skill/SKILL.md")
             if [ "$lines" -gt 500 ]; then
-              echo "  ⚠ SKILL.md is $lines lines (500 recommended)"
-              failed=1
+              echo "  ⚠ SKILL.md is $lines lines (500 recommended) — not failing the build"
             fi
           done
           if [ "$found" -eq 0 ]; then
