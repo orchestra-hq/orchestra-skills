@@ -51,11 +51,21 @@ skills/
     .claude-plugin/plugin.json
     .cursor-plugin/plugin.json
     skills/
-      create-orchestra-pipeline/
+      identify-pipeline-error/          # diagnose & fix
+      fix-pipeline-dbt-task/
+      fix-pipeline-python-task/
       fix-orchestra-pipeline/
       triage-orchestra-pipeline/
-      orchestra-dbt-slim-ci-setup/
-      run-snowflake-quality-tests/
+      create-orchestra-pipeline/        # author & maintain
+      merge-duplicate-pipelines/
+      account-health-check/             # account health & governance
+      orchestra-dbt-slim-ci-setup/      # dbt state-aware orchestration
+      configure-dbt-source-freshness/
+      configure-dbt-build-after/
+      write-snowflake-dq-tests/         # data-quality testing
+      write-bigquery-dq-tests/
+      write-clickhouse-dq-tests/
+      write-databricks-dq-tests/
     references/
       orchestra/            # shared docs, bundled with the plugin
         README.md
@@ -70,7 +80,7 @@ README.md
 
 - Change skill workflows directly in `skills/orchestra/skills/*/SKILL.md` — there is a single skill tree, no generation step. Write skills client-agnostically: describe a capability ("if your client can schedule a wake-up…") rather than naming a specific tool.
 - Change shared playbooks and tool notes under `skills/orchestra/references/orchestra/`.
-- Adding a skill: create `skills/orchestra/skills/<name>/SKILL.md`; it is exposed automatically by the `orchestra` plugin (no manifest edit needed unless you add a new plugin). Bump the `version` in both `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`.
+- Adding a skill: create `skills/orchestra/skills/<name>/SKILL.md`; it is exposed automatically by the `orchestra` plugin (no manifest edit needed unless you add a new plugin). Bump the `version` in both `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add the skill's path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — `tessl-publish.yml` no longer auto-bumps this on every push (see PR #27), so it now needs the same manual bump as the other two manifests or Tessl publishing silently stops reflecting new skills.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.
 

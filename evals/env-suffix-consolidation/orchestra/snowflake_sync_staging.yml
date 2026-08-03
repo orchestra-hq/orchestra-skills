@@ -1,0 +1,54 @@
+version: v1
+name: 'Snowflake Customer Sync - Staging'
+pipeline:
+  grp-fivetran:
+    tasks:
+      task-fivetran:
+        integration: FIVETRAN
+        integration_job: FIVETRAN_SYNC_ALL
+        parameters:
+          connector_id: cust360_staging_connector
+        depends_on: []
+        name: Sync Fivetran connector
+    depends_on: []
+    name: Ingest
+  grp-dbt:
+    tasks:
+      task-dbt:
+        integration: DBT_CORE
+        integration_job: DBT_CORE_EXECUTE
+        parameters:
+          commands: dbt run --select tag:customer_360
+          package_manager: PIP
+          python_version: '3.12'
+          project_dir: dbt_projects/customer_360
+          shallow_clone_dirs: dbt_projects/customer_360
+          warehouse_identifier: STAGING_WH.US-EAST-1.AWS
+        depends_on: []
+        name: Build customer 360 models
+        connection: dbt_snowflake_staging_09912
+    depends_on:
+    - grp-fivetran
+    name: Transform
+  grp-notify:
+    tasks:
+      task-slack:
+        integration: SLACK
+        integration_job: SLACK_SEND_MESSAGE
+        parameters:
+          message: Customer 360 sync complete (staging)
+        depends_on: []
+        name: Notify Slack
+        connection: slack_staging_alerts_10099
+    depends_on:
+    - grp-dbt
+    name: Notify
+schedule:
+- name: Nightly 3am
+  cron: 0 3 ? * * *
+  timezone: UTC
+configuration:
+  concurrency:
+    max_active: 1
+meta:
+  notes: Staging customer 360 sync -- mirrors prod for testing dbt changes before promotion.

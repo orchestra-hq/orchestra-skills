@@ -22,6 +22,13 @@ Grouped by concern. Paths below are relative to `references/orchestra/` in this 
 | `dbt-sao/orchestra-task.md` | Enabling `use_state_orchestration` on the dbt Core task (Git- vs Orchestra-backed) |
 | `dbt-sao/warehouses/*.md` | Per-warehouse freshness specifics (Snowflake, BigQuery, Databricks, MotherDuck) |
 
+## Data-quality test pipelines
+
+| File | Purpose |
+|------|---------|
+| `dq-tests/workflow.md` | Engine-agnostic workflow: thresholds, matrix/gating, branch, register, trigger, interpret results |
+| `dq-tests/{snowflake,bigquery,databricks,clickhouse}.md` | Per-warehouse profiling SQL, test catalogue, and pipeline YAML (`write-*-dq-tests` skills) |
+
 ## MCP (connecting & tool usage)
 
 | File | Purpose |

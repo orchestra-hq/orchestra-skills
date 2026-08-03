@@ -1,0 +1,101 @@
+# Golden reference for the `ecommerce-full` eval (files/analytics_inventory.md).
+#
+# NOT diffed mechanically — correct YAML has many valid shapes. This is the anchor
+# for human review and the blind-LLM quality comparison described in evals/README.md.
+#
+# Built from the pattern in the skill's SKILL.md. Replace with the canonical sample
+# the skill is expected to produce when you have one.
+version: v1
+name: 'Snowflake Data Quality Tests #snowflake #dataquality'
+pipeline:
+  not_null_tests:
+    tasks:
+      check_not_null:
+        integration: SNOWFLAKE
+        integration_job: SNOWFLAKE_RUN_TEST
+        parameters:
+          statement: 'select * from ANALYTICS.${{ MATRIX.dq_inputs[''schema''] }}
+            .${{ MATRIX.dq_inputs[''table''] }}
+            where ${{ MATRIX.dq_inputs[''column''] }} is null
+            limit 100'
+          error_threshold_expression: '> 0'
+          warn_threshold_expression: '> 0'
+        depends_on: []
+        name: Not Null Check
+        connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
+    depends_on: []
+    name: Not Null Tests
+    matrix:
+      inputs:
+        dq_inputs:
+        - schema: PUBLIC
+          table: FCT_ORDERS
+          column: ORDER_ID
+        - schema: PUBLIC
+          table: FCT_ORDERS
+          column: CUSTOMER_ID
+        - schema: PUBLIC
+          table: DIM_CUSTOMERS
+          column: CUSTOMER_ID
+  uniqueness_tests:
+    tasks:
+      check_unique:
+        integration: SNOWFLAKE
+        integration_job: SNOWFLAKE_RUN_TEST
+        parameters:
+          statement: 'select ${{ MATRIX.dq_inputs[''column''] }}, count(*) as n
+            from ANALYTICS.${{ MATRIX.dq_inputs[''schema''] }}
+            .${{ MATRIX.dq_inputs[''table''] }}
+            group by ${{ MATRIX.dq_inputs[''column''] }}
+            having count(*) > 1
+            limit 100'
+          error_threshold_expression: '> 0'
+          warn_threshold_expression: '> 0'
+        depends_on: []
+        name: Uniqueness Check
+        connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
+    depends_on:
+    - not_null_tests
+    name: Uniqueness Tests
+    matrix:
+      inputs:
+        dq_inputs:
+        - schema: PUBLIC
+          table: DIM_CUSTOMERS
+          column: CUSTOMER_ID
+  freshness_tests:
+    tasks:
+      check_freshness:
+        integration: SNOWFLAKE
+        integration_job: SNOWFLAKE_RUN_TEST
+        parameters:
+          statement: 'select * from ANALYTICS.${{ MATRIX.dq_inputs[''schema''] }}
+            .${{ MATRIX.dq_inputs[''table''] }}
+            having max(${{ MATRIX.dq_inputs[''column''] }}) < dateadd(day, -1, current_timestamp())'
+          error_threshold_expression: '> 0'
+          warn_threshold_expression: '> 0'
+        depends_on: []
+        name: Freshness Check
+        connection: ${{ ENV.SNOWFLAKE_CONNECTION }}
+    depends_on:
+    - not_null_tests
+    name: Freshness Tests
+    matrix:
+      inputs:
+        dq_inputs:
+        - schema: PUBLIC
+          table: FCT_ORDERS
+          column: ORDER_TS
+schedule:
+- name: Daily at 8am
+  cron: 0 8 ? * MON-FRI *
+  timezone: Europe/London
+webhook:
+  enabled: false
+alerts:
+- name: Failures
+  statuses:
+  - FAILED
+  destinations:
+  - integration: SLACK
+    destination: alert-testing

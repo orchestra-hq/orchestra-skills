@@ -1,0 +1,78 @@
+{
+  "skill_name": "build-data-reconciliation-pipeline",
+  "evals": [
+    {
+      "id": 0,
+      "name": "explicit-table-list-cutover",
+      "prompt": "We're migrating our orders and customers tables from Snowflake (RAW.PUBLIC schema) to Databricks (catalog prod, schema sales) as part of a warehouse migration. Cutover is this weekend. Can you build an Orchestra pipeline that checks row counts and the total_amount sum on orders, plus row counts on customers, to make sure the migration landed correctly? Exact match required, no tolerance.",
+      "expected_output": "An Orchestra pipeline YAML using DATA_RECONCILIATION_MANUAL_QUERY tasks: a row-count check for both orders and customers, and a total_amount sum check for orders, each with source_integration SNOWFLAKE / destination_integration DATABRICKS, correctly-qualified table names, and an explicit error_threshold_expression (exact match, e.g. != 0) on every task.",
+      "files": [],
+      "assertions": [
+        "Uses integration: ORCHESTRA with integration_job: DATA_RECONCILIATION_MANUAL_QUERY for the comparison tasks",
+        "Sets source_integration to SNOWFLAKE and destination_integration to DATABRICKS",
+        "Includes a row-count comparison for the orders table",
+        "Includes a row-count comparison for the customers table",
+        "Includes a total_amount sum comparison for the orders table",
+        "Every DATA_RECONCILIATION_MANUAL_QUERY task sets an explicit error_threshold_expression (never left unset)",
+        "Thresholds reflect an exact-match intent (e.g. != 0) rather than a loose tolerance, matching the user's 'no tolerance' requirement",
+        "Every source_query/destination_query resolves to a single scalar (no SELECT *, no multi-row GROUP BY)",
+        "Table names are qualified per engine convention (e.g. RAW.PUBLIC.ORDERS for Snowflake, catalog.schema.table for Databricks) rather than left as placeholders with no explanation",
+        "No hardcoded credentials or secrets appear in the YAML",
+        "The written response clearly explains what is checked and flags any assumptions made instead of silently guessing"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "schema-wide-with-monitor",
+      "prompt": "We're replatforming from SQL Server (dbo schema, LegacyDW database) to Snowflake (ANALYTICS database, CORE schema) — basically the whole schema, dozens of tables, I don't have an exact list handy. After the initial migration validates, I also want an hourly job going forward to catch any drift using something like updated_at columns. Can you set this up?",
+      "expected_output": "Recognizes there's no fixed table list and either asks the user to paste the information_schema table/column list or proposes a self-discovering pipeline, rather than inventing table names. Produces (or clearly plans) two pipelines: a manual-query full validation pipeline and a scheduled (hourly cron) DATA_RECONCILIATION_CURSOR_FIELD monitor keyed on an updated_at-style column, asking which column is genuinely monotonic per table rather than assuming.",
+      "files": [],
+      "assertions": [
+        "Does not invent a specific, made-up table list and present it as the real schema contents without flagging it as illustrative/placeholder",
+        "Either asks the user to supply the table/column list (e.g. via an information_schema query they run) or clearly builds a self-discovering pipeline pattern, rather than silently stalling with no path forward",
+        "Produces two distinct pipeline concepts: a one-off full validation pipeline and a separate ongoing scheduled monitor pipeline",
+        "The monitor pipeline uses integration_job DATA_RECONCILIATION_CURSOR_FIELD",
+        "The monitor pipeline has an hourly cron schedule (or explicitly notes hourly as requested)",
+        "The monitor task(s) reference an updated_at-style cursor column for both source and destination",
+        "Explicitly asks or flags whether the chosen cursor column is genuinely monotonic rather than silently assuming it is",
+        "Sets source_integration to SQL_SERVER and destination_integration to SNOWFLAKE correctly",
+        "If the self-discovery pattern is used, explains the information_schema query + set_outputs + matrix-expression mechanism coherently rather than a broken or hand-wavy version"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "unsupported-engine-guardrail",
+      "prompt": "We just moved our Postgres analytics DB over to Snowflake and I want a reconciliation pipeline in Orchestra comparing the public.events table in Postgres against the new RAW.EVENTS table in Snowflake to make sure nothing was dropped.",
+      "expected_output": "Correctly flags that Orchestra's native Data Reconciliation tasks only support SNOWFLAKE, SQL_SERVER, and DATABRICKS as source/destination — Postgres isn't one of them — rather than silently generating a DATA_RECONCILIATION_MANUAL_QUERY task with an unsupported integration. Either stops to clarify, or proposes a materially different manual/fallback approach while being explicit that it isn't the native DataRec feature.",
+      "files": [],
+      "assertions": [
+        "Explicitly states that Orchestra's native Data Reconciliation tasks only support SNOWFLAKE, SQL_SERVER, and DATABRICKS as source/destination",
+        "Explicitly states Postgres is not one of the supported engines for this feature",
+        "Does not produce a DATA_RECONCILIATION_MANUAL_QUERY or DATA_RECONCILIATION_CURSOR_FIELD task with POSTGRES as source_integration or destination_integration",
+        "Does not silently proceed as if the unsupported pairing would work",
+        "If a fallback approach is proposed (e.g. a plain RUN_QUERY/RUN_TEST-based manual comparison), it is clearly labeled as a different approach from the native DataRec feature, not presented as equivalent",
+        "The response stops to clarify or clearly states the limitation rather than guessing past it"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "same-engine-migration",
+      "prompt": "We're doing a schema reorg inside our Snowflake account -- migrating our PROD database into a new MIGRATION database (same account, same warehouse). Can you build a reconciliation pipeline checking row counts on our orders and customers tables, the total_amount sum on orders, and freshness of updated_at on orders? We want exact matches on the row counts, but some tolerance is fine on the sum and timestamp checks.",
+      "expected_output": "A native DATA_RECONCILIATION_MANUAL_QUERY pipeline with source_integration and destination_integration both SNOWFLAKE (same engine on both sides), row-count checks for orders/customers with exact-match thresholds, a total_amount sum check and an updated_at freshness check for orders with tolerant literal-integer thresholds, no Python fallback task, and no confusion with the unsupported-engine case.",
+      "files": [],
+      "assertions": [
+        "Uses integration: ORCHESTRA with integration_job: DATA_RECONCILIATION_MANUAL_QUERY for the comparison tasks",
+        "Sets both source_integration and destination_integration to SNOWFLAKE (same engine on both sides, not a different engine)",
+        "Includes a row-count comparison for the orders table",
+        "Includes a row-count comparison for the customers table",
+        "Includes a total_amount sum comparison for the orders table",
+        "Includes an updated_at freshness/max-timestamp comparison for the orders table",
+        "Row-count thresholds reflect an exact-match intent (e.g. != 0)",
+        "Sum and timestamp thresholds reflect a tolerance (not exact match), matching the user's explicit ask for some tolerance there",
+        "Every error_threshold_expression is a literal comparator + non-negative integer (no decimals, no negative numbers, no matrix-templated value)",
+        "Does not introduce a Python/PYTHON_EXECUTE_SCRIPT task for the comparison -- native DATA_RECONCILIATION tasks plus a MetaEngine/matrix are sufficient here since both sides are supported engines",
+        "Does not mention Postgres, an unsupported-engine fallback, or otherwise treat this as anything other than a straightforward same-engine reconciliation"
+      ]
+    }
+  ]
+}

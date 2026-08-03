@@ -14,4 +14,4 @@ jobs:
       - uses: tesslio/setup-tessl@v2
         with:
           token: ${{ secrets.TESSL_TOKEN }}
-      - run: tessl plugin publish --bump patch
+      - run: tessl plugin publish

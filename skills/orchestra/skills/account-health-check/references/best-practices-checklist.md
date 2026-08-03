@@ -1,6 +1,6 @@
 # Orchestra best-practices checklist (review rubric)
 
-The rubric for `review-orchestra-account`. Each check states what good looks like, the MCP signal
+The rubric for `account-health-check`. Each check states what good looks like, the MCP signal
 that detects a violation, a default severity, and the doc path to cite (prefix with the docs host,
 e.g. `https://docs.getorchestra.io`). Severities are defaults — adjust to real impact and the
 user's maturity. `[MANUAL]` marks checks the MCP can't see; surface those under **Manual
@@ -86,6 +86,15 @@ Good: every task ID and task-group ID is unique. Signal: duplicate IDs in `get_p
 produce a pipeline that runs but 404s in the editor). → Rename to unique IDs. Docs:
 `/docs/core-concepts/pipelines/schema`, `/docs/faq`.
 
+**1.11 Metadata/lineage enabled on transformation tasks** — *Medium* `[MANUAL]` (partial)
+Good: dbt Core tasks produce/upload `manifest.json` + `run_results.json`; dbt Cloud and Coalesce jobs
+have metadata collection enabled on their integration/connection. Signal: `get_pipeline` shows a
+`DBT_CORE_EXECUTE` task with artifact upload / state orchestration off — that part is visible; whether
+a dbt Cloud/Coalesce connection has metadata collection enabled lives on the integration itself, so
+flag that half for manual confirmation. → Enable metadata collection; lineage, column-level impact,
+and the `fix-pipeline-*`/`triage-orchestra-pipeline` skills all depend on it. Docs:
+`/docs/guides/dbt-core/gha-setup`, `/docs/api`.
+
 ## 2. Environments and promotion
 
 **2.1 Don't run one pipeline per environment** — *Medium*
@@ -152,11 +161,14 @@ identities aren't fully exposed — flag for manual check. Docs:
 
 **4.3 Secrets in a secrets manager, never in task parameters** — *High*
 Good: secrets come from integration credentials or a key vault (AWS Secrets Manager / Azure Key
-Vault). Signal: in `get_pipeline`, literal-looking secrets in task params — values matching API-key/
-token/password/connection-string patterns (e.g. long high-entropy strings, `sk-`, `AKIA`, `xoxb-`,
-`postgres://user:pass@`) instead of `${{ ENV.* }}` or a connection ref. → Move to a secrets
-manager/credential. High severity — call out the exact task and key **name** only; never record or
-report the secret value itself (not even a fragment). Docs: `/docs/integrations/aws_secrets_manager`.
+Vault). Signal: in `get_pipeline`, **any literal value in a credential-bearing param** — connection
+strings, account/tenant ids, usernames, API keys, tokens, or passwords — that isn't `${{ ENV.* }}`
+or a connection ref. Pattern matches (long high-entropy strings, `sk-`, `AKIA`, `xoxb-`,
+`postgres://user:pass@`) are a high-confidence subset, not the whole check — don't let their absence
+wave through a hardcoded id or account name that's just as inappropriate inline. When in doubt about
+whether a literal is sensitive, flag it rather than pass it. → Move to a secrets manager/credential.
+High severity — call out the exact task and key **name** only; never record or report the value
+itself (not even a fragment). Docs: `/docs/integrations/aws_secrets_manager`.
 
 **4.4 Avoid plain-text env vars for sensitive values** — *High*
 Good: sensitive values use integration credentials or a key vault; env vars are for non-sensitive
@@ -253,13 +265,32 @@ Good: backfills use the run-multiple-pipelines approach (one token/workspace, ra
 not ad-hoc loops. Not directly visible — flag if the user mentions backfill scripts. Docs:
 `/docs/guides/run-multiple-pipelines`.
 
-## 8. AI, agents and MCP — *Low* `[MANUAL]`
+**7.6 Hybrid deployment fit for Python-heavy workloads** — *Low* `[MANUAL]` (partial)
+Good: accounts running a large or long-running share of Python compute evaluate hybrid deployment
+(compute in the customer's own environment, control plane in Orchestra) for cost, scale, and
+data-residency/security. Signal: sum recent `PYTHON` task-run durations — `list_task_runs` /
+`GET /task_runs?integration=PYTHON&page_size=200&time_from=<ISO>&time_to=<ISO>`, summing
+`completedAt - startedAt` and noting count, frequency, and max memory/cpu params. → If Python compute
+is a large/long share of runs, quantify it in the report (e.g. "Python tasks = X runs, Y total
+minutes/week") and recommend evaluating hybrid deployment and self-hosted tasks. Docs:
+`/docs/deployment-options/hybrid/`, `/docs/deployment-options/hybrid/architecture`,
+`/docs/core-concepts/tasks/self-hosted-tasks/`.
 
-Mostly configuration/usage guidance not exposed by MCP. If relevant: start from agentic workflow
-templates, use the Pipeline AI Agent iteratively (beta — review before publishing), add
-human-in-the-loop approvals (`ORCHESTRA APPROVAL` tasks) for production-affecting steps, and connect
-one MCP per workspace. Signal you *can* see: production-affecting agent/LLM tasks with no `APPROVAL`
-gate. Docs: `/docs/mcp`, `/docs/integrations/orchestra/approval`.
+## 8. AI, agents and MCP — *Low* `[MANUAL]` (partial)
+
+**Recommend setting up an auto-fix/triage flow.** This is a standing recommendation, not a
+conditional one — unless the user confirms one is already in place, recommend the
+`identify-pipeline-error` → `fix-pipeline-dbt-task`/`fix-pipeline-python-task`/
+`fix-orchestra-pipeline` and `triage-orchestra-pipeline` skills in this plugin (or an equivalent
+agentic pipeline), so common breakages self-heal or arrive pre-diagnosed. Surface this in **Fix
+first** if the account has nothing like it. Docs: `/docs/mcp`, `/docs/ai_agents`.
+
+Other guidance if relevant: start from agentic workflow templates, use the Pipeline AI Agent
+iteratively (beta — review before publishing), add human-in-the-loop approvals
+(`ORCHESTRA APPROVAL` tasks) for production-affecting steps, and connect one MCP per workspace.
+Signal you *can* see: production-affecting agent/LLM tasks with no `APPROVAL` gate — this one is an
+actual finding, not just advisory. Docs: `/docs/integrations/orchestra/approval`,
+`/docs/core-concepts/pipelines/ai_agent`.
 
 ---
 

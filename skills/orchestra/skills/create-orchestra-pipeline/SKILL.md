@@ -31,6 +31,12 @@ From the user message, determine:
 
 If no filename is given, derive a short kebab-case name from the pipeline purpose.
 
+When editing an existing pipeline, check whether it's Git-backed or Orchestra-backed
+before deciding how to apply the change — `list_pipelines` metadata includes
+`storageProvider`. For Git-backed pipelines, edit the repo YAML directly (the repo is
+the source of truth); `update_pipeline` cannot write to them. For Orchestra-backed
+pipelines with no local YAML, use the MCP tools instead of authoring a file.
+
 ### Step 2 — Match repo conventions
 
 List existing pipeline YAML (typically `orchestra/`, or paths the user names). Read one or two
@@ -41,6 +47,15 @@ connection references, and schedule format.
 
 Follow `../../references/orchestra/pipeline/yaml-authoring.md` for structure, required fields,
 integration table, and variable syntax. Omit empty `tags` arrays.
+
+Editorial defaults, unless the user asks otherwise:
+
+- Prefer `cron` or `webhook` triggers over sensors where the source integration supports it.
+- Don't hardcode a `connection`; omit it and let Orchestra pick the default, or reference an
+  existing environment variable (`${{ ENV.VAR }}`) when one already covers that connection.
+- Add a failure alert as a matter of course — most pipelines should have one.
+- For matrices, define the `inputs` list once on the task group, then reference values in task
+  parameters as `${{ MATRIX.key }}` rather than repeating the list per task.
 
 ### Step 4 — Validate
 
@@ -76,3 +91,6 @@ Keep the summary concise.
   automatically on `*.yml` / `*.yaml` — still run validation explicitly when unsure.
 - For Git-backed pipelines, committing YAML does not deploy until the repo is connected in
   Orchestra; call out any UI setup the user still needs.
+- Task group and task IDs only need to be unique strings, not real UUIDs.
+- Don't add `run_inputs` to a trigger unless asked — that's for setting inputs dynamically per
+  trigger, not a default every pipeline needs.
