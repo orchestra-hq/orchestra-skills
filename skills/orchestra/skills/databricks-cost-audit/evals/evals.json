@@ -1,0 +1,61 @@
+{
+  "skill_name": "databricks-cost-audit",
+  "evals": [
+    {
+      "id": 0,
+      "name": "daily-audit-standard-run",
+      "prompt": "Run the daily Databricks cost audit. Credentials are already set as DATABRICKS_HOST/DATABRICKS_HTTP_PATH/DATABRICKS_TOKEN env vars.",
+      "expected_output": "Runs scripts/audit.py (no flags) to execute all enabled checks and persist findings, then presents a result led by total estimated monthly saving and the count of findings new today, followed by the top ~10 findings by est_monthly_saving_usd, and calls out any checks that were skipped rather than silently dropping them.",
+      "files": [],
+      "assertions": [
+        "Runs scripts/audit.py rather than re-deriving the checks by hand or querying system tables ad hoc",
+        "Does not pass --dry-run or --no-write when the user asked to actually run the audit",
+        "The presented summary leads with total estimated monthly saving and the new-today count before the detailed findings list",
+        "Lists top findings ordered by est_monthly_saving_usd (highest first)",
+        "Explicitly mentions any skipped checks and why (e.g. a system table not enabled), rather than omitting them silently",
+        "Does not fabricate a specific dollar figure that did not come from the script's output",
+        "States clearly that dollar figures are estimates/list-price-based, not a bill"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "missing-credentials",
+      "prompt": "Can you check our Databricks spend for cost savings? I haven't set up any credentials or told you which workspace.",
+      "expected_output": "Asks the user for DATABRICKS_HOST, DATABRICKS_HTTP_PATH, and DATABRICKS_TOKEN (or confirms where to find them) before attempting to run anything, rather than guessing a host/warehouse or fabricating findings.",
+      "files": [],
+      "assertions": [
+        "Explicitly asks for the required connection details (host, HTTP path, token) rather than guessing them",
+        "Does not invent example findings, dollar figures, or a fake summary while credentials are missing",
+        "Does not claim to have run the audit when it has not",
+        "Does not silently fall back to a different workspace or default host"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "dry-run-preview",
+      "prompt": "Before I give you write access to our billing tables, show me what the daily cost audit would actually check -- don't write anything or touch the findings table yet.",
+      "expected_output": "Runs scripts/audit.py --dry-run (or explains the checks without executing writes), printing/describing the SQL each check would run without creating the findings table or inserting any rows.",
+      "files": [],
+      "assertions": [
+        "Uses the --dry-run flag (or otherwise avoids persisting anything) given the user explicitly asked not to write anything yet",
+        "Does not call ensure_table / CREATE TABLE / INSERT against the findings table in this run",
+        "Describes what the 10 (or 11 with C11 enabled) checks look for, matching the check list in SKILL.md",
+        "Does not present fabricated dollar findings as if a real run had already happened"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "system-tables-not-enabled",
+      "prompt": "Run the full cost audit, but heads up -- I don't think query history or table lineage system tables are enabled in this workspace yet.",
+      "expected_output": "Runs the audit anyway, and when checks needing system.query.history or system.access.table_lineage fail/skip, explains why (schema not enabled) using references/system-tables.md, and tells the user how to enable those schemas rather than treating the partial run as a complete audit with no caveats.",
+      "files": [],
+      "assertions": [
+        "Still runs the checks that don't depend on the missing schemas, rather than refusing the whole audit",
+        "Explicitly reports that checks needing system.query.history and/or system.access.table_lineage were skipped, and why",
+        "References how to enable the missing system-table schemas (the WorkspaceClient.system_schemas.enable pattern or admin console) rather than leaving the user stuck",
+        "Does not present the partial result as a complete 10-check audit without noting what was skipped",
+        "Does not fabricate query-history or lineage-based findings to compensate for the missing data"
+      ]
+    }
+  ]
+}
