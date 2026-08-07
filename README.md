@@ -60,6 +60,8 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 A separate plugin (`migrate-to-orchestra`) for converting pipelines from another orchestrator into Orchestra pipeline YAML. Point your client at the source project (Dagster code today) and describe what you want migrated — each skill auto-triggers off the Dagster APIs it recognizes. Start with `dagster-definitions-to-orchestra` for any whole-job conversion; it establishes the pipeline root that the task-level skills below build on.
 
+_Not yet in `.tessl-plugin/plugin.json` — intentionally excluded from Tessl publishing for now._
+
 #### Pipeline structure & cross-cutting concerns
 
 | Skill | What it does |

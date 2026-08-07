@@ -26,6 +26,8 @@ Read the full `SKILL.md` for the matching skill before changing pipelines, openi
 
 Apply `dagster-definitions-to-orchestra` first for any whole-job/whole-`Definitions` conversion — it establishes the pipeline root (`schedule`, `configuration`, `inputs`) that every task-level skill below builds on. All 17 skills live under `skills/migrate-to-orchestra/skills/` and are listed in the [README's Migrate to Orchestra section](README.md#migrate-to-orchestra); they reference each other by bare skill name (e.g. `dagster-alerts-to-orchestra`) since they sit as flat siblings, same as the `orchestra` plugin's skills.
 
+`migrate-to-orchestra` is intentionally left out of `.tessl-plugin/plugin.json` for now (not yet published via Tessl) — don't add its skill paths there or widen `tessl-skill-checks.yml`'s path filters until that changes.
+
 ## Reference index
 
 Skill `SKILL.md` files reference shared docs with paths relative to the skill folder (`../../references/orchestra/...`, which resolves to the plugin's `references/orchestra/`). From the repository root, use `skills/orchestra/references/orchestra/`.
