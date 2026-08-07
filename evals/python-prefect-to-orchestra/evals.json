@@ -1,0 +1,51 @@
+{
+  "skill_name": "python-prefect-to-orchestra",
+  "description": "Given a Prefect @task running arbitrary Python (pandas, requests, boto3), author the matching Orchestra PYTHON_EXECUTE_SCRIPT task — defaulting to parameters.source: INLINE with the body copied verbatim into parameters.code since the task already lives in the flow file, and correctly declining to convert a task whose entire body is actually a Slack notification.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "pandas-inline-no-creds",
+      "prompt": "Convert this Prefect task to an Orchestra pipeline task (see files/clean_customer_orders_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE and parameters.code containing the drop_duplicates/net_amount/filter/to_parquet body verbatim, parameters.build_command installing pandas, and connection: null since the task needs no external credentials.",
+      "files": ["clean_customer_orders_task.py"],
+      "assertions_ref": ["python"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "connection is left null — no credentials are needed", "check": "some_task", "field": "connection", "equals": null },
+        { "text": "build_command installs pandas for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*pandas", "ignore_case": true },
+        { "text": "The copied code preserves the actual transform logic (dropping duplicate order_ids, net_amount = gross_amount - discount_amount, keeping only non-negative net_amount, writing to the curated-bucket parquet path) rather than a paraphrased summary" }
+      ]
+    },
+    {
+      "id": "typed-params-retry-delay",
+      "prompt": "Convert this Prefect task and its flow parameters to an Orchestra pipeline task, including the retry/timeout configuration (see files/region_metrics_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE, the requests-based body copied into parameters.code, build_command installing requests, region/lookback_days flow parameters represented as pipeline inputs: (with defaults 'us-east-1' and 7) threaded through parameters.environment_variables as a JSON string referencing ${{ inputs.region }} / ${{ inputs.lookback_days }}, configuration.retries: 3, configuration.retry_delay: 2 (90 seconds converted to whole minutes, rounded up), configuration.timeout: 300, and METRICS_API_KEY read via os.environ rather than hardcoded.",
+      "files": ["region_metrics_task.py"],
+      "assertions_ref": ["python", "connections"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "configuration.retries is carried over as 3", "check": "some_task", "field": "configuration.retries", "equals": 3 },
+        { "text": "retry_delay_seconds (90) is converted to whole MINUTES rounded up (2), not left as 90 or converted to 1", "check": "some_task", "field": "configuration.retry_delay", "equals": 2 },
+        { "text": "timeout_seconds (300) is carried over as configuration.timeout", "check": "some_task", "field": "configuration.timeout", "equals": 300 },
+        { "text": "environment_variables is used to thread the flow parameters through as a JSON string", "check": "regex", "pattern": "environment_variables" },
+        { "text": "region and lookback_days flow parameters are represented in a pipeline inputs: block with sensible types and defaults ('us-east-1' and 7), not dropped or hardcoded as fixed literals in code" },
+        { "text": "METRICS_API_KEY is read via os.environ in the code (matching the source) and is not written as a literal API key value anywhere in the YAML" }
+      ]
+    },
+    {
+      "id": "disguised-slack-notify",
+      "prompt": "Convert this Prefect task to an Orchestra pipeline task (see files/disguised_slack_notify_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "The task's entire body posts a message via slack_sdk.WebClient(...).chat_postMessage(...) with no prefect_slack import — per the skill's own 'check it isn't actually a Slack task' callout, this should NOT be converted as a PYTHON_EXECUTE_SCRIPT task. It should be recognized as a Slack notification and produced as (or flagged to become, per slack-prefect-to-orchestra) a SLACK task using integration_job: SEND_SLACK_MESSAGE with parameters.channel_name '#data-alerts', not a PYTHON task with the WebClient call pasted into parameters.code. SLACK_BOT_TOKEN is never written as a literal value.",
+      "files": ["disguised_slack_notify_task.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "A SLACK task is present rather than the notification being left as PYTHON_EXECUTE_SCRIPT", "check": "some_task", "field": "integration", "equals": "SLACK" },
+        { "text": "The Slack task runs SEND_SLACK_MESSAGE", "check": "some_task", "field": "integration_job", "equals": "SEND_SLACK_MESSAGE" },
+        { "text": "parameters.channel_name is present", "check": "regex", "pattern": "channel_name" },
+        { "text": "The conversion correctly declines to treat this as generic Python — it does not paste the slack_sdk.WebClient(...).chat_postMessage(...) call into a PYTHON_EXECUTE_SCRIPT task's parameters.code, and instead flags/converts it per slack-prefect-to-orchestra as an integration: SLACK task, recognizing that the absence of a prefect_slack import doesn't make this generic Python" },
+        { "text": "SLACK_BOT_TOKEN is not written as a literal token value in the YAML — it's represented via a connection: reference instead" }
+      ]
+    }
+  ]
+}

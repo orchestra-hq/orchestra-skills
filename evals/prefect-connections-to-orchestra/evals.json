@@ -1,0 +1,30 @@
+{
+  "skill_name": "prefect-connections-to-orchestra",
+  "description": "Given Prefect blocks holding credentials (SnowflakeCredentials/SnowflakeConnector, AirbyteConnection, or any other loaded via Block.load()), map each to the matching Orchestra connection type, referenced by name/${{ ENV.* }} in pipeline YAML — never inlined.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "snowflake-block-basic",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task, focusing on how the SnowflakeConnector block's credentials should be represented (see files/snowflake_block_flow.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A SNOWFLAKE task whose connection: references either a name_XXXXX connection or a ${{ ENV.* }} variable — never the literal account/user/password from the environment variable reads. warehouse/database/schema are not written as task parameters since they belong to the connection, not duplicated per task unless the source genuinely varies them.",
+      "files": ["snowflake_block_flow.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "The task uses the SNOWFLAKE integration", "check": "some_task", "field": "integration", "equals": "SNOWFLAKE" },
+        { "text": "SNOWFLAKE_ACCOUNT / SNOWFLAKE_USER / SNOWFLAKE_PASSWORD env var names are not written as literal parameter values in the YAML" }
+      ]
+    },
+    {
+      "id": "airbyte-cloud-vs-server-distinction",
+      "prompt": "Convert this Prefect flow to Orchestra pipeline tasks, making sure the two AirbyteConnection blocks map to the correct Orchestra connection types (see files/airbyte_cloud_and_server_flow.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two tasks: one using an Airbyte Cloud-style connection (from the AirbyteConnection pointed at api.airbyte.com) and one using an Airbyte Server-style connection (from the AirbyteConnection pointed at the self-hosted internal host), each with the correct connection_id from the source, and neither block's credentials (the API key implied by api.airbyte.com auth, AIRBYTE_SERVER_USER/PASSWORD) written as literal values.",
+      "files": ["airbyte_cloud_and_server_flow.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Both Airbyte tasks are distinguished from each other rather than collapsed into one identical connection type — the api.airbyte.com AirbyteConnection and the self-hosted AirbyteConnection map to different Orchestra connections", "check": "regex", "pattern": "AIRBYTE", "ignore_case": true, "min_count": 2 },
+        { "text": "Connection ids 11111111-2222-3333-4444-555555555555 and 66666666-7777-8888-9999-000000000000 are carried over as the sync targets (as parameters, not as the connection: name itself)", "check": "regex", "pattern": "(11111111-2222-3333-4444-555555555555|66666666-7777-8888-9999-000000000000)" },
+        { "text": "AIRBYTE_SERVER_USER and AIRBYTE_SERVER_PASSWORD are not written as literal parameter values" }
+      ]
+    }
+  ]
+}

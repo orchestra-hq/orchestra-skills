@@ -1,0 +1,43 @@
+{
+  "skill_name": "powerbi-prefect-to-orchestra",
+  "description": "Given a Prefect @task that refreshes a Power BI dataset or dataflow (hand-rolled msal + requests against the Power BI REST API, no official Prefect block), convert it to an Orchestra pipeline YAML task under the POWER_BI integration, with the correct integration_job (POWER_BI_REFRESH_DATASET vs. POWER_BI_REFRESH_DATAFLOW), correctly-named parameters, retries/retry_delay_seconds converted to configuration.retries/configuration.retry_delay (minutes), and the Azure service-principal credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "powerbi-prefect-dataflow-refresh",
+      "prompt": "Convert this Prefect flow (marketing_dataflow_flow) to Orchestra pipeline YAML. Note this is a Power BI DATAFLOW refresh (not a dataset refresh), hand-rolled with msal + requests since there's no official Prefect Power BI block (see files/powerbi_dataflow_refresh.py). Write the pipeline YAML to pipeline.yml in the current directory — no live calls, no deploy.",
+      "expected_output": "Orchestra YAML with integration: POWER_BI, integration_job: POWER_BI_REFRESH_DATAFLOW, parameters.dataflow_id and parameters.workspace_id (not dataset_id or group_id), connection: field for the Azure service principal (not raw tenant_id/client_id/client_secret in YAML), and retries=2/retry_delay_seconds=120 converted to configuration.retries: 2 and configuration.retry_delay: 2 (minutes, not 120 or 120 seconds).",
+      "files": ["powerbi_dataflow_refresh.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Every task uses the POWER_BI integration", "check": "every_task", "field": "integration", "equals": "POWER_BI" },
+        { "text": "integration_job is POWER_BI_REFRESH_DATAFLOW, not POWER_BI_REFRESH_DATASET", "check": "some_task", "field": "integration_job", "equals": "POWER_BI_REFRESH_DATAFLOW" },
+        { "text": "integration_job only ever takes a valid Power BI value", "check": "valid_enum", "field": "integration_job", "allowed": ["POWER_BI_REFRESH_DATASET", "POWER_BI_REFRESH_DATAFLOW"] },
+        { "text": "parameters use dataflow_id, not dataset_id (dataflow, not dataset, refresh)", "check": "regex", "pattern": "dataflow_id", "min_count": 1 },
+        { "text": "retries=2 is converted to configuration.retries: 2", "check": "some_task", "field": "configuration.retries", "equals": 2 },
+        { "text": "retry_delay_seconds=120 is converted to configuration.retry_delay: 2 (minutes, not 120)", "check": "some_task", "field": "configuration.retry_delay", "equals": 2 },
+        { "text": "No literal tenant_id/client_id/client_secret values are written into the YAML — the Azure service principal is represented via a connection: field", "check": "no_hardcoded_secret", "extra_keys": ["tenant_id", "client_id"] },
+        { "text": "parameters use workspace_id (not an invented key like group_id) for the workspace" },
+        { "text": "No parameter keys are invented beyond dataflow_id, workspace_id, refresh_type, apply_refresh_policy, and the manual polling loop is dropped entirely rather than preserved as a separate task" }
+      ]
+    },
+    {
+      "id": "powerbi-prefect-dataset-refresh",
+      "prompt": "Convert this Prefect flow (sales_dataset_flow) to Orchestra pipeline YAML. Note this is a Power BI DATASET (semantic model) refresh, hand-rolled with msal + requests since there's no official Prefect Power BI block (see files/powerbi_dataset_refresh.py). Write the pipeline YAML to pipeline.yml in the current directory — no live calls, no deploy.",
+      "expected_output": "Orchestra YAML with integration: POWER_BI, integration_job: POWER_BI_REFRESH_DATASET, parameters.dataset_id set to 8f3c1a90-6b2d-4e77-9c10-5a6b7c8d9e0f (copied verbatim, not fabricated as an ${{ ENV.* }} reference since the source hardcodes it as a literal), parameters.refresh_type: Full (from the {\"type\": \"Full\"} request body), and a connection: field for the Azure service principal rather than raw tenant_id/client_id/client_secret in the YAML.",
+      "files": ["powerbi_dataset_refresh.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Every task uses the POWER_BI integration", "check": "every_task", "field": "integration", "equals": "POWER_BI" },
+        { "text": "integration_job is POWER_BI_REFRESH_DATASET, not POWER_BI_REFRESH_DATAFLOW", "check": "some_task", "field": "integration_job", "equals": "POWER_BI_REFRESH_DATASET" },
+        { "text": "integration_job only ever takes a valid Power BI value", "check": "valid_enum", "field": "integration_job", "allowed": ["POWER_BI_REFRESH_DATASET", "POWER_BI_REFRESH_DATAFLOW"] },
+        { "text": "parameters use dataset_id, not dataflow_id (dataset, not dataflow, refresh)", "check": "regex", "pattern": "dataset_id", "min_count": 1 },
+        { "text": "The literal dataset ID 8f3c1a90-6b2d-4e77-9c10-5a6b7c8d9e0f is carried over verbatim rather than replaced with a fabricated ${{ ENV.* }} reference", "check": "regex", "pattern": "8f3c1a90-6b2d-4e77-9c10-5a6b7c8d9e0f" },
+        { "text": "refresh_type is set to Full from the request body's {\"type\": \"Full\"}", "check": "some_task", "field": "parameters.refresh_type", "equals": "Full" },
+        { "text": "No literal tenant_id/client_id/client_secret values are written into the YAML — the Azure service principal is represented via a connection: field", "check": "no_hardcoded_secret", "extra_keys": ["tenant_id", "client_id"] },
+        { "text": "No dataflow_id parameter appears on this dataset-refresh task — the correct id field for POWER_BI_REFRESH_DATASET is dataset_id, never dataflow_id" },
+        { "text": "No parameter keys are invented beyond dataset_id, workspace_id, refresh_type, apply_refresh_policy, and the manual polling loop is dropped entirely rather than preserved as a separate task" }
+      ]
+    }
+  ]
+}

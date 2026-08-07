@@ -1,0 +1,47 @@
+{
+  "skill_name": "prefect-secrets-to-orchestra",
+  "description": "Given Prefect code using Secret blocks, SecretStr fields, SecretDict, or AWS Secrets Manager blocks, produce a secrets checklist naming every secret and where it must be re-entered in Orchestra. This skill's output is a conversational checklist, not a pipeline.yml artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file. It must never ask for or write real secret values.",
+  "evals": [
+    {
+      "id": "saas-api-token",
+      "prompt": "I'm migrating this Prefect flow to Orchestra (see files/saas_api_token_secret.py). It calls a billing API using a token stored in a Prefect Secret block. Give me a checklist of what I need to move over. Don't ask me for the actual secret values — I just want the checklist.",
+      "expected_output": "Identifies billing-api-token as a secret consumed via Secret.load(...).get() and used as a bearer token for the billing API call. Produces a checklist naming the secret, its Prefect source, and that it should be re-entered as an Orchestra connection credential field or Python connection environment variable — without ever asking for or fabricating the actual token value.",
+      "files": ["saas_api_token_secret.py"],
+      "assertions_ref": ["secrets"],
+      "assertions": [
+        { "text": "Identifies the Secret.load(\"billing-api-token\") call as the secret to migrate" },
+        { "text": "Names the secret specifically (e.g. billing-api-token or a clearly derived env var name) rather than referring to it only vaguely as 'the API secret'" },
+        { "text": "States that the token is used as a Bearer/Authorization header for the billing API call, giving useful context on how it's consumed" },
+        { "text": "Recommends re-entering the value as an Orchestra connection credential field or a Python connection environment variable, consistent with the skill's mapping" },
+        { "text": "Does not attempt to produce or write pipeline.yml as the primary deliverable — the response centers on the secrets checklist" }
+      ]
+    },
+    {
+      "id": "secretstr-credential-block",
+      "prompt": "See files/secretstr_credential_block.py — this Prefect flow loads warehouse credentials from a PostgresCredentials block where the password field is a SecretStr. Give me a checklist of what needs to move to Orchestra. Don't ask me for the actual secret values — I just want the checklist.",
+      "expected_output": "Identifies the SecretStr password field on PostgresCredentials as the secret to migrate, notes that host/username are non-sensitive connection metadata (not secrets themselves), and produces a checklist directing the password to be stored on the corresponding Orchestra connection's credential field per prefect-connections-to-orchestra, without asking for or writing the real password.",
+      "files": ["secretstr_credential_block.py"],
+      "assertions_ref": ["secrets"],
+      "assertions": [
+        { "text": "Identifies the SecretStr password field on the PostgresCredentials block as the secret to migrate" },
+        { "text": "Distinguishes the password (secret) from host and username (non-secret connection metadata), not lumping all three fields into the secrets checklist as if equally sensitive" },
+        { "text": "Recommends storing the password on the corresponding Orchestra connection's credential field, consistent with SecretStr-on-a-credential-block handling in the skill (defers to prefect-connections-to-orchestra for identifying the connection type)" },
+        { "text": "Does not call .get_secret_value() or otherwise reproduce/echo the real password anywhere in its response" }
+      ]
+    },
+    {
+      "id": "mixed-secret-and-variable",
+      "prompt": "See files/mixed_secret_and_variable.py — this Prefect task uses a Secret block for the partner API key and a Prefect Variable for a database name. Give me a checklist of what needs to move to Orchestra. Don't ask me for the actual secret values — I just want the checklist.",
+      "expected_output": "Correctly separates the two config sources: partner-api-key (a Secret) goes into the secrets checklist for re-entry in an Orchestra connection; DATABASE_VAR (a Variable) is called out as non-sensitive config that belongs in pipeline inputs/env vars, not the secrets checklist.",
+      "files": ["mixed_secret_and_variable.py"],
+      "assertions_ref": ["secrets"],
+      "assertions": [
+        { "text": "Identifies partner-api-key (Secret.load) as the one true secret requiring migration" },
+        { "text": "Correctly identifies DATABASE_VAR as a Variable, not a secret, and does not include it in the secrets checklist" },
+        { "text": "Explicitly recommends routing DATABASE_VAR to Orchestra pipeline inputs: or task env_vars: rather than to a connection credential field" },
+        { "text": "The secrets checklist contains exactly one secret entry (partner-api-key), not two" },
+        { "text": "Does not ask for or fabricate the real value of either DATABASE_VAR or the partner API key" }
+      ]
+    }
+  ]
+}

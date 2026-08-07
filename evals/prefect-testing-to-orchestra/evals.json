@@ -1,0 +1,57 @@
+{
+  "skill_name": "prefect-testing-to-orchestra",
+  "description": "Given a Prefect @task that runs a SQL data-quality assertion — a null-count check, a min-row-count threshold, or a soft logger.warning failure — author the matching Orchestra *_RUN_TEST task with correctly inverted pass/fail semantics: Prefect passes when the assertion is TRUE, Orchestra fails when the threshold expression IS MET.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "null-check-order-ids",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/null_check_order_ids.py). check_no_null_order_ids asserts the null count is exactly zero. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a load task for the orders insert, followed by a sequenced SNOWFLAKE_RUN_TEST task for check_no_null_order_ids whose error_threshold_expression is '> 0' — the inverted form of Prefect's assert nulls == 0 — not '= 0'.",
+      "files": ["null_check_order_ids.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A SNOWFLAKE_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
+        { "text": "At least two task groups are present (load + quality)", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on (quality runs after load)", "check": "groups_chained" },
+        { "text": "The check queries for IS NULL", "check": "regex", "pattern": "is\\s+null", "ignore_case": true },
+        { "text": "error_threshold_expression is the inverted '> 0' form (fails when the null count is greater than zero)", "check": "some_task", "field": "parameters.error_threshold_expression", "equals": "> 0" },
+        { "text": "The threshold is genuinely inverted from Prefect's assert nulls == 0 — it is '> 0', not a same-direction '= 0' that would (wrongly) fail only when the null count is exactly zero, the opposite of the intended check" },
+        { "text": "Prefect's assert-true-means-pass semantics are correctly flipped: the SQL counts violating (null) rows, and the Orchestra task is written to fail precisely when that count is nonzero, matching what made the original assertion fail" }
+      ]
+    },
+    {
+      "id": "min-row-count-check",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/min_row_count_check.py). check_daily_event_volume raises a ValueError if the row count is below 5000. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a GCP_BQ_RUN_TEST task for check_daily_event_volume whose error_threshold_expression is '< 5000' — the same-direction threshold matching Prefect's if count < 5000: raise — sequenced after the load task.",
+      "files": ["min_row_count_check.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A GCP_BQ_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "GCP_BQ_RUN_TEST" },
+        { "text": "At least two task groups are present (load + quality)", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on (quality runs after load)", "check": "groups_chained" },
+        { "text": "error_threshold_expression fails when the row count is below 5000", "check": "some_task", "field": "parameters.error_threshold_expression", "equals": "< 5000" },
+        { "text": "The SQL statement returns a single numeric value (a row count), not a raw multi-column or multi-row select", "check": "regex", "pattern": "COUNT\\(\\*\\)", "ignore_case": true },
+        { "text": "The raise condition's comparator direction is preserved without an extra, unnecessary flip — 'if count < 5000: raise' already fails on the low-count case, so it is not accidentally re-inverted into '>= 5000' or '> 5000'" }
+      ]
+    },
+    {
+      "id": "soft-failure-stale-customers",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/soft_failure_stale_customers.py). check_customers_freshness only logs a warning when the table is more than 24 hours stale — it never raises, so the flow always continues regardless of the outcome. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a POSTGRES_RUN_TEST task for check_customers_freshness carrying warn_threshold_expression: '> 24' and treat_failure_as_warning: true (no hard error_threshold_expression), sequenced after sync_customers, so the pipeline continues with WARNING status instead of failing.",
+      "files": ["soft_failure_stale_customers.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A POSTGRES_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "POSTGRES_RUN_TEST" },
+        { "text": "Task groups are chained via depends_on (the freshness check runs after sync_customers)", "check": "groups_chained" },
+        { "text": "treat_failure_as_warning is set so the soft check never hard-fails the pipeline", "check": "regex", "pattern": "treat_failure_as_warning:\\s*true", "min_count": 1 },
+        { "text": "At least one task has treat_failure_as_warning set to true", "check": "some_task", "field": "treat_failure_as_warning", "equals": true },
+        { "text": "warn_threshold_expression fires when the table is more than 24 hours stale", "check": "some_task", "field": "parameters.warn_threshold_expression", "equals": "> 24" },
+        { "text": "No hard error_threshold_expression is set alongside the warning — this check is only ever a WARNING outcome, mirroring logger.warning's non-raising behavior in the Prefect source, not a hard failure with treat_failure_as_warning bolted on top" },
+        { "text": "The SQL still resolves to a single numeric value (hours since the table was last updated) suitable for parameters.statement on a *_RUN_TEST task" }
+      ]
+    }
+  ]
+}

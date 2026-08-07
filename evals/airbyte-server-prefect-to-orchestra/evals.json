@@ -1,0 +1,32 @@
+{
+  "skill_name": "airbyte-server-prefect-to-orchestra",
+  "description": "Given a Prefect flow that syncs a self-hosted Airbyte Server (AirbyteConnection.load(...) pointed at a non-Cloud host, trigger_sync_run_and_wait_for_completion), convert it to an Orchestra pipeline YAML task under the AIRBYTE_SERVER integration, with connection_id carried over verbatim into parameters.connection_id (never onto the connection: field) and host/credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airbyte-server-prefect-single-sync",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task (see files/airbyte_server_single_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_SERVER task running AIRBYTE_SERVER_JOB, with parameters.connection_id set to d3e4f5a6-7890-4bcd-9ef0-123456789abc (copied verbatim) and parameters.job_type: sync, plus a connection: field representing the self-hosted Airbyte Server resource — the host airbyte-internal.mycorp.com and port 8000 are never written as literal task parameters, and the integration is AIRBYTE_SERVER, not AIRBYTE_CLOUD.",
+      "files": ["airbyte_server_single_sync.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "connection_id d3e4f5a6-7890-4bcd-9ef0-123456789abc is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "d3e4f5a6-7890-4bcd-9ef0-123456789abc" },
+        { "text": "job_type is sync, matching trigger_sync_run_and_wait_for_completion with no reset_cache", "check": "some_task", "field": "parameters.job_type", "equals": "sync" },
+        { "text": "The integration is AIRBYTE_SERVER, not AIRBYTE_CLOUD — the self-hosted host airbyte-internal.mycorp.com is not api.airbyte.com", "check": "every_task", "field": "integration", "equals": "AIRBYTE_SERVER" },
+        { "text": "The host airbyte-internal.mycorp.com and port 8000 are not written as literal task parameters — they belong on the Orchestra Airbyte Server connection, not duplicated as parameters" }
+      ]
+    },
+    {
+      "id": "airbyte-server-prefect-reset",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task (see files/airbyte_server_reset_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_SERVER task running AIRBYTE_SERVER_JOB, with parameters.connection_id set to 99887766-5544-3322-1100-ffeeddccbbaa (copied verbatim) and parameters.job_type: reset (from reset_cache=True), plus a connection: field for the self-hosted Airbyte Server resource — the host airbyte.onprem.internal and port 8001 are never written as literal task parameters.",
+      "files": ["airbyte_server_reset_sync.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "connection_id 99887766-5544-3322-1100-ffeeddccbbaa is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "99887766-5544-3322-1100-ffeeddccbbaa" },
+        { "text": "reset_cache=True correctly maps to job_type: reset, not sync", "check": "some_task", "field": "parameters.job_type", "equals": "reset" },
+        { "text": "The host airbyte.onprem.internal and port 8001 are not written as literal task parameters, and no separate polling/sensor task is added since AIRBYTE_SERVER_JOB already waits for completion" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "skill_name": "tableau-prefect-to-orchestra",
+  "description": "Given a Prefect @task that uses tableau-server-client (TSC) to refresh a Tableau workbook or datasource extract, convert it to an Orchestra pipeline YAML task under the TABLEAU_CLOUD integration with the correct integration_job (TABLEAU_REFRESH_WORKBOOK vs. TABLEAU_REFRESH_EXTRACT), the required project_name parameter, and credentials represented via a connection: field rather than inline env vars.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "workbook-refresh-tsc-task",
+      "prompt": "Convert this Prefect task to an Orchestra pipeline task (see files/workbook_refresh_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live refresh, no deploy.",
+      "expected_output": "A single TABLEAU_CLOUD task using integration_job TABLEAU_REFRESH_WORKBOOK, with parameters.project_name 'Sales' and parameters.workbook_name 'Sales Dashboard', connection: referencing an Orchestra Tableau Cloud connection rather than the raw TABLEAU_TOKEN_NAME/TABLEAU_TOKEN env vars, and no site_id/site_name parameter on the task (it lives on the connection).",
+      "files": ["workbook_refresh_task.py"],
+      "assertions_ref": ["tableau", "connections"],
+      "assertions": [
+        { "text": "integration_job is TABLEAU_REFRESH_WORKBOOK", "check": "some_task", "field": "integration_job", "equals": "TABLEAU_REFRESH_WORKBOOK" },
+        { "text": "parameters.workbook_name is present", "check": "regex", "pattern": "workbook_name" },
+        { "text": "Targets the Sales Dashboard workbook", "check": "regex", "pattern": "Sales Dashboard" },
+        { "text": "parameters.project_name ('Sales') is present — REQUIRED alongside workbook_name per the skill's Gotchas, not omitted or left for the connection to imply" },
+        { "text": "TABLEAU_TOKEN_NAME / TABLEAU_TOKEN env var values are not written as literal parameter values in the YAML — they're represented by a connection: reference" },
+        { "text": "site_id ('salesteam') is not duplicated as a task parameter since it belongs on the Orchestra connection" }
+      ]
+    },
+    {
+      "id": "extract-refresh-tsc-task",
+      "prompt": "Convert this Prefect task to an Orchestra pipeline task, noting it refreshes a Tableau datasource extract, not a workbook (see files/datasource_extract_refresh_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live refresh, no deploy.",
+      "expected_output": "A single TABLEAU_CLOUD task using integration_job TABLEAU_REFRESH_EXTRACT, with parameters.project_name 'Finance' and parameters.datasource_name 'Finance Extract', connection: referencing an Orchestra Tableau Cloud connection holding the PAT rather than TABLEAU_PAT_NAME/TABLEAU_PAT_SECRET literal values, and no invented workbook_name field.",
+      "files": ["datasource_extract_refresh_task.py"],
+      "assertions_ref": ["tableau", "connections"],
+      "assertions": [
+        { "text": "integration_job is TABLEAU_REFRESH_EXTRACT, not TABLEAU_REFRESH_WORKBOOK", "check": "some_task", "field": "integration_job", "equals": "TABLEAU_REFRESH_EXTRACT" },
+        { "text": "parameters.datasource_name is present", "check": "regex", "pattern": "datasource_name" },
+        { "text": "Targets the Finance Extract datasource", "check": "regex", "pattern": "Finance Extract" },
+        { "text": "parameters.project_name ('Finance') is present — REQUIRED alongside datasource_name per the skill's Gotchas" },
+        { "text": "The task's parameters do not invent a workbook_name field — this is an extract/datasource refresh, so only project_name and datasource_name are set" },
+        { "text": "No literal PAT name/secret values (TABLEAU_PAT_NAME/TABLEAU_PAT_SECRET) are written into the YAML — the personal access token is represented via a connection: field" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "skill_name": "prefect-conditions-to-orchestra",
+  "description": "Given a Prefect flow with an input-driven branch, a runtime output-driven branch, or an allow_failure pattern, author the matching Orchestra YAML — mutually-exclusive condition: stages for branches, an upstream set_outputs: true task feeding a runtime OUTPUTS condition, and treat_failure_as_warning for allow_failure, never conflating the three.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "config-driven-load-mode-branch",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/config_load_mode_branch.py). The `full_refresh` flow parameter decides at trigger time whether the backfill branch or the incremental branch runs — only one of the two tasks actually executes per run. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline with a full_refresh boolean input, a stage conditioned on ${{ inputs.full_refresh == true }} running run_backfill, and a mutually-exclusive stage conditioned on the false case running run_incremental.",
+      "files": ["config_load_mode_branch.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "Pipeline declares an input for the branch decision", "check": "yaml_present", "path": "inputs" },
+        { "text": "full_refresh is referenced both as an input and inside a condition expression", "check": "regex", "pattern": "full_refresh", "min_count": 2 },
+        { "text": "A condition references inputs.full_refresh (a trigger-time / parameter-driven branch, not a runtime OUTPUTS lookup)", "check": "regex", "pattern": "\\$\\{\\{\\s*inputs\\.full_refresh", "min_count": 1 },
+        { "text": "Both branch stages carry a condition key", "check": "all_groups_have", "key": "condition" },
+        { "text": "The two conditions are genuinely mutually exclusive (one tests full_refresh true, the other tests false/not-true) rather than both able to evaluate true, or both false, in the same run" },
+        { "text": "run_backfill and run_incremental land as separate tasks under their respective conditioned stages, not merged into a single task with if/else routing logic ported over verbatim from the Prefect flow body" }
+      ]
+    },
+    {
+      "id": "runtime-row-count-branch",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/runtime_row_count_branch.py). Whether orders get loaded or a no-data notice fires depends on a row count computed during the run via `.submit()`/`.result()`, not on any parameter passed in at trigger time. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline where check_staging_orders becomes an upstream task with set_outputs: true, and two downstream stages condition on that task's OUTPUTS — one for the positive/has-rows case running load_orders, one for the complementary case running send_no_data_notice.",
+      "files": ["runtime_row_count_branch.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "The upstream check is a task that sets outputs for downstream conditions to read", "check": "regex", "pattern": "set_outputs", "min_count": 1 },
+        { "text": "A condition references the upstream task's OUTPUTS via ORCHESTRA.PIPELINE_RUN_TASKS", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[[^\\]]+\\]\\.OUTPUTS\\[", "min_count": 1 },
+        { "text": "Downstream stages are sequenced after the check via depends_on", "check": "groups_chained" },
+        { "text": "The value surfaced by check_staging_orders (the row count) is a real value from the source logic (e.g. row_count), not an invented placeholder key unrelated to what the task actually returns" },
+        { "text": "load_orders conditions on the positive/has-rows case and send_no_data_notice conditions on the true complementary case, correctly mirroring new_row_count > 0 vs the zero case rather than both being gated on the same condition or one left unconditioned" }
+      ]
+    },
+    {
+      "id": "allow-failure-cleanup",
+      "prompt": "Convert this Prefect flow to Orchestra (see files/allow_failure_cleanup.py). purge_temp_tables is best-effort cleanup — the `allow_failure` wrapping around it means load_orders must proceed regardless of whether cleanup succeeded, and a failure alert should only fire if the load itself comes back with zero rows. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline where purge_temp_tables carries treat_failure_as_warning: true so its failure doesn't hard-fail the run, load_orders is sequenced after it via depends_on without being gated behind a success condition on the cleanup task, load_orders sets outputs, and a downstream stage conditions send_load_failure_alert on load_orders' OUTPUTS equalling zero.",
+      "files": ["allow_failure_cleanup.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "purge_temp_tables (or its converted task) carries treat_failure_as_warning: true so allow_failure semantics are preserved", "check": "regex", "pattern": "treat_failure_as_warning:\\s*true", "min_count": 1 },
+        { "text": "At least one task has treat_failure_as_warning set to true", "check": "some_task", "field": "treat_failure_as_warning", "equals": true },
+        { "text": "load_orders sets outputs so the downstream zero-rows check can read them", "check": "regex", "pattern": "set_outputs", "min_count": 1 },
+        { "text": "A condition references load_orders' OUTPUTS via ORCHESTRA.PIPELINE_RUN_TASKS", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[[^\\]]+\\]\\.OUTPUTS\\[", "min_count": 1 },
+        { "text": "Task groups are chained via depends_on (load stage runs after cleanup, alert stage runs after load)", "check": "groups_chained" },
+        { "text": "load_orders is sequenced after purge_temp_tables via depends_on but is not itself gated behind a condition on cleanup's success — allow_failure means downstream continues regardless of the upstream outcome, it is not modeled as a branch condition" },
+        { "text": "treat_failure_as_warning is applied to purge_temp_tables (the task that may legitimately fail), not mistakenly attached to load_orders or send_load_failure_alert, and the alert's condition checks the zero-rows case specifically rather than an always-true/always-false stand-in" }
+      ]
+    }
+  ]
+}

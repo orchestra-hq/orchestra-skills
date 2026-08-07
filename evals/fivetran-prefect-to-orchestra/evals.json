@@ -1,0 +1,34 @@
+{
+  "skill_name": "fivetran-prefect-to-orchestra",
+  "description": "Given a Prefect Fivetran integration (FivetranConnector block plus trigger_sync_and_wait_for_completion), convert the connector sync into a single FIVETRAN Sync task in Orchestra pipeline YAML — carrying over the connector_id slug verbatim and representing the API key/secret via a connection: reference rather than inlined.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "single-connector-sync",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task (see files/single_connector_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single FIVETRAN task (integration_job FIVETRAN_SYNC_ALL) with parameters.connector_id: bronzing_regularly carried over verbatim from the source comment, and a connection: reference standing in for the 'fivetran-prod' FivetranConnector.load(...) block's api_key/api_secret, never a literal API key/secret in the YAML.",
+      "files": ["single_connector_sync.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id bronzing_regularly is carried over verbatim", "check": "regex", "pattern": "bronzing_regularly" },
+        { "text": "connector_id is a slug, not a UUID — no UUID-formatted value is invented in its place", "check": "regex", "pattern": "connector_id:\\s*['\"]?bronzing_regularly['\"]?" },
+        { "text": "A single Orchestra task represents both the FivetranConnector.load(...) block and the trigger_sync_and_wait_for_completion() call — there is no separate two-step trigger/poll modeling" }
+      ]
+    },
+    {
+      "id": "fivetran-then-dbt-cross-integration-dependency",
+      "prompt": "Convert this Prefect flow to Orchestra pipeline tasks (see files/fivetran_then_dbt.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two tasks: a FIVETRAN task with parameters.connector_id: quietly_frontier, and a DBT_CORE/DBT_CORE_EXECUTE task running 'dbt build --select tag:daily;' with project_dir: dbt_project, where the dbt task's depends_on references the Fivetran task so the dbt build only runs after the sync completes.",
+      "files": ["fivetran_then_dbt.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id quietly_frontier is carried over verbatim", "check": "regex", "pattern": "quietly_frontier" },
+        { "text": "A DBT_CORE task is present alongside the Fivetran task", "check": "some_task", "field": "integration", "equals": "DBT_CORE" },
+        { "text": "The dbt task runs the DBT_CORE_EXECUTE job", "check": "some_task", "field": "integration_job", "equals": "DBT_CORE_EXECUTE" },
+        { "text": "The dbt build command with its --select flag is preserved", "check": "regex", "pattern": "dbt build --select tag:daily" },
+        { "text": "At least one depends_on list is populated with a reference rather than left empty everywhere", "check": "regex", "pattern": "depends_on:\\s*\\n\\s*-\\s*\\S" },
+        { "text": "The dbt task's depends_on wires it after the Fivetran sync task (by task id or stage), reflecting that the dbt build in the source only runs once the sync above it has completed — the Fivetran sync and the dbt build are modeled as two separate tasks, not collapsed into one, and not left as unrelated/parallel tasks lacking the dependency link the source's sequential flow implies" }
+      ]
+    }
+  ]
+}
