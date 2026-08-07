@@ -1,0 +1,35 @@
+{
+  "skill_name": "airbyte-server-dagster-to-orchestra",
+  "description": "Given a Dagster integration that syncs a self-hosted Airbyte Server (AirbyteResource with host/port, plus build_airbyte_assets), convert it to an Orchestra pipeline YAML task under the AIRBYTE_SERVER integration, with connection_id carried over verbatim and host/username/password represented via a connection: field rather than inline parameters.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airbyte-server-single-connection-sync",
+      "prompt": "Convert this Dagster job to an Orchestra pipeline task (see files/airbyte_server_single_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_SERVER task running AIRBYTE_SERVER_JOB, with parameters.connection_id set to d3e4f5a6-7890-4bcd-9ef0-123456789abc (copied verbatim), parameters.job_type: sync, and a connection: field representing the self-hosted Airbyte Server resource — the host airbyte-internal.mycorp.com, port 8000, and AIRBYTE_SERVER_USER/AIRBYTE_SERVER_PASSWORD are never written as literal task parameters. destination_tables collapses into the single sync task rather than being enumerated.",
+      "files": ["airbyte_server_single_sync.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "connection_id d3e4f5a6-7890-4bcd-9ef0-123456789abc is carried over verbatim as a parameter", "check": "regex", "pattern": "d3e4f5a6-7890-4bcd-9ef0-123456789abc" },
+        { "text": "Exactly one Airbyte task is produced for the single connection_id (destination_tables does not fan out into multiple tasks)", "check": "regex", "pattern": "connection_id", "min_count": 1 },
+        { "text": "The host airbyte-internal.mycorp.com and port 8000 are not written as literal task parameters — they map to the Airbyte Server connection:, never the parameters" },
+        { "text": "AIRBYTE_SERVER_USER and AIRBYTE_SERVER_PASSWORD are not written as literal values anywhere in the YAML" }
+      ]
+    },
+    {
+      "id": "airbyte-server-multi-connection-with-alert",
+      "prompt": "Convert this Dagster job to Orchestra pipeline tasks, and carry over its failure notification as a pipeline alert (see files/airbyte_server_multi_connection_alert.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two AIRBYTE_SERVER tasks running AIRBYTE_SERVER_JOB — one for connection_id 11aa22bb-33cc-44dd-55ee-66ff77aa88bb (HR) and one for 99887766-5544-3322-1100-ffeeddccbbaa (Billing), each with job_type: sync and a connection: field for the shared self-hosted Airbyte Server resource. The make_slack_on_run_failure_sensor becomes an alerts block firing on FAILED to a Slack destination. The host airbyte.onprem.internal, port 8001, and AIRBYTE_SERVER_USER/AIRBYTE_SERVER_PASSWORD/SLACK_TOKEN never appear as literal values.",
+      "files": ["airbyte_server_multi_connection_alert.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "Both connections become separate tasks, each with their own connection_id, rather than being collapsed into one task", "check": "regex", "pattern": "connection_id", "min_count": 2 },
+        { "text": "HR connection_id 11aa22bb-33cc-44dd-55ee-66ff77aa88bb is carried over verbatim", "check": "regex", "pattern": "11aa22bb-33cc-44dd-55ee-66ff77aa88bb" },
+        { "text": "Billing connection_id 99887766-5544-3322-1100-ffeeddccbbaa is carried over verbatim", "check": "regex", "pattern": "99887766-5544-3322-1100-ffeeddccbbaa" },
+        { "text": "A failure alert is configured from the make_slack_on_run_failure_sensor", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The Slack failure alert destination includes the #data-eng-alerts channel as its destination", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The host airbyte.onprem.internal and port 8001 are not written as literal task parameters, and SLACK_TOKEN is not written as a literal value in the YAML" }
+      ]
+    }
+  ]
+}

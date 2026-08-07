@@ -1,0 +1,54 @@
+{
+  "skill_name": "dagster-asset-checks-to-orchestra",
+  "description": "Given Dagster asset checks (@asset_check/AssetCheckResult), dbt tests run via dagster-dbt, or Python-based expectations (great_expectations/pandera), author the matching Orchestra test task(s): a *_RUN_TEST job with correctly inverted pass/fail semantics and threshold expressions for SQL checks, DBT_CORE_EXECUTE for dbt tests, or PYTHON_EXECUTE_SCRIPT for GE/pandera checks.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "asset-check-warn-severity",
+      "prompt": "Convert this Dagster asset and its two asset checks to an Orchestra pipeline (see files/asset_check_severity.py). One check is a hard null-ID check, the other is a WARN-severity staleness check that shouldn't fail the whole run. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a load task for the orders insert, followed by a sequenced quality group containing a SNOWFLAKE_RUN_TEST task for no_null_order_ids (fails on any NULL order_id) and a SNOWFLAKE_RUN_TEST task for orders_not_stale mapped to a WARN-level threshold or treat_failure_as_warning so it doesn't hard-fail the pipeline.",
+      "files": ["asset_check_severity.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "At least one SNOWFLAKE_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
+        { "text": "At least two task groups are present (load + quality)", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on (quality runs after load)", "check": "groups_chained" },
+        { "text": "The null-ID check queries for IS NULL", "check": "regex", "pattern": "is\\s+null", "ignore_case": true },
+        { "text": "AssetCheckResult(passed=...) semantics are correctly inverted — the SQL counts violating rows (nulls), and the task fails when that count is > 0, matching Dagster's passed=True meaning success" },
+        { "text": "The WARN-severity check (orders_not_stale) is mapped to a looser/warn-only outcome — either warn_threshold_expression looser than error_threshold_expression, or treat_failure_as_warning: true — so it doesn't hard-fail the pipeline the way the null-ID check does", "check": "regex", "pattern": "treat_failure_as_warning|warn_threshold_expression" },
+        { "text": "Threshold expressions use single '=' comparator syntax where equality is needed, not Python-style '=='" }
+      ]
+    },
+    {
+      "id": "dbt-tests-via-dagster-dbt",
+      "prompt": "Convert this Dagster @dbt_assets definition to Orchestra (see files/dbt_tests_via_dagster_dbt.py). It builds models and relies on dbt's own test suite running as part of that build. Write the pipeline YAML to pipeline.yml in the current directory — no live dbt runs, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a DBT_CORE / DBT_CORE_EXECUTE task running 'dbt build' (or 'dbt run; dbt test;'), not a reimplementation of dbt's tests as raw SQL SNOWFLAKE_RUN_TEST tasks.",
+      "files": ["dbt_tests_via_dagster_dbt.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A DBT_CORE task is present", "check": "some_task", "field": "integration", "equals": "DBT_CORE" },
+        { "text": "The task runs the DBT_CORE_EXECUTE job", "check": "some_task", "field": "integration_job", "equals": "DBT_CORE_EXECUTE" },
+        { "text": "The dbt command includes a test or build step", "check": "regex", "pattern": "dbt (build|test)", "ignore_case": true },
+        { "text": "dbt's tests are run through the dbt CLI task rather than reimplemented as hand-written SQL SNOWFLAKE_RUN_TEST statements" },
+        { "text": "If both a run/build and a test step are represented, their relative order preserves models being built before tests run against them" }
+      ]
+    },
+    {
+      "id": "great-expectations-checkpoint",
+      "prompt": "Convert this Dagster asset check, which runs a Great Expectations checkpoint, to Orchestra (see files/ge_checkpoint_check.py). Write the pipeline YAML to pipeline.yml in the current directory — no live checkpoint runs, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a PYTHON / PYTHON_EXECUTE_SCRIPT task that runs a script invoking the GE checkpoint and surfaces its pass/fail result via set_outputs, since there is no native Great Expectations integration.",
+      "files": ["ge_checkpoint_check.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A PYTHON task is present", "check": "some_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The task runs the PYTHON_EXECUTE_SCRIPT job", "check": "some_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+        { "text": "set_outputs is enabled so the checkpoint's pass/fail reaches Orchestra", "check": "regex", "pattern": "set_outputs" },
+        { "text": "No native Great Expectations or pandera integration is invented — the check is run via a Python script rather than a fabricated GE-specific task type" },
+        { "text": "The generated script (or its reference) actually surfaces the checkpoint's success/failure signal, e.g. via client.set_output(...) or a non-zero exit code, rather than always reporting success" }
+      ]
+    }
+  ]
+}

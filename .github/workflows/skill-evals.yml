@@ -1,0 +1,105 @@
+name: Skill Evals
+
+# Runs a suite's with_skill/without_skill delta via evals/runner.py + grade.py (static
+# checks only — no live Orchestra credentials, see skill-evals-live.yml for that).
+# Costs real tokens against secrets.ANTHROPIC_API_KEY, so on pull requests it only runs
+# when explicitly opted into via the 'run-evals' label — add the label to a PR to run just
+# the suites it touches. A nightly scheduled run covers every suite unconditionally, to
+# catch regressions from edits to a shared assertions file or a skill's SKILL.md that a
+# changed-suites-only PR matrix would miss.
+
+# Temporarily disabled: manual trigger only, until ANTHROPIC_API_KEY is configured. To
+# re-enable automatic runs, restore:
+#   pull_request:
+#     types: [opened, synchronize, reopened, labeled]
+#     paths: ['evals/**']
+#   schedule:
+#     - cron: '0 4 * * *'
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: skill-evals-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  detect-suites:
+    name: Detect suites to run
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name != 'pull_request' ||
+      contains(github.event.pull_request.labels.*.name, 'run-evals')
+    outputs:
+      suites: ${{ steps.detect.outputs.suites }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: detect
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Only the suites this PR actually touches.
+            git diff --name-only \
+                "${{ github.event.pull_request.base.sha }}" \
+                "${{ github.event.pull_request.head.sha }}" \
+                -- evals/ \
+              | awk -F/ '$2 != "_shared_assertions" && NF >= 2 { print $2 }' \
+              | sort -u \
+              | while read -r suite; do
+                  [ -f "evals/$suite/evals.json" ] && echo "$suite"
+                  true
+                done > suites.txt
+          else
+            # Scheduled / manual dispatch: every suite, to catch shared-assertion or
+            # SKILL.md regressions a changed-files-only matrix would miss.
+            for f in evals/*/evals.json; do
+              basename "$(dirname "$f")"
+            done > suites.txt
+          fi
+
+          echo "Suites to run:"
+          cat suites.txt || true
+          json=$(jq -R -s -c 'split("\n") | map(select(length > 0))' suites.txt)
+          echo "suites=$json" >> "$GITHUB_OUTPUT"
+
+  run-evals:
+    name: Eval ${{ matrix.suite }}
+    needs: detect-suites
+    if: needs.detect-suites.outputs.suites != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJson(needs.detect-suites.outputs.suites) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install claude CLI and pyyaml
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          pip install -r evals/requirements.txt
+
+      - name: Run ${{ matrix.suite }} (with_skill vs without_skill, static grading only)
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 evals/runner.py "${{ matrix.suite }}" | tee run.log
+
+          {
+            echo "## Skill eval: \`${{ matrix.suite }}\`"
+            echo '```'
+            tail -n 40 run.log
+            it_dir=$(ls -d evals/.workspace/"${{ matrix.suite }}"/iteration-* | sort -V | tail -1)
+            if [ -f "$it_dir/benchmark.json" ]; then
+              echo
+              echo "benchmark.json:"
+              cat "$it_dir/benchmark.json"
+            fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

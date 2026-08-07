@@ -1,0 +1,7 @@
+{
+  "category": "testing",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "A pass/fail threshold or severity field is present on at least one test task (e.g. error_threshold_expression, warn_threshold_expression, test_severity_level)", "check": "regex", "pattern": "error_threshold_expression|warn_threshold_expression|test_severity_level" }
+  ]
+}

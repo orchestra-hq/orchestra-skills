@@ -1,0 +1,10 @@
+{
+  "category": "sensors",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "The trigger is declared at the pipeline root — a sensors: block for external-state polling, or trigger_events: for reacting to another Orchestra pipeline's completion — not modeled as a pipeline task", "check": "regex", "pattern": "(?m)^(sensors|trigger_events):", "min_count": 1 },
+    { "text": "Each sensor declares at least one check under its checks: block", "check": "regex", "pattern": "checks:", "min_count": 1 },
+    { "text": "Each sensor's timeout_mins stays below its cron interval rather than exceeding it" },
+    { "text": "Each sensor's frequency_secs (when set) falls within Orchestra's valid 60-600 second polling range" }
+  ]
+}

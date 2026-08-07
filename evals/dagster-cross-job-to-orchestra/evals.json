@@ -1,0 +1,51 @@
+{
+  "skill_name": "dagster-cross-job-to-orchestra",
+  "description": "Given Dagster cross-job triggering patterns — run-status sensors, asset sensors, or explicit launch-and-wait ops — author the matching Orchestra mechanism: trigger_events: for reactive/launch-only patterns, a TRIGGER_PIPELINE task for explicit mid-flow launch-and-wait.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "run-status-sensor-success-trigger-events",
+      "prompt": "Convert this Dagster run-status sensor to Orchestra (see files/run_status_sensor_success.py). It watches nightly_elt for success and launches daily_report with a run_config env override. Author the daily-report pipeline's trigger_events: block that reacts to nightly_elt completing. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A daily-report pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id set to a placeholder for the nightly-elt pipeline, statuses including SUCCEEDED) and run_inputs carrying over env: prod from the sensor's RunRequest run_config, plus a pipeline: block for the report build task — not a TRIGGER_PIPELINE task, since the sensor only launches and does not wait.",
+      "files": ["run_status_sensor_success.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "A pipeline: block with tasks is still present alongside trigger_events", "check": "yaml_present", "path": "pipeline" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "SUCCEEDED is among the trigger statuses", "check": "regex", "pattern": "SUCCEEDED" },
+        { "text": "run_inputs carries over the env: prod override from the sensor's RunRequest(run_config=...)", "check": "regex", "pattern": "(?s)run_inputs:.*?env:\\s*prod" },
+        { "text": "No TRIGGER_PIPELINE task is used for this case — trigger_events: alone is sufficient since the sensor only launches and never waits" }
+      ]
+    },
+    {
+      "id": "asset-sensor-cross-location-trigger-events",
+      "prompt": "Convert this Dagster asset sensor to Orchestra (see files/asset_sensor_cross_location.py). It watches the raw_orders asset — materialized by a job in a separate code location — and launches reporting_job once raw_orders lands. Author the reporting pipeline's trigger_events: block reacting to the raw_orders producer pipeline. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A reporting pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id set to a placeholder for the raw_orders-producing pipeline, statuses defaulting to or including SUCCEEDED) plus a pipeline: block for the daily_order_summary build — not a TRIGGER_PIPELINE task, since asset sensors map to reactive trigger_events, not an explicit wait.",
+      "files": ["asset_sensor_cross_location.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "A pipeline_id field is set on the trigger_events entry", "check": "regex", "pattern": "pipeline_id" },
+        { "text": "SUCCEEDED is among the (explicit or default) trigger statuses" },
+        { "text": "The trigger targets the raw_orders-producing pipeline specifically, matching the asset_sensor's cross-code-location watch — not a same-pipeline dependency or a TRIGGER_PIPELINE task" }
+      ]
+    },
+    {
+      "id": "launch-and-wait-trigger-pipeline-task",
+      "prompt": "Convert this Dagster op to Orchestra (see files/launch_and_wait_op.py). It explicitly launches reporting_job mid-flow via the GraphQL client, polls until completion, and only then runs publish_dashboard. Model this as a TRIGGER_PIPELINE task inside the orchestration_job pipeline, sequenced ahead of the dashboard-publishing task. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An orchestration pipeline.yml with an ORCHESTRA/TRIGGER_PIPELINE task (parameters.pipeline_id a placeholder for reporting_job, run_inputs carrying the env: prod config) that a downstream publish-dashboard task depends_on, since the source op explicitly waits for reporting_job to finish before continuing — not a trigger_events: block, which would only react rather than block mid-flow.",
+      "files": ["launch_and_wait_op.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A task uses the ORCHESTRA integration", "check": "some_task", "field": "integration", "equals": "ORCHESTRA" },
+        { "text": "A task runs the TRIGGER_PIPELINE job", "check": "some_task", "field": "integration_job", "equals": "TRIGGER_PIPELINE" },
+        { "text": "The TRIGGER_PIPELINE task sets parameters.pipeline_id", "check": "regex", "pattern": "(?s)TRIGGER_PIPELINE.*?pipeline_id" },
+        { "text": "run_inputs carries over the env: prod override from the submitted run_config", "check": "regex", "pattern": "(?s)run_inputs:.*?env:\\s*prod" },
+        { "text": "The publish-dashboard task depends_on the TRIGGER_PIPELINE task, preserving the source's launch-and-wait-then-continue ordering" },
+        { "text": "No trigger_events: block is used for this case — the op explicitly launches and blocks mid-flow, which requires the waiting TRIGGER_PIPELINE task rather than a reactive trigger" }
+      ]
+    }
+  ]
+}

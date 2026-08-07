@@ -1,0 +1,27 @@
+name: Validate Evals
+
+# Static lint of every evals/<suite>/evals.json — no tokens spent, no `claude` invocation.
+# This is what would have caught this repo's three independently-invented evals.json
+# schemas (assertions vs. expectations, name vs. id, ...) at PR time; see evals/lint_evals.py.
+
+# Temporarily disabled: manual trigger only. To re-enable automatic runs, restore:
+#   push:
+#     paths: ['evals/**']
+#   pull_request:
+#     paths:
+#       - 'evals/**'
+#       - '.github/workflows/validate-evals.yml'
+on:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install pyyaml
+        run: pip install -r evals/requirements.txt
+
+      - name: Lint every eval suite
+        run: python3 evals/lint_evals.py

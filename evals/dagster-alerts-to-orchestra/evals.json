@@ -1,0 +1,46 @@
+{
+  "skill_name": "dagster-alerts-to-orchestra",
+  "description": "Given Dagster run-status sensors, sensor factories, or op hooks that send notifications, author the matching Orchestra alerts: block — pipeline-level for job-scoped sensors, task-level for op-scoped hooks — with the correct required field per destination type (destination for SLACK/EMAIL, connection_id for PAGER_DUTY/TEAMS/WEBHOOK/DATADOG).",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "run-failure-sensor-pagerduty-slack",
+      "prompt": "Convert this Dagster run-failure sensor to an Orchestra pipeline-level alert (see files/run_failure_sensor_multi.py). It pages PagerDuty and also posts to the #incidents Slack channel on failure. Write the pipeline YAML to pipeline.yml in the current directory — no live paging, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with two destinations: PAGER_DUTY (connection_id set, no destination field) and SLACK (destination: '#incidents', no connection_id field).",
+      "files": ["run_failure_sensor_multi.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The PAGER_DUTY destination sets connection_id (SLACK/EMAIL require destination; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)", "check": "alert_destination_requires", "integration": "PAGER_DUTY", "field": "connection_id" },
+        { "text": "A SLACK destination targeting #incidents is present", "check": "regex", "pattern": "#incidents" }
+      ]
+    },
+    {
+      "id": "email-and-teams-multi-sensor",
+      "prompt": "Convert these Dagster failure notifications to Orchestra pipeline-level alerts (see files/email_and_teams_sensors.py) — both the email sensor and the Microsoft Teams webhook it mentions. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry (or entries) firing on FAILED with an EMAIL destination (destination: 'data-team@example.com') and a MICROSOFT_TEAMS destination (connection_id: teams_webhook_54321).",
+      "files": ["email_and_teams_sensors.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The EMAIL destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "EMAIL", "field": "destination" },
+        { "text": "The MICROSOFT_TEAMS destination sets connection_id", "check": "alert_destination_requires", "integration": "MICROSOFT_TEAMS", "field": "connection_id" },
+        { "text": "data-team@example.com is carried over as the EMAIL destination value", "check": "regex", "pattern": "data-team@example\\.com" },
+        { "text": "teams_webhook_54321 is carried over as the MICROSOFT_TEAMS connection_id", "check": "regex", "pattern": "teams_webhook_54321" }
+      ]
+    },
+    {
+      "id": "failure-hook-task-level-datadog",
+      "prompt": "Convert this Dagster op-level failure hook to an Orchestra task-level alert on the critical_transform task only — it should not fire for the whole pipeline (see files/failure_hook_task_level.py). Write the pipeline YAML to pipeline.yml in the current directory — no live events, no deploy.",
+      "expected_output": "A task-level alerts: entry on the critical-transform task (not the pipeline root) firing on FAILED with a DATADOG destination (connection_id set, parameters.priority present), since op-scoped hooks map to task-level alerts, not job-wide sensors.",
+      "files": ["failure_hook_task_level.py"],
+      "assertions": [
+        { "text": "A DATADOG destination is present", "check": "regex", "pattern": "integration:\\s*DATADOG", "min_count": 1 },
+        { "text": "The DATADOG destination sets a parameters.priority value", "check": "regex", "pattern": "priority", "min_count": 1 },
+        { "text": "The alert is placed on the critical-transform TaskModel (task-level), not the pipeline root alerts: block — matching the op-scoped @failure_hook rather than a job-wide run-status sensor" },
+        { "text": "downstream_report, which has no hook, does not also get this alert" },
+        { "text": "The DATADOG connection_id follows the name_XXXXX suffix convention (a plausible placeholder) rather than being left as a bare invented name, or is flagged as needing a real value from the user" }
+      ]
+    }
+  ]
+}

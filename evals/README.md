@@ -10,8 +10,11 @@ The design follows the [agentskills.io eval guide](https://agentskills.io/skill-
 `benchmark.json`, iteration directories) and borrows the scenario/runner layout from
 [dbt-labs/dbt-agent-skills](https://github.com/dbt-labs/dbt-agent-skills/tree/main/evals).
 
-Currently wired up for **`write-snowflake-dq-tests`** only. Adding more skills is a
-matter of dropping a new suite directory next to it (see [Adding a suite](#adding-a-suite)).
+Every suite lives in this flat `evals/` namespace regardless of which plugin its skill
+belongs to — `runner.py` resolves a suite name's `SKILL.md` against every known plugin
+root (`skills/orchestra/skills/`, `skills/migrate-to-orchestra/skills/`) and requires an
+unambiguous match; pass `--plugin` to disambiguate a name collision, or `--skills-root`
+to point at a skill tree outside this repo entirely (see [Adding a suite](#adding-a-suite)).
 
 ## Layout
 
@@ -21,21 +24,30 @@ evals/
 ├── requirements.txt                # pyyaml (use system python3 or a venv)
 ├── runner.py                       # drives `claude -p` with/without the skill
 ├── grade.py                        # code-grades generated YAML against assertions
+├── validate_live.py                # optional: validates already-generated YAML against
+│                                    # the real Orchestra schema via the validate_pipeline
+│                                    # MCP tool (credential-gated, skips gracefully without one)
+├── _shared_assertions/              # category-level assertion libraries, referenced by
+│   ├── definitions.json            # multiple suites via a case's "assertions_ref" — e.g.
+│   ├── connections.json            # every *-alerts-to-orchestra suite (Dagster today,
+│   ├── alerts.json                 # Airflow/Prefect later) references alerts.json instead
+│   └── ...                         # of hand-copying the same 6-destination checks
 ├── .workspace/                     # run outputs (git-ignored)
 │   └── write-snowflake-dq-tests/
 │       └── iteration-1/
 │           ├── <eval-id>/
-│           │   ├── with_skill/    { files/, pipeline.yml, timing.json, grading.json, transcript.txt }
+│           │   ├── with_skill/    { files/, pipeline.yml, timing.json, grading.json, transcript.txt, validate_live.json }
 │           │   └── without_skill/ { ... }
 │           └── benchmark.json
-└── write-snowflake-dq-tests/    # the suite (checked in)
+└── write-snowflake-dq-tests/    # a suite (checked in)
     ├── evals.json                  # test cases: prompt, expected_output, files, assertions
     ├── files/                      # input fixtures fed to the agent
     └── expected/golden_pipeline.yml# reference output for human / blind-LLM comparison
 ```
 
-`evals.json` and the fixtures are the only files you author by hand. `timing.json`,
-`grading.json`, and `benchmark.json` are produced by the harness.
+`evals.json`, fixtures, and `_shared_assertions/*.json` are the only files you author by
+hand. `timing.json`, `grading.json`, `benchmark.json`, and `validate_live.json` are
+produced by the harness.
 
 ## Scope: YAML generation only
 
@@ -125,9 +137,48 @@ Coded `check` types (see [`grade.py`](grade.py) for arguments):
 | `every_task` / `some_task` | a field equals a value across all / at least one task |
 | `alerts_status` | an alert fires on a given status (e.g. `FAILED`) |
 | `groups_chained` | at least one group has a non-empty `depends_on` |
+| `depends_on_edge` | a specific group `depends_on` a specific upstream group (`group`, `upstream`) |
+| `no_hardcoded_secret` | no secret-shaped key (`api_key`/`token`/`password`/...) holds a literal value instead of a `${{ ... }}` reference (`extra_keys` optional) |
+| `valid_enum` | a field's value across all tasks is one of an allowed set (`field`, `allowed`) |
+| `alert_destination_requires` | every alert destination of a given `integration` sets a required `field` (e.g. PAGER_DUTY needs `connection_id`) |
 
 `grading.json` records PASS/FAIL plus concrete `evidence` per assertion; `benchmark.json`
 aggregates pass-rate / tokens / duration per configuration and the **delta** between them.
+
+### Shared assertions across suites
+
+A case can pull in one or more category-level assertion files before its own, via
+`"assertions_ref": ["definitions", "connections", "alerts"]` — each name resolves to
+`_shared_assertions/<name>.json` (`{"category": ..., "assertions": [...]}`, same object
+shape as inline assertions). This is what keeps ~50 suites across three source
+orchestrators from each hand-copying the same category checks: write `alerts.json` once
+against `dagster-alerts-to-orchestra`'s destination schema, and `airflow-alerts-to-orchestra`
+/ `prefect-alerts-to-orchestra` reference the same file later, adding only their
+orchestrator-specific fixture and a couple of case-specific literals. Shared assertions are
+graded ahead of a case's own so `grading.json` reads generic-to-specific.
+
+### Live schema validation (optional)
+
+`grade.py` only checks what a suite's `evals.json` happens to assert — it never confirms
+the YAML would actually be accepted by Orchestra. `validate_live.py` closes that gap by
+handing an already-generated `pipeline.yml` to the real `validate_pipeline` MCP tool:
+
+```bash
+python3 evals/validate_live.py dagster-alerts-to-orchestra --iteration 1
+```
+
+It needs `ORCHESTRA_MCP_CONFIG_PATH` set to a file path holding an MCP config that
+exposes `orchestra-mcp`'s `validate_pipeline` tool; without it, every case is recorded
+`{"status": "skipped"}` and the script exits `0` — it never turns a missing credential
+into a hard failure. Locally, point it at a config file you already have. In CI
+(`skill-evals-live.yml`), there's no such file on a fresh runner — a preceding step
+writes the repo variable `ORCHESTRA_MCP_CONFIG` (the `mcpServers` JSON block itself) out
+to a temp file and points `ORCHESTRA_MCP_CONFIG_PATH` at it; leave that repo variable
+unset to keep the nightly run a no-op skip. Kept separate from `runner.py`/`grade.py`
+because those two are deliberately sandboxed
+(`--strict-mcp-config --mcp-config '{"mcpServers":{}}'`) so a generation run can never
+reach a live system; validation against the real schema is opt-in and runs only after
+generation, never during it.
 
 The `expected/golden_pipeline.yml` reference is **not** diffed mechanically (correct YAML
 has many valid shapes). It's the anchor for human review and the blind-LLM comparison the
@@ -153,6 +204,11 @@ the full method.
 ## Adding a suite
 
 1. `mkdir evals/<skill-name>` with `evals.json`, `files/`, and optionally `expected/`.
-2. Name the suite directory exactly after the skill directory under
-   `skills/orchestra/skills/<skill-name>/` — the runner resolves `SKILL.md` from there.
-3. `python3 evals/runner.py <skill-name>`.
+2. Name the suite directory exactly after the skill directory — the runner resolves
+   `SKILL.md` by searching every known plugin root (`skills/orchestra/skills/`,
+   `skills/migrate-to-orchestra/skills/`) for that name; pass `--plugin` only if the same
+   name exists under more than one, or `--skills-root` to test a skill tree outside this repo.
+3. Before writing category-shape assertions from scratch, check `_shared_assertions/` for
+   an existing file covering the concept (`alerts`, `connections`, `sensors`, ...) and
+   reference it via `"assertions_ref": [...]` — add only case-specific literals inline.
+4. `python3 evals/runner.py <skill-name>`.

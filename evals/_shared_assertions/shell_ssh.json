@@ -1,0 +1,10 @@
+{
+  "category": "shell_ssh",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "No hardcoded SSH keys, passwords, or other secrets appear in the YAML", "check": "no_hardcoded_secret" },
+    { "text": "A source-side command list (e.g. a Python argv list or a Pipes command list) is flattened into a single string for the command parameter, not left as a YAML list" },
+    { "text": "dbt commands run via shell/SSH/Pipes are not converted into a shell/SSH/container task here — they belong to dbt-core-dagster-to-orchestra's dedicated DBT_CORE_EXECUTE job instead" },
+    { "text": "Pure local glue commands (echo, mkdir, env checks) with no real external effect are flagged as droppable or foldable into an adjacent task rather than translated verbatim into their own task" }
+  ]
+}

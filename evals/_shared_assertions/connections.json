@@ -1,0 +1,9 @@
+{
+  "category": "connections",
+  "assertions": [
+    { "text": "No hardcoded credentials or secrets appear in the YAML", "check": "no_hardcoded_secret" },
+    { "text": "Every connection: value follows the required name_XXXXX suffix format, a ${{ ENV.* }} reference, or explicit null — never a bare invented name", "check": "regex", "pattern": "connection:\\s*(\\$\\{\\{\\s*ENV\\.[A-Z0-9_]+\\s*\\}\\}|[A-Za-z0-9_]+_\\d{5}|null)", "min_count": 1 },
+    { "text": "Connection names follow the required descriptive-name_XXXXX suffix format rather than being invented ad hoc, and no connection is fabricated for a resource the source code doesn't actually reference (connection: null when there is none)" },
+    { "text": "A parameter that duplicates connection-level scope (e.g. a workspace/account/host id) is only set to an explicit literal/input/${{ ENV.* }} value when the source genuinely varies it per task; otherwise it is left null/omitted so the connection's own configured default applies" }
+  ]
+}

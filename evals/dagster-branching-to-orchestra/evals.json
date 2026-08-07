@@ -1,0 +1,50 @@
+{
+  "skill_name": "dagster-branching-to-orchestra",
+  "description": "Given a Dagster job with conditional Out branching, a runtime-computed branch, or a DynamicOut fan-out, author the matching Orchestra YAML — mutually-exclusive condition: stages for branches and a matrix block for fan-out, never conflating the two.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "config-driven-load-mode-branch",
+      "prompt": "Convert this Dagster job to Orchestra (see files/config_load_mode_branch.py). The `full_refresh` config flag decides at trigger time whether the backfill branch or the incremental branch runs — only one of the two ops actually executes per run. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline with a full_refresh boolean input, a stage conditioned on ${{ inputs.full_refresh == true }} running the backfill task, and a mutually-exclusive stage conditioned on the false case running the incremental task.",
+      "files": ["config_load_mode_branch.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "Pipeline declares an input for the branch decision", "check": "yaml_present", "path": "inputs" },
+        { "text": "full_refresh is referenced both as an input and inside a condition expression", "check": "regex", "pattern": "full_refresh", "min_count": 2 },
+        { "text": "A condition references inputs.full_refresh (a trigger-time / config-driven branch, not a runtime OUTPUTS lookup)", "check": "regex", "pattern": "\\$\\{\\{\\s*inputs\\.full_refresh", "min_count": 1 },
+        { "text": "Both branch stages carry a condition key", "check": "all_groups_have", "key": "condition" },
+        { "text": "The two conditions are genuinely mutually exclusive (one tests full_refresh true, the other tests false/not-true) rather than both able to evaluate true, or both false, in the same run" },
+        { "text": "run_backfill and run_incremental land as separate tasks under their respective conditioned stages, not merged into a single task with branching logic written inside its parameters" }
+      ]
+    },
+    {
+      "id": "runtime-row-count-branch",
+      "prompt": "Convert this Dagster job to Orchestra (see files/runtime_row_count_branch.py). Whether orders get loaded or a no-data notice fires depends on a row count computed during the run, not on any config passed in at trigger time. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra pipeline where the check_staging_orders logic becomes an upstream task with set_outputs: true, and two downstream stages condition on that task's OUTPUTS — one for the positive/has-rows case running load_orders, one for the complementary case running send_no_data_notice.",
+      "files": ["runtime_row_count_branch.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "The upstream check is a task that sets outputs for downstream conditions to read", "check": "regex", "pattern": "set_outputs", "min_count": 1 },
+        { "text": "A condition references the upstream task's OUTPUTS via ORCHESTRA.PIPELINE_RUN_TASKS", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[[^\\]]+\\]\\.OUTPUTS\\[", "min_count": 1 },
+        { "text": "Downstream stages are sequenced after the check via depends_on", "check": "groups_chained" },
+        { "text": "The value surfaced by check_staging_orders (row count or a has-data flag) is a real value from the source logic, not an invented placeholder key unrelated to what the op actually computes" },
+        { "text": "load_orders conditions on the positive/has-rows case and send_no_data_notice conditions on the true complementary case, correctly mirroring has_new_orders vs no_new_orders rather than both being gated on the same condition or one left unconditioned" }
+      ]
+    },
+    {
+      "id": "dynamic-fanout-with-failure-alert",
+      "prompt": "Convert this Dagster job to Orchestra (see files/dynamic_fanout_with_alert.py). list_regions fans out sync_region across three regions in parallel, then check_sync_results decides whether to fire send_failure_alert. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline where the DynamicOut fan-out becomes a matrix block on the region-sync task group (not a condition), sequenced into a separate stage conditioned on the upstream failure-check output that runs send_failure_alert only when failures occurred.",
+      "files": ["dynamic_fanout_with_alert.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "The fan-out is modeled as a matrix block", "check": "regex", "pattern": "matrix", "min_count": 1 },
+        { "text": "All three region values from list_regions appear as matrix inputs", "check": "regex", "pattern": "\\b(us|eu|apac)\\b", "ignore_case": true, "min_count": 3 },
+        { "text": "The failure-alert stage is sequenced after the fan-out stage via depends_on", "check": "groups_chained" },
+        { "text": "The DynamicOut fan-out is kept as a matrix block and is not also force-fit into a condition: expression — only the has_failures/all_clean branch gets a condition", "check": "regex", "pattern": "matrix" },
+        { "text": "send_failure_alert's condition references the check_sync_results output rather than an invented always-true/always-false stand-in, so the alert genuinely only fires when a region failed" }
+      ]
+    }
+  ]
+}

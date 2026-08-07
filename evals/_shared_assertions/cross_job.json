@@ -1,0 +1,9 @@
+{
+  "category": "cross_job",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+    { "text": "pipeline_id values are UUID-shaped placeholders (or explicitly flagged as needing the real Orchestra pipeline UUID from the pipeline URL) — never a literal Dagster job/asset name" },
+    { "text": "The correct cross-job mechanism is chosen for the source semantics: trigger_events: for reactive/launch-only patterns (run_status_sensor, asset_sensor), a TRIGGER_PIPELINE task for explicit mid-flow launch-and-wait — not the other one used interchangeably" }
+  ]
+}

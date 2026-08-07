@@ -1,0 +1,10 @@
+{
+  "category": "branching",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "At least one condition: expression gates a stage or task on branching logic", "check": "regex", "pattern": "condition:", "min_count": 1 },
+    { "text": "Condition expressions use Orchestra's ${{ ... }} interpolation syntax rather than a bare Python-style expression", "check": "regex", "pattern": "condition:\\s*[\"']?\\$\\{\\{", "min_count": 1 },
+    { "text": "Mutually-exclusive Dagster branches (conditionally-yielded Outs) are modeled as separate stages/tasks each carrying its own condition, not as a single task with inline if/else routing logic ported over" },
+    { "text": "Downstream stages account for a false condition producing a SKIPPED status upstream, rather than assuming the conditioned stage always resolves to SUCCEEDED or FAILED" }
+  ]
+}

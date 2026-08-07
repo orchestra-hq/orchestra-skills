@@ -1,1 +1,0 @@
-{ "description": "Consolidate an env-suffix duplicate pipeline pair (prod/staging)", "include": ["./orchestra"] }

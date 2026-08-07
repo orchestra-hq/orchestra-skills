@@ -1,0 +1,44 @@
+{
+  "skill_name": "fivetran-dagster-to-orchestra",
+  "description": "Given a Dagster Fivetran integration (FivetranResource/FivetranWorkspace with build_fivetran_assets, fivetran_assets, or load_fivetran_asset_specs), convert each connector sync into a single FIVETRAN Sync task in Orchestra pipeline YAML — carrying over the connector_id verbatim and representing the API key/secret via a connection: reference rather than inlined.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "single-connector-sync-and-wait",
+      "prompt": "Convert this Dagster asset to an Orchestra pipeline task (see files/single_connector_build_assets.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single FIVETRAN task (integration_job FIVETRAN_SYNC_ALL) with parameters.connector_id: brightly_typical carried over verbatim from build_fivetran_assets — one task for the whole connector, not split per destination table — and a connection: reference (name_XXXXX or ${{ ENV.* }}) standing in for the FivetranResource's api_key/api_secret, never the literal FIVETRAN_API_KEY/FIVETRAN_API_SECRET env var names.",
+      "files": ["single_connector_build_assets.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id brightly_typical is carried over verbatim", "check": "regex", "pattern": "brightly_typical" },
+        { "text": "Only one Fivetran task represents the whole connector sync — the destination tables (salesforce.accounts, salesforce.opportunities) are not split into separate per-table tasks" },
+        { "text": "Does not invent non-default force/resync parameter values since the source's build_fivetran_assets call doesn't specify them" }
+      ]
+    },
+    {
+      "id": "single-connector-sync-and-poll-workspace",
+      "prompt": "Convert this Dagster Fivetran integration to an Orchestra pipeline task (see files/single_connector_workspace_poll.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single FIVETRAN task with parameters.connector_id: calmly_effective, recognizing that the explicit sync_and_poll call still collapses to one Orchestra Sync task (Orchestra always waits for completion, so no separate poll/sensor task is needed), with the FivetranWorkspace's account_id/api_key/api_secret represented via a connection: reference rather than inlined.",
+      "files": ["single_connector_workspace_poll.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id calmly_effective is carried over verbatim", "check": "regex", "pattern": "calmly_effective" },
+        { "text": "The explicit sync_and_poll call is not modeled as two separate tasks (a trigger task plus a separate poll/wait task) — it collapses to one Orchestra Sync task that always waits for completion" },
+        { "text": "account_id is not invented as a task parameter — it belongs to the connection, not duplicated per task" }
+      ]
+    },
+    {
+      "id": "multi-connector-distinct-tasks",
+      "prompt": "Convert this Dagster job with two Fivetran connectors to Orchestra pipeline tasks (see files/multi_connector_two_syncs.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two FIVETRAN tasks — one for connector_id deeply_current (hubspot) and one for connector_id loosely_secondary (netsuite) — each carrying its own correct connector_id rather than collapsed into a single task or invented, with the shared FivetranWorkspace credentials represented via one connection: reference reused by both tasks.",
+      "files": ["multi_connector_two_syncs.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id deeply_current is present", "check": "regex", "pattern": "deeply_current" },
+        { "text": "connector_id loosely_secondary is present", "check": "regex", "pattern": "loosely_secondary" },
+        { "text": "Two separate connector_id parameters appear, matching the two source connectors, not merged into a single task", "check": "regex", "pattern": "connector_id:", "min_count": 2 },
+        { "text": "Each Fivetran task is named distinctly (e.g. reflecting hubspot vs netsuite) rather than both tasks sharing an identical generic name" }
+      ]
+    }
+  ]
+}

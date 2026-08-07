@@ -1,0 +1,50 @@
+{
+  "skill_name": "slack-dagster-to-orchestra",
+  "description": "Given Dagster Slack notifications — SlackResource, make_slack_on_run_failure_sensor, or op success/failure hooks — determine whether the message is a run-status notification (pipeline- or task-scoped Orchestra alerts: block, destination not connection_id) or an explicit mid-run pipeline step (SLACK integration task with SEND_SLACK_MESSAGE), and author the corresponding YAML.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "run-failure-sensor-pipeline-alert",
+      "prompt": "Convert this Dagster Slack failure notification to an Orchestra pipeline-level alert (see files/slack_run_failure_sensor.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with a single SLACK destination (destination: '#eng-oncall', no connection_id field) — the literal channel carried straight through since only the bot token, not the channel, is environment-dependent.",
+      "files": ["slack_run_failure_sensor.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The SLACK destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The #eng-oncall channel is carried over as the SLACK destination value", "check": "regex", "pattern": "#eng-oncall" },
+        { "text": "connection_id is NOT set on the SLACK destination — Slack alerts resolve from the workspace Slack connection; connection_id is only required for PAGER_DUTY/TEAMS/WEBHOOK/DATADOG" },
+        { "text": "The channel is placed directly as the literal string '#eng-oncall' rather than routed through ${{ ENV.* }}, since the source only reads the bot token — not the channel — from an environment variable" }
+      ]
+    },
+    {
+      "id": "success-hook-task-level-alert",
+      "prompt": "Convert this Dagster op-level Slack success hook to an Orchestra task-level alert on the load_warehouse task only — it should not fire for the whole pipeline (see files/slack_success_hook_op.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A task-level alerts: entry on the load-warehouse task (not the pipeline root) firing on SUCCEEDED with a SLACK destination (destination: '#warehouse-notifications', no connection_id field), since an op-scoped hook maps to a task-level alert, not a job-wide sensor.",
+      "files": ["slack_success_hook_op.py"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "An alert fires on SUCCEEDED", "check": "alerts_status", "status": "SUCCEEDED" },
+        { "text": "The SLACK destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The #warehouse-notifications channel is carried over as the SLACK destination value", "check": "regex", "pattern": "#warehouse-notifications" },
+        { "text": "The alert is placed on the load-warehouse TaskModel (task-level), not the pipeline root alerts: block — matching the op-scoped @success_hook rather than a job-wide run-status sensor" },
+        { "text": "extract_data, which has no hook, does not also get this alert" }
+      ]
+    },
+    {
+      "id": "mid-pipeline-slack-message-task",
+      "prompt": "This Dagster job posts a Slack message mid-run, after the dbt build finishes and before the downstream load starts (see files/slack_mid_pipeline_message.py). Convert this to the appropriate Orchestra pipeline construct — this is a workflow step, not a status notification. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A SLACK pipeline task (integration: SLACK, integration_job: SEND_SLACK_MESSAGE) with parameters.channel_name '#data-team' and text set, wired via depends_on so it runs after the run_dbt_build task and before load_downstream — NOT an alerts: block, since this is an explicit step whose position in the run matters.",
+      "files": ["slack_mid_pipeline_message.py"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "A SLACK integration task is present", "check": "some_task", "field": "integration", "equals": "SLACK" },
+        { "text": "The SLACK task runs SEND_SLACK_MESSAGE", "check": "some_task", "field": "integration_job", "equals": "SEND_SLACK_MESSAGE" },
+        { "text": "The task sets a channel_name parameter", "check": "regex", "pattern": "channel_name" },
+        { "text": "The #data-team channel is carried over as the channel_name value", "check": "regex", "pattern": "#data-team" },
+        { "text": "This is expressed as a SLACK/SEND_SLACK_MESSAGE task wired via depends_on, not an alerts: block, since the message is a positioned mid-run step rather than a run-status notification" },
+        { "text": "The task's depends_on reflects it firing after the dbt build task and before the downstream load task, preserving the source's execution order" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "skill_name": "dagster-io-managers-to-orchestra",
+  "description": "Given Dagster ops/assets that pass data via return values, IO managers, Output(value, metadata=...), or context.add_output_metadata, author the matching Orchestra pipeline YAML using explicit set_outputs: true tasks and ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...].OUTPUTS[...] }} references between tasks.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "implicit-return-value-io-manager",
+      "prompt": "Convert this Dagster asset pipeline to Orchestra pipeline YAML (see files/pending_order_count_io_manager.py). The pending_order_count asset returns an int that's persisted by a custom SnowflakeCountIOManager and consumed by the downstream process_pending_orders asset, which branches on whether the count is greater than zero. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a SNOWFLAKE task that runs the count query with set_outputs: true, and a downstream task/stage that references the count via the OUTPUTS templating syntax, preserving the count > 0 branching logic.",
+      "files": ["pending_order_count_io_manager.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (one to compute the count, one to process orders)", "check": "min_task_groups", "min": 2 },
+        { "text": "The count query runs as a SNOWFLAKE task, matching the original snowflake.connector call", "check": "some_task", "field": "integration", "equals": "SNOWFLAKE" },
+        { "text": "The count-producing task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The custom SnowflakeCountIOManager's handle_output/load_input persistence logic is not reproduced as Orchestra infrastructure — it is replaced entirely by the count task's explicit set_outputs" },
+        { "text": "The conditional processing in process_pending_orders (only process when count > 0) is preserved, e.g. via a condition: expression referencing the count output or equivalent branching logic in the downstream task, not silently dropped" }
+      ]
+    },
+    {
+      "id": "output-value-with-metadata",
+      "prompt": "Convert this Dagster job to Orchestra pipeline YAML (see files/customer_extract_output_metadata.py). extract_customers stages a parquet file and returns its path via Output(path, metadata={...}), and load_customers reads that path. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a PYTHON task for extract_customers that sets_outputs the staged file path, and a downstream PYTHON task for load_customers that references that path via the OUTPUTS templating syntax; the num_rows/preview metadata is not treated as data the downstream task depends on.",
+      "files": ["customer_extract_output_metadata.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (extract then load)", "check": "min_task_groups", "min": 2 },
+        { "text": "Both tasks use the PYTHON integration", "check": "every_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The extract task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The num_rows/preview metadata from Output(path, metadata=...) is treated as observability only and is not what load_customers depends on — only the file path is passed as the explicit output value" },
+        { "text": "load_customers reads the staged parquet file via the passed path/output reference rather than assuming the original DataFrame object itself crosses tasks" }
+      ]
+    },
+    {
+      "id": "add-output-metadata-staged-reference",
+      "prompt": "Convert this Dagster job to Orchestra pipeline YAML (see files/daily_report_add_output_metadata.py). export_daily_report stages a CSV to S3, calls context.add_output_metadata with the s3_key and row_count, and returns the report key; notify_report_ready consumes that key. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a PYTHON task for export_daily_report that sets_outputs the report key (not the add_output_metadata fields), and a downstream PYTHON task for notify_report_ready that references the report key via the OUTPUTS templating syntax.",
+      "files": ["daily_report_add_output_metadata.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (export then notify)", "check": "min_task_groups", "min": 2 },
+        { "text": "The export task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The report key or s3 key concept is carried through as an output value somewhere in the YAML", "check": "regex", "pattern": "s3_key|report_key|report-key", "ignore_case": true, "min_count": 1 },
+        { "text": "context.add_output_metadata's s3_key/row_count fields are treated as observability only, not as the mechanism for passing data to notify_report_ready — the op's actual return value (the report key) becomes the explicit Orchestra output" },
+        { "text": "notify_report_ready references the upstream task's output via the OUTPUTS templating syntax keyed off the exact upstream task id, not a hardcoded literal string" }
+      ]
+    }
+  ]
+}
