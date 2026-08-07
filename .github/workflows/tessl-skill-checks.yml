@@ -16,6 +16,9 @@ name: Tessl Skill Checks
 on:
   pull_request:
     paths:
+      # migrate-to-orchestra is deliberately excluded from .tessl-plugin/plugin.json for
+      # now, so its skills stay out of these path filters too — add
+      # 'skills/migrate-to-orchestra/skills/**' back here once it's added to Tessl.
       - 'skills/orchestra/skills/**'
       - 'skills/orchestra/references/orchestra/**'
       - '.tessl-plugin/plugin.json'
