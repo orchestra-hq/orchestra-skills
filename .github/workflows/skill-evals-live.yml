@@ -39,10 +39,20 @@ jobs:
             python3 evals/runner.py "$suite" --configs with_skill --no-grade || true
           done
 
+      - name: Write the Orchestra MCP config
+        if: vars.ORCHESTRA_MCP_CONFIG != ''
+        run: |
+          # ORCHESTRA_MCP_CONFIG holds the orchestra-mcp mcpServers JSON block itself
+          # (whatever env vars/credentials that server needs are inside it) — a fresh
+          # runner has no file for a plain path variable to point at, so this step is
+          # what actually materializes one. Repo var, not secret: it's an MCP client
+          # config shape (server command + its own env), not a bare credential — if
+          # it ends up containing a real token inline, move it to a secret instead.
+          echo "${{ vars.ORCHESTRA_MCP_CONFIG }}" > "${RUNNER_TEMP}/orchestra-mcp-config.json"
+          echo "ORCHESTRA_MCP_CONFIG_PATH=${RUNNER_TEMP}/orchestra-mcp-config.json" >> "$GITHUB_ENV"
+
       - name: Validate every suite's latest generation against the real Orchestra schema
         continue-on-error: true
-        env:
-          ORCHESTRA_MCP_CONFIG_PATH: ${{ vars.ORCHESTRA_MCP_CONFIG_PATH }}
         run: |
           {
             echo "## Live schema validation"

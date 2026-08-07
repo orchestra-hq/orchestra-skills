@@ -167,10 +167,15 @@ handing an already-generated `pipeline.yml` to the real `validate_pipeline` MCP 
 python3 evals/validate_live.py dagster-alerts-to-orchestra --iteration 1
 ```
 
-It needs `ORCHESTRA_MCP_CONFIG_PATH` set to an MCP config exposing `orchestra-mcp`'s
-`validate_pipeline` tool; without it, every case is recorded `{"status": "skipped"}` and
-the script exits `0` — it never turns a missing credential into a hard failure. Kept
-separate from `runner.py`/`grade.py` because those two are deliberately sandboxed
+It needs `ORCHESTRA_MCP_CONFIG_PATH` set to a file path holding an MCP config that
+exposes `orchestra-mcp`'s `validate_pipeline` tool; without it, every case is recorded
+`{"status": "skipped"}` and the script exits `0` — it never turns a missing credential
+into a hard failure. Locally, point it at a config file you already have. In CI
+(`skill-evals-live.yml`), there's no such file on a fresh runner — a preceding step
+writes the repo variable `ORCHESTRA_MCP_CONFIG` (the `mcpServers` JSON block itself) out
+to a temp file and points `ORCHESTRA_MCP_CONFIG_PATH` at it; leave that repo variable
+unset to keep the nightly run a no-op skip. Kept separate from `runner.py`/`grade.py`
+because those two are deliberately sandboxed
 (`--strict-mcp-config --mcp-config '{"mcpServers":{}}'`) so a generation run can never
 reach a live system; validation against the real schema is opt-in and runs only after
 generation, never during it.
