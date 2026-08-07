@@ -14,7 +14,13 @@ iteration is graded on completion (see grade.py).
 Usage:
     python3 evals/runner.py <suite> [--only ID] [--configs with_skill,without_skill]
                                     [--iteration N] [--model NAME] [--max-turns N]
-                                    [--no-grade]
+                                    [--no-grade] [--plugin NAME] [--skills-root PATH]
+
+A suite's SKILL.md is resolved against every known plugin root (see PLUGIN_ROOTS) and
+must match exactly one; pass --plugin to disambiguate a name collision, or --skills-root
+to point at a skill tree outside this repo entirely (e.g. the dag-converter repo's
+Airflow/Prefect skills, once they exist) — the suite's evals.json still lives under this
+repo's flat evals/<suite>/ regardless of where the skill itself lives.
 """
 from __future__ import annotations
 
@@ -28,7 +34,14 @@ from pathlib import Path
 
 EVALS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = EVALS_DIR.parent
-SKILLS_ROOT = REPO_ROOT / "skills" / "orchestra" / "skills"
+# Every plugin's skill tree the runner knows how to resolve a suite name against.
+# Adding a plugin (or repo — see --skills-root below) never requires touching grade.py,
+# since suites always live in the flat evals/<suite>/ namespace regardless of which
+# plugin the skill itself belongs to.
+PLUGIN_ROOTS = {
+    "orchestra": REPO_ROOT / "skills" / "orchestra" / "skills",
+    "migrate-to-orchestra": REPO_ROOT / "skills" / "migrate-to-orchestra" / "skills",
+}
 CONFIGS = ("with_skill", "without_skill")
 
 REFERENCE_LINK_RE = re.compile(r"`(\.\./\.\./references/[^`]+\.md)`")
@@ -44,8 +57,32 @@ WITH_SKILL_PREAMBLE = (
 REFERENCE_BLOCK = "\n\n----- BEGIN REFERENCE: {path} -----\n{body}\n----- END REFERENCE -----"
 
 
-def skill_body(suite: str) -> str:
-    skill_dir = SKILLS_ROOT / suite
+def resolve_skill_dir(suite: str, plugin: str | None, skills_root: str | None) -> Path:
+    """Find the skill directory a suite name refers to.
+
+    Tries, in order: an explicit out-of-repo tree (--skills-root, for a sibling repo like
+    dag-converter), an explicit plugin (--plugin, for disambiguating a name collision),
+    or an unambiguous match across every known plugin root.
+    """
+    if skills_root:
+        return Path(skills_root) / suite
+    if plugin:
+        root = PLUGIN_ROOTS.get(plugin)
+        if root is None:
+            sys.exit(f"Unknown --plugin {plugin!r}; known: {list(PLUGIN_ROOTS)}")
+        return root / suite
+    hits = [root / suite for root in PLUGIN_ROOTS.values() if (root / suite / "SKILL.md").exists()]
+    if not hits:
+        sys.exit(f"No SKILL.md for suite {suite!r} under any of "
+                  f"{[str(r) for r in PLUGIN_ROOTS.values()]} — pass --skills-root for a "
+                  f"skill tree outside this repo.")
+    if len(hits) > 1:
+        sys.exit(f"Suite {suite!r} exists under multiple plugins ({hits}); pass --plugin to disambiguate.")
+    return hits[0]
+
+
+def skill_body(suite: str, plugin: str | None = None, skills_root: str | None = None) -> str:
+    skill_dir = resolve_skill_dir(suite, plugin, skills_root)
     skill_md = skill_dir / "SKILL.md"
     if not skill_md.exists():
         sys.exit(f"SKILL.md not found at {skill_md} — suite must match the skill directory name.")
@@ -140,6 +177,13 @@ def main():
     ap.add_argument("--model", help="pin a model, e.g. claude-opus-4-8")
     ap.add_argument("--max-turns", type=int, default=30)
     ap.add_argument("--no-grade", action="store_true", help="skip grading after runs")
+    ap.add_argument("--plugin", choices=sorted(PLUGIN_ROOTS),
+                    help="disambiguate which plugin's skill tree to resolve the suite against "
+                         "(only needed if the suite name exists under more than one)")
+    ap.add_argument("--skills-root",
+                    help="resolve the suite's SKILL.md under this directory instead of a known "
+                         "plugin root — for running suites against a skill tree outside this "
+                         "repo (e.g. the dag-converter repo's Airflow/Prefect skills)")
     args = ap.parse_args()
 
     suite_dir = EVALS_DIR / args.suite
@@ -153,7 +197,7 @@ def main():
     if not cases:
         sys.exit(f"No eval matches --only {args.only!r}")
 
-    body = skill_body(args.suite)
+    body = skill_body(args.suite, plugin=args.plugin, skills_root=args.skills_root)
     workspace = EVALS_DIR / ".workspace" / args.suite
     it = args.iteration or next_iteration(workspace)
     iteration_dir = workspace / f"iteration-{it}"

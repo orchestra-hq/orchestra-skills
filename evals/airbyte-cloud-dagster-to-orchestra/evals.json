@@ -1,0 +1,34 @@
+{
+  "skill_name": "airbyte-cloud-dagster-to-orchestra",
+  "description": "Given a Dagster integration that syncs Airbyte Cloud (AirbyteCloudResource, build_airbyte_assets, load_airbyte_cloud_asset_specs, or airbyte_assets), convert it to an Orchestra pipeline YAML task under the AIRBYTE_CLOUD integration, with connection_id carried over verbatim and API-key credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airbyte-cloud-single-connection-sync",
+      "prompt": "Convert this Dagster job to an Orchestra pipeline task (see files/airbyte_cloud_single_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_CLOUD task running AIRBYTE_CLOUD_JOB, with parameters.connection_id set to 7e2c9f10-4b3a-4d5e-9f1a-2b3c4d5e6f70 (copied verbatim), parameters.job_type: sync, and a connection: field representing the Airbyte Cloud API key resource — never the literal AIRBYTE_CLOUD_API_KEY env var. destination_tables collapses into the single sync task rather than being enumerated.",
+      "files": ["airbyte_cloud_single_sync.py"],
+      "assertions_ref": ["airbyte_cloud", "connections"],
+      "assertions": [
+        { "text": "connection_id 7e2c9f10-4b3a-4d5e-9f1a-2b3c4d5e6f70 is carried over verbatim as a parameter", "check": "regex", "pattern": "7e2c9f10-4b3a-4d5e-9f1a-2b3c4d5e6f70" },
+        { "text": "Exactly one Airbyte task is produced for the single connection_id (destination_tables does not fan out into multiple tasks)", "check": "regex", "pattern": "connection_id", "min_count": 1 },
+        { "text": "AIRBYTE_CLOUD_API_KEY is not written as a literal value anywhere in the YAML — the API key resource maps to the connection:, never the parameters" }
+      ]
+    },
+    {
+      "id": "airbyte-cloud-multi-connection-with-alert",
+      "prompt": "Convert this Dagster job to Orchestra pipeline tasks, and carry over its failure notification as a pipeline alert (see files/airbyte_cloud_multi_connection_alert.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two AIRBYTE_CLOUD tasks running AIRBYTE_CLOUD_JOB — one for connection_id a4d8e2f0-1234-4abc-9def-56789abcdef0 (Salesforce) and one for c9b7a6d5-4321-4fed-8cba-0987654321ff (NetSuite), each with job_type: sync and a connection: field for the shared Airbyte Cloud API key resource. The make_slack_on_run_failure_sensor becomes an alerts block firing on FAILED to a Slack destination, and neither AIRBYTE_CLOUD_API_KEY nor SLACK_TOKEN appears as a literal value.",
+      "files": ["airbyte_cloud_multi_connection_alert.py"],
+      "assertions_ref": ["airbyte_cloud", "connections"],
+      "assertions": [
+        { "text": "Both connections become separate tasks, each with their own connection_id, rather than being collapsed into one task", "check": "regex", "pattern": "connection_id", "min_count": 2 },
+        { "text": "Salesforce connection_id a4d8e2f0-1234-4abc-9def-56789abcdef0 is carried over verbatim", "check": "regex", "pattern": "a4d8e2f0-1234-4abc-9def-56789abcdef0" },
+        { "text": "NetSuite connection_id c9b7a6d5-4321-4fed-8cba-0987654321ff is carried over verbatim", "check": "regex", "pattern": "c9b7a6d5-4321-4fed-8cba-0987654321ff" },
+        { "text": "A failure alert is configured from the make_slack_on_run_failure_sensor", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The Slack failure alert destination includes the #data-alerts channel as its destination", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "SLACK_TOKEN is not written as a literal value in the YAML — it belongs on the Slack alert destination's connection, not inlined" }
+      ]
+    }
+  ]
+}

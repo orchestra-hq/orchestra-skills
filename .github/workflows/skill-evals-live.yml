@@ -1,0 +1,56 @@
+name: Skill Evals (live validation)
+
+# Runs evals/validate_live.py against the latest iteration of every suite, confirming
+# already-generated YAML is actually accepted by Orchestra's real schema validator
+# (validate_pipeline via orchestra-mcp) rather than only the static checks in grade.py.
+#
+# Nightly/manual only — never on pull requests, since it needs an Orchestra credential
+# forked PRs can't have, and validate_live.py itself already skips gracefully (never a
+# hard failure) when that credential is absent; keeping it off PRs entirely just avoids
+# spending the run on a guaranteed no-op there.
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  live-validate:
+    runs-on: ubuntu-latest
+    if: github.repository == 'orchestra-hq/orchestra-skills'
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install claude CLI and pyyaml
+        run: |
+          npm install -g @anthropic-ai/claude-code
+          pip install -r evals/requirements.txt
+
+      - name: Generate the latest iteration for every suite (with_skill only)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for f in evals/*/evals.json; do
+            suite=$(basename "$(dirname "$f")")
+            python3 evals/runner.py "$suite" --configs with_skill --no-grade || true
+          done
+
+      - name: Validate every suite's latest generation against the real Orchestra schema
+        continue-on-error: true
+        env:
+          ORCHESTRA_MCP_CONFIG_PATH: ${{ vars.ORCHESTRA_MCP_CONFIG_PATH }}
+        run: |
+          {
+            echo "## Live schema validation"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          for f in evals/*/evals.json; do
+            suite=$(basename "$(dirname "$f")")
+            echo "── $suite"
+            python3 evals/validate_live.py "$suite" --configs with_skill
+          done | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

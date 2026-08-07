@@ -1,0 +1,49 @@
+{
+  "skill_name": "dagster-shell-ssh-to-orchestra",
+  "description": "Given Dagster code that shells out or runs containers (non-dbt) via PipesSubprocessClient, SSHResource, or Pipes clients like PipesECSClient/PipesK8sClient, the skill should map each to the matching Orchestra integration (PYTHON, LINUX_SSH/WINDOWS_SSH, AWS_ECS/GKE/AKS, or the managed-compute equivalent) and produce valid pipeline YAML.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "pipes-subprocess-python-script",
+      "prompt": "Convert this Dagster asset that shells out via PipesSubprocessClient to run a Python script into an equivalent Orchestra pipeline task (see files/shell_pipes_subprocess.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT whose command parameter is the flattened 'python scripts/transform_orders.py --date {{ ds }}' string, with python_version and package_manager set and a connection reference — not a LINUX_SSH task.",
+      "files": ["shell_pipes_subprocess.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the PYTHON integration", "check": "some_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The task runs the PYTHON_EXECUTE_SCRIPT job", "check": "some_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+        { "text": "The command references the source script", "check": "regex", "pattern": "transform_orders\\.py" },
+        { "text": "The command list ['python', 'scripts/transform_orders.py', '--date', '{{ ds }}'] is joined into a single string command parameter rather than left as a YAML list" },
+        { "text": "python_version and package_manager are populated with sensible defaults (e.g. '3.12' / PIP) since PipesSubprocessClient's Python execution has no equivalent fields to carry over literally" }
+      ]
+    },
+    {
+      "id": "ssh-remote-linux-command",
+      "prompt": "Convert this Dagster job that SSHes into a remote Linux server to run a sync script into an equivalent Orchestra pipeline task (see files/ssh_remote_command.py). Write the pipeline YAML to pipeline.yml in the current directory — no live SSH access, no deploy.",
+      "expected_output": "A LINUX_SSH task running LINUX_SSH_EXECUTE_COMMAND with parameters.command set to the exact remote shell command, and a connection reference standing in for the SSHResource's host/username/password rather than any of those values being inlined.",
+      "files": ["ssh_remote_command.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the LINUX_SSH integration", "check": "some_task", "field": "integration", "equals": "LINUX_SSH" },
+        { "text": "The task runs the LINUX_SSH_EXECUTE_COMMAND job", "check": "some_task", "field": "integration_job", "equals": "LINUX_SSH_EXECUTE_COMMAND" },
+        { "text": "The command references the remote sync script", "check": "regex", "pattern": "run_sync\\.sh" },
+        { "text": "remote_host (etl-box.internal), username (etl_svc), and any password/key material from SSHResource are not written into the YAML as literal parameter values — they are represented purely by the connection: reference" },
+        { "text": "parameters only contains command, matching LinuxSSHExecuteCommandParametersModel — no invented host/user/key fields are added alongside it" }
+      ]
+    },
+    {
+      "id": "ecs-pipes-container-task",
+      "prompt": "Convert this Dagster asset that runs a containerized enrichment job via PipesECSClient into an equivalent Orchestra pipeline task (see files/ecs_container_job.py). Write the pipeline YAML to pipeline.yml in the current directory — no live AWS access, no deploy.",
+      "expected_output": "An AWS_ECS task running AWS_ECS_RUN_TASK with cluster, task_definition, subnet_ids, and security_group_ids parameters carried over from the Pipes run_task_params, connecting via a named AWS connection rather than launching an arbitrary image.",
+      "files": ["ecs_container_job.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the AWS_ECS integration", "check": "some_task", "field": "integration", "equals": "AWS_ECS" },
+        { "text": "The task runs the AWS_ECS_RUN_TASK job", "check": "some_task", "field": "integration_job", "equals": "AWS_ECS_RUN_TASK" },
+        { "text": "The task definition from the source is carried over", "check": "regex", "pattern": "enrichment-task" },
+        { "text": "cluster (data-platform-cluster), subnet_ids (subnet-0a1b2c3d), and security_group_ids (sg-0f1e2d3c) are carried over as task parameters from run_task_params rather than invented or dropped" },
+        { "text": "This is represented as running an existing registered ECS task definition (AWS_ECS_RUN_TASK), not as launching an arbitrary container image directly" }
+      ]
+    }
+  ]
+}

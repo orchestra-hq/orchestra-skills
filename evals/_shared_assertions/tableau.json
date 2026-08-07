@@ -1,0 +1,10 @@
+{
+  "category": "tableau",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+    { "text": "Every task uses the TABLEAU_CLOUD integration", "check": "every_task", "field": "integration", "equals": "TABLEAU_CLOUD" },
+    { "text": "integration_job only ever takes a valid Tableau Cloud value", "check": "valid_enum", "field": "integration_job", "allowed": ["TABLEAU_REFRESH_WORKBOOK", "TABLEAU_REFRESH_EXTRACT", "TABLEAU_UPDATE_SUBSCRIPTION"] },
+    { "text": "site_name / pod_name are not written as per-task parameters — they belong on the connection, not duplicated per task" }
+  ]
+}

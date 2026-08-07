@@ -1,0 +1,53 @@
+{
+  "skill_name": "dagster-sensors-to-orchestra",
+  "description": "Given a Dagster @sensor or @asset_sensor that polls external state and yields RunRequest, author the matching Orchestra sensors: block at the pipeline root with a cron window, polling frequency clamped to 60-600s, and the correct SensorChecksEnum check for the polled system.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "s3-file-sensor",
+      "prompt": "Convert this Dagster S3 polling sensor to an Orchestra sensor (see files/s3_file_sensor.py). It waits for files to land in the daily-uploads bucket under the orders/ prefix before triggering the orders processing job. Write the pipeline YAML to pipeline.yml in the current directory — no live AWS access, no deploy.",
+      "expected_output": "A top-level sensors: block with a check using integration: AWS_S3 and sensor_type: AWS_S3_FILE, parameters.bucket_name: daily-uploads and parameters.prefix: orders/, frequency_secs carried over from the 90s minimum_interval_seconds (already within the 60-600 range), with the process_orders op still represented as a pipeline: task.",
+      "files": ["s3_file_sensor.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An AWS_S3_FILE sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*AWS_S3_FILE" },
+        { "text": "The check's integration is AWS_S3", "check": "regex", "pattern": "integration:\\s*AWS_S3\\b" },
+        { "text": "The S3 bucket name daily-uploads is carried over", "check": "regex", "pattern": "daily-uploads" },
+        { "text": "The S3 prefix orders/ is carried over", "check": "regex", "pattern": "orders/" },
+        { "text": "The 90s minimum_interval_seconds is carried over as frequency_secs unchanged, since it already falls within the 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*90\\b" },
+        { "text": "The sensor is not modeled as a pipeline task (no integration/integration_job task fields for the file check) — it lives only in the sensors: block, matching the 'sensors are triggers, not tasks' rule" },
+        { "text": "A sensible cron window is chosen for a daily file-arrival check rather than an arbitrary or overly wide window" }
+      ]
+    },
+    {
+      "id": "snowflake-sql-sensor-clamped-interval",
+      "prompt": "Convert this Dagster Snowflake polling sensor to an Orchestra sensor (see files/snowflake_data_ready_sensor.py). It waits for today's orders to land before triggering the daily processing job. Write the pipeline YAML to pipeline.yml in the current directory — no live Snowflake queries, no deploy.",
+      "expected_output": "A top-level sensors: block with a check using integration: SNOWFLAKE and sensor_type: SNOWFLAKE_QUERY whose parameters.query mirrors the COUNT(*) ... CURRENT_DATE check, with frequency_secs clamped up to Orchestra's 60-second minimum since the source's minimum_interval_seconds (45s) falls below the allowed 60-600 range.",
+      "files": ["snowflake_data_ready_sensor.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "A SNOWFLAKE_QUERY sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*SNOWFLAKE_QUERY" },
+        { "text": "The check's integration is SNOWFLAKE", "check": "regex", "pattern": "integration:\\s*SNOWFLAKE\\b" },
+        { "text": "The query references the raw.orders table and CURRENT_DATE", "check": "regex", "pattern": "raw\\.orders", "ignore_case": true },
+        { "text": "frequency_secs is clamped up to Orchestra's 60-second minimum since the source's 45s minimum_interval_seconds falls below the allowed 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*60\\b" },
+        { "text": "A connection reference is used rather than a literal Snowflake account/user credential", "check": "no_hardcoded_secret" },
+        { "text": "Does not invent an additional check or a poke_interval the source sensor didn't specify" },
+        { "text": "The sensor lives only under sensors:, not duplicated as a pipeline: task" }
+      ]
+    },
+    {
+      "id": "asset-sensor-upstream-pipeline",
+      "prompt": "Convert this Dagster asset sensor to Orchestra (see files/asset_sensor_upstream_pipeline.py). It watches the raw_orders asset, which is produced by a separate Dagster job that has already been migrated to its own Orchestra pipeline with id 3f29ac10-2222-4a11-9999-abcdef123456. Wire revenue_report_job to run once that upstream pipeline succeeds. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "Either a trigger_events: entry referencing pipeline_id 3f29ac10-2222-4a11-9999-abcdef123456 with statuses including SUCCEEDED, or a sensors: block with an ORCHESTRA_PIPELINE_STATUS check against that same pipeline_id — not an AWS_S3_FILE or SQL-query check, since the dependency is on another pipeline's completion rather than external file/row state.",
+      "files": ["asset_sensor_upstream_pipeline.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "Models the dependency as either trigger_events or an ORCHESTRA_PIPELINE_STATUS sensor check, matching another-Orchestra-pipeline completion rather than external file/row state", "check": "regex", "pattern": "trigger_events|ORCHESTRA_PIPELINE_STATUS" },
+        { "text": "The upstream pipeline id 3f29ac10-2222-4a11-9999-abcdef123456 is carried over", "check": "regex", "pattern": "3f29ac10-2222-4a11-9999-abcdef123456" },
+        { "text": "Does not model this as an AWS_S3_FILE or SQL-query sensor check, since the dependency is on another pipeline's completion, not external file/row state" },
+        { "text": "If trigger_events is used, its statuses include SUCCEEDED, matching the asset sensor firing only after a successful upstream materialization" },
+        { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
+      ]
+    }
+  ]
+}

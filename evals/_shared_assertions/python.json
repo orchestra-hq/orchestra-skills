@@ -1,0 +1,13 @@
+{
+  "category": "python",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Every task uses the PYTHON integration", "check": "every_task", "field": "integration", "equals": "PYTHON" },
+    { "text": "Every PYTHON task runs the PYTHON_EXECUTE_SCRIPT job", "check": "every_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+    { "text": "parameters.source is a valid value (INLINE or GIT), not an invented mode", "check": "valid_enum", "field": "parameters.source", "allowed": ["INLINE", "GIT"] },
+    { "text": "No hardcoded credentials or secrets appear in the YAML", "check": "no_hardcoded_secret" },
+    { "text": "connection: is left null unless the op/asset genuinely needs credentials from a connection — no placeholder like ${{ ENV.PYTHON_CONNECTION }} invented just to fill the field" },
+    { "text": "parameters.build_command (if present) only installs packages the source actually imports beyond the stdlib — no invented dependencies, and no build_command at all when everything used is stdlib" },
+    { "text": "The op/asset function body is carried into parameters.code (for INLINE) essentially verbatim — not paraphrased, summarized, or reduced to a stub/comment" }
+  ]
+}

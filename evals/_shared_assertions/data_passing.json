@@ -1,0 +1,10 @@
+{
+  "category": "data_passing",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "At least one task explicitly sets parameters.set_outputs: true to emit a value for downstream use", "check": "regex", "pattern": "set_outputs:\\s*true", "min_count": 1 },
+    { "text": "A downstream reference uses the ORCHESTRA.PIPELINE_RUN_TASKS[...].OUTPUTS[...] templating syntax rather than a bare Python variable name or in-process object", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[", "min_count": 1 },
+    { "text": "No Dagster IOManager class, io_manager decorator, or IO-manager-key wiring is carried over into the Orchestra YAML or its referenced scripts — persistence becomes an explicit write/read inside the task's own script instead" },
+    { "text": "Any large or complex data (DataFrames, file contents, query result sets) is staged externally (e.g. S3, a warehouse table) with only a small reference — a path, table name, id, or count — passed as the output value, never the full object embedded inline in the YAML" }
+  ]
+}

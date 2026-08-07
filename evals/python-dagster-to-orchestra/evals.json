@@ -1,0 +1,47 @@
+{
+  "skill_name": "python-dagster-to-orchestra",
+  "description": "Given a Dagster @op or @asset running arbitrary Python (pandas, boto3, API calls), author the matching Orchestra PYTHON_EXECUTE_SCRIPT task — defaulting to parameters.source: INLINE with the body copied verbatim into parameters.code, reserving source: GIT for ops that already check out and run a script from a separate repo.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "pandas-transform-inline",
+      "prompt": "Convert this Dagster asset to an Orchestra pipeline task (see files/pandas_transform_asset.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE and parameters.code containing the dropna/order_total/filter/to_parquet body verbatim, parameters.build_command installing pandas, and connection: null since the op needs no external credentials.",
+      "files": ["pandas_transform_asset.py"],
+      "assertions_ref": ["python"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "connection is left null — no credentials are needed", "check": "some_task", "field": "connection", "equals": null },
+        { "text": "build_command installs pandas for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*pandas", "ignore_case": true },
+        { "text": "The copied code preserves the actual transform logic (dropping nulls on order_id/customer_id, order_total = quantity * unit_price, keeping only positive totals, writing to the curated-data-bucket parquet path) rather than a paraphrased summary" }
+      ]
+    },
+    {
+      "id": "boto3-config-env-creds",
+      "prompt": "Convert this Dagster op to an Orchestra pipeline task, including how the Config fields and AWS credentials should come through (see files/boto3_s3_upload_op.py). Write the pipeline YAML to pipeline.yml in the current directory — no live upload, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE, the boto3 upload body copied into parameters.code, build_command installing boto3, the UploadConfig fields (bucket_name, prefix) represented as inline literals or via parameters.environment_variables (a JSON string), and AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY read from env vars injected by a connection rather than hardcoded.",
+      "files": ["boto3_s3_upload_op.py"],
+      "assertions_ref": ["python", "connections"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "build_command installs boto3 for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*boto3", "ignore_case": true },
+        { "text": "environment_variables is used to carry the Config fields or injected credentials through as a JSON string", "check": "regex", "pattern": "environment_variables" },
+        { "text": "AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are read via os.environ in the code (matching the source), not replaced with literal key/secret values anywhere in the YAML" },
+        { "text": "config.bucket_name and config.prefix are resolved to concrete inline literals or environment_variables entries, not left as unresolved Dagster Config/UploadConfig references in the copied code" }
+      ]
+    },
+    {
+      "id": "git-checkout-external-script",
+      "prompt": "Convert this Dagster op to an Orchestra pipeline task — note it already checks out and runs a script from a separate repo rather than running inline logic (see files/git_script_op.py). Write the pipeline YAML to pipeline.yml in the current directory — no live clone, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: GIT (not INLINE), parameters.command invoking transform/reconcile_inventory.py with --env prod, and a connection pointing at the acme-data/etl-scripts repo — the op's own `git clone` subprocess call is not duplicated into parameters.code since Orchestra's Git source handles the checkout.",
+      "files": ["git_script_op.py"],
+      "assertions_ref": ["python", "connections"],
+      "assertions": [
+        { "text": "parameters.source is GIT, not INLINE, since the script already lives in a separate repo", "check": "some_task", "field": "parameters.source", "equals": "GIT" },
+        { "text": "parameters.command references reconcile_inventory.py with the --env prod argument", "check": "regex", "pattern": "reconcile_inventory\\.py[^\\n]*--env\\s+prod", "ignore_case": true },
+        { "text": "connection is set to a Python/Git connection pointing at the acme-data/etl-scripts repo rather than left null, since GIT source needs a repo-pointing connection" },
+        { "text": "The op's own `git clone` subprocess call is not reproduced inside parameters.code — the checkout is delegated to Orchestra's GIT source/connection instead of being duplicated as a shell step" }
+      ]
+    }
+  ]
+}

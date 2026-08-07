@@ -1,0 +1,51 @@
+{
+  "skill_name": "dagster-definitions-to-orchestra",
+  "description": "Given a Dagster job/schedule/Definitions, author the Orchestra pipeline root: schedule (6-field cron), configuration.retries/retry_delay/timeout/concurrency, and inputs — dropping orchestrator-specific concepts (partitions, backfills, backoff strategies) with an explicit flag rather than force-fitting them.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "retry-schedule-concurrency",
+      "prompt": "Convert this Dagster job to the Orchestra pipeline root (see files/nightly_elt_job.py) — schedule, retries, timeout, and concurrency only, don't worry about the task bodies yet. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline root with version v1, a 6-field cron schedule converted from '0 2 * * *' in UTC, configuration.retries=2, configuration.retry_delay=5 (300s/60), configuration.timeout=3600 (from dagster/max_runtime), and configuration.concurrency.max_active=1 (from dagster/max_concurrent). Backoff.LINEAR and the 'team' tag have no direct equivalent and should be flagged, not silently dropped.",
+      "files": ["nightly_elt_job.py"],
+      "assertions_ref": ["definitions"],
+      "assertions": [
+        { "text": "Schedule uses a 6-field AWS EventBridge cron (minute hour day-of-month month day-of-week year), not Dagster's 5-field cron_schedule copied verbatim", "check": "regex", "pattern": "cron:\\s*['\"]?\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+\\s+\\S+", "min_count": 1 },
+        { "text": "configuration.retries is 2", "check": "yaml_eq", "path": "configuration.retries", "value": 2 },
+        { "text": "configuration.retry_delay is 5 minutes (Dagster's delay=300 seconds / 60), not 300", "check": "yaml_eq", "path": "configuration.retry_delay", "value": 5 },
+        { "text": "configuration.timeout is 3600 (from dagster/max_runtime)", "check": "yaml_eq", "path": "configuration.timeout", "value": 3600 },
+        { "text": "configuration.concurrency.max_active is 1 (from dagster/max_concurrent)", "check": "yaml_eq", "path": "configuration.concurrency.max_active", "value": 1 },
+        { "text": "Backoff.LINEAR has no Orchestra equivalent — the base delay is used and the simplification is flagged, not silently dropped" },
+        { "text": "The 'team' tag is preserved as a task-level tag (or noted under meta) rather than lost or placed on the enclosing stage" }
+      ]
+    },
+    {
+      "id": "config-driven-no-schedule",
+      "prompt": "Convert this Dagster job's pipeline root to Orchestra (see files/config_driven_job.py). It has no schedule — it's only triggered manually or by an upstream asset sensor. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline root with no schedule: block (or webhook: {enabled: true} noted instead), inputs.target_env and inputs.table mapped from the Config class with their defaults, and PARTNER_API_KEY represented as a connection/${{ ENV.* }} reference rather than an input or literal value.",
+      "files": ["config_driven_job.py"],
+      "assertions_ref": ["definitions", "connections"],
+      "assertions": [
+        { "text": "inputs.target_env is declared with default 'prod'", "check": "yaml_eq", "path": "inputs.target_env.default", "value": "prod" },
+        { "text": "inputs.table is declared with default 'orders'", "check": "yaml_eq", "path": "inputs.table.default", "value": "orders" },
+        { "text": "PARTNER_API_KEY is referenced (as a connection or ${{ ENV.* }}), not silently dropped", "check": "regex", "pattern": "PARTNER_API_KEY", "min_count": 1 },
+        { "text": "No schedule: block is invented — the job has no ScheduleDefinition in the source, so the pipeline either omits schedule: or sets webhook: {enabled: true}, not a guessed cron" },
+        { "text": "PARTNER_API_KEY does not become an inputs: field — it's a secret, so it belongs on the connection, not inputs" }
+      ]
+    },
+    {
+      "id": "partitioned-backfill-retry-cap",
+      "prompt": "Convert this Dagster job's pipeline root to Orchestra (see files/partitioned_backfill_job.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline root with configuration.retries=3 and configuration.retry_delay capped at 120 (Dagster's delay=9000s/60=150, over the 120-minute cap) with a flagging comment, and the partitions/backfill schedule explicitly called out as having no Orchestra equivalent rather than converted into a matrix or fabricated cron.",
+      "files": ["partitioned_backfill_job.py"],
+      "assertions_ref": ["definitions"],
+      "assertions": [
+        { "text": "configuration.retries is 3", "check": "yaml_eq", "path": "configuration.retries", "value": 3 },
+        { "text": "configuration.retry_delay is capped at 120 (not 150, the uncapped 9000s/60 conversion)", "check": "yaml_eq", "path": "configuration.retry_delay", "value": 120 },
+        { "text": "The retry_delay cap is called out with a comment or note explaining the source value exceeded 120 minutes", "check": "regex", "pattern": "(?i)cap", "min_count": 1 },
+        { "text": "Partitions and the partitioned schedule are explicitly flagged as having no Orchestra equivalent, rather than silently dropped or converted into a fabricated cron" },
+        { "text": "No matrix: or inputs: block is invented to simulate partitioning — that's a different Orchestra concept and isn't equivalent" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "category": "definitions",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+    { "text": "Orchestrator-specific concepts with no Orchestra equivalent (e.g. partitions, backfills, backoff/jitter retry strategies) are dropped and explicitly flagged as a manual-review item, rather than force-fit into an existing field or silently ignored" },
+    { "text": "Tags carried over from the source are placed on individual tasks, never on the enclosing task group/stage (TaskGroupModel has no tags field)" }
+  ]
+}

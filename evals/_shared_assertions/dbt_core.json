@@ -1,0 +1,13 @@
+{
+  "category": "dbt_core",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Every dbt task uses the DBT_CORE integration", "check": "every_task", "field": "integration", "equals": "DBT_CORE" },
+    { "text": "Every dbt task runs the DBT_CORE_EXECUTE job", "check": "every_task", "field": "integration_job", "equals": "DBT_CORE_EXECUTE" },
+    { "text": "package_manager is one of the valid Orchestra enum values (PIP, POETRY, UV)", "check": "valid_enum", "field": "parameters.package_manager", "allowed": ["PIP", "POETRY", "UV"] },
+    { "text": "parameters.project_dir is explicitly set (a subdirectory path, or null when the project sits at the repo root) on every DBT_CORE task rather than omitted, since DbtProject(project_dir=...) is a real task parameter, not connection config", "check": "regex", "pattern": "project_dir:", "min_count": 1 },
+    { "text": "The dbt project's Git repository URL/branch and the warehouse credentials live on the DBT_CORE connection, never hardcoded as literal parameter values — Orchestra pulls the dbt project from the connected Git repo and compiles the manifest itself, so no manifest.json is shipped" },
+    { "text": "Multiple @dbt_assets or sequential dbt.cli([...]) invocations against the same dbt project are consolidated into a single DBT_CORE_EXECUTE task's semicolon-joined commands string, not split into one task per asset/model" },
+    { "text": "commands never pass --profiles-dir or a literal profile/target credential; profiles.yml-managed warehouse credentials are left entirely to the Orchestra dbt Core connection" }
+  ]
+}

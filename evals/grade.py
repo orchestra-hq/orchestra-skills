@@ -25,6 +25,7 @@ except ModuleNotFoundError:
 
 EVALS_DIR = Path(__file__).resolve().parent
 CONFIGS = ("with_skill", "without_skill")
+SHARED_ASSERTIONS_DIR = EVALS_DIR / "_shared_assertions"
 
 
 # --- helpers ---------------------------------------------------------------
@@ -125,6 +126,65 @@ def _groups_chained(a, raw, doc):
     return bool(chained), f"groups with non-empty depends_on: {chained or 'none'}"
 
 
+def _depends_on_edge(a, raw, doc):
+    """check: depends_on_edge — args: group, upstream.
+
+    Asserts a *specific* dependency edge exists (group depends_on upstream), not just
+    that chaining exists somewhere (groups_chained only proves that much) — needed to
+    verify a migration preserved the actual source topology, not just "some" order.
+    """
+    groups = (doc or {}).get("pipeline") or {}
+    g = groups.get(a["group"])
+    if not isinstance(g, dict):
+        return False, f"group '{a['group']}' not found"
+    deps = g.get("depends_on") or []
+    return a["upstream"] in deps, f"{a['group']}.depends_on = {deps} (need '{a['upstream']}')"
+
+
+def _no_hardcoded_secret(a, raw, doc):
+    """check: no_hardcoded_secret — args: extra_keys (optional list[str]).
+
+    Flags secret-shaped YAML keys (api_key/token/password/etc.) holding a literal-looking
+    value instead of a ${{ ... }} reference — catches an agent inlining a credential that
+    should have become a `connection:` reference instead (see dagster-connections-to-orchestra).
+    """
+    keys = {"api_key", "secret", "token", "password", "client_secret", "private_key"} | set(a.get("extra_keys", []))
+    pattern = r'(?i)\b(' + "|".join(re.escape(k) for k in keys) + r')\b\s*:\s*[\'"]?(?!\$\{\{)[A-Za-z0-9_\-/+=]{8,}'
+    hits = re.findall(pattern, raw)
+    return not hits, (f"{len(hits)} literal-looking secret field(s): {hits}" if hits
+                       else "no literal secret-shaped values")
+
+
+def _valid_enum(a, raw, doc):
+    """check: valid_enum — args: field (dotted path into each task), allowed (list).
+
+    Generalizes every_task/some_task's single-value equality to a whitelist — needed for
+    fields with more than one legal value per integration (e.g. Power BI's
+    POWER_BI_REFRESH_DATASET vs. POWER_BI_REFRESH_DATAFLOW).
+    """
+    tasks = list(iter_tasks((doc or {}).get("pipeline") or {}))
+    allowed = set(a["allowed"])
+    bad = sorted({v for t in tasks for _, v in [dig(t, a["field"])] if v is not None and v not in allowed})
+    return not bad, (f"invalid {a['field']} values: {bad}" if bad else f"all {a['field']} in {sorted(allowed)}")
+
+
+def _alert_destination_requires(a, raw, doc):
+    """check: alert_destination_requires — args: integration, field.
+
+    Encodes a destination-specific required-field rule (e.g. SLACK/EMAIL need
+    `destination`; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG need `connection_id`) as a real,
+    reusable check instead of an unverified free-text assertion.
+    """
+    alerts = (doc or {}).get("alerts") or []
+    found, ok = [], True
+    for al in alerts if isinstance(alerts, list) else []:
+        for d in (al.get("destinations") or []) if isinstance(al, dict) else []:
+            if isinstance(d, dict) and d.get("integration") == a["integration"]:
+                found.append(d)
+                ok = ok and bool(d.get(a["field"]))
+    return (ok and bool(found)), f"{len(found)} {a['integration']} destination(s), field '{a['field']}' present: {ok}"
+
+
 CHECKS = {
     "valid_yaml": _valid_yaml,
     "yaml_eq": _yaml_eq,
@@ -136,6 +196,10 @@ CHECKS = {
     "some_task": _some_task,
     "alerts_status": _alerts_status,
     "groups_chained": _groups_chained,
+    "depends_on_edge": _depends_on_edge,
+    "no_hardcoded_secret": _no_hardcoded_secret,
+    "valid_enum": _valid_enum,
+    "alert_destination_requires": _alert_destination_requires,
 }
 
 
@@ -194,6 +258,24 @@ def grade_output(assertions, output_path: Path) -> dict:
     }
 
 
+def resolve_assertions(case: dict) -> list[dict]:
+    """Merge a case's shared category assertions (assertions_ref) ahead of its own.
+
+    assertions_ref names files under evals/_shared_assertions/<ref>.json, each holding
+    {"category": ..., "assertions": [...]} in the same object shape used inline — this is
+    what lets ~50 suites across categories (alerts, connections, sensors, ...) reuse one
+    set of checks instead of hand-copying them per suite. Shared checks come first so
+    grading.json reads generic-to-specific; case-specific literals follow.
+    """
+    assertions = []
+    for ref in case.get("assertions_ref", []):
+        path = SHARED_ASSERTIONS_DIR / f"{ref}.json"
+        if not path.exists():
+            sys.exit(f"Unknown assertions_ref '{ref}' in case '{case['id']}' — no {path}")
+        assertions += json.loads(path.read_text())["assertions"]
+    return assertions + list(case.get("assertions", []))
+
+
 def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
     evals = json.loads((EVALS_DIR / suite / "evals.json").read_text())
     output_file = evals.get("output_file", "pipeline.yml")
@@ -205,7 +287,7 @@ def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
             run_dir = case_dir / config
             if not run_dir.exists():
                 continue
-            grading = grade_output(case["assertions"], run_dir / output_file)
+            grading = grade_output(resolve_assertions(case), run_dir / output_file)
             (run_dir / "grading.json").write_text(json.dumps(grading, indent=2) + "\n")
             timing = {}
             tpath = run_dir / "timing.json"

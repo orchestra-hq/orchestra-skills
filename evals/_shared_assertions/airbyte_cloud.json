@@ -1,0 +1,11 @@
+{
+  "category": "airbyte_cloud",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Every task uses the AIRBYTE_CLOUD integration", "check": "every_task", "field": "integration", "equals": "AIRBYTE_CLOUD" },
+    { "text": "Every task runs the AIRBYTE_CLOUD_JOB job", "check": "every_task", "field": "integration_job", "equals": "AIRBYTE_CLOUD_JOB" },
+    { "text": "job_type only ever takes a valid Airbyte job type (sync or reset)", "check": "valid_enum", "field": "parameters.job_type", "allowed": ["sync", "reset"] },
+    { "text": "job_type is specified on the Airbyte task(s)", "check": "regex", "pattern": "job_type:\\s*(sync|reset)" },
+    { "text": "No host or port parameter is present on any task — Airbyte Cloud is API-key auth against the managed SaaS product, with no self-hosted host/port to carry over" }
+  ]
+}

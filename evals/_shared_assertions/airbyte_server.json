@@ -1,0 +1,11 @@
+{
+  "category": "airbyte_server",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "Every task uses the AIRBYTE_SERVER integration", "check": "every_task", "field": "integration", "equals": "AIRBYTE_SERVER" },
+    { "text": "Every task runs the AIRBYTE_SERVER_JOB job", "check": "every_task", "field": "integration_job", "equals": "AIRBYTE_SERVER_JOB" },
+    { "text": "job_type only ever takes a valid Airbyte job type (sync or reset)", "check": "valid_enum", "field": "parameters.job_type", "allowed": ["sync", "reset"] },
+    { "text": "job_type is specified on the Airbyte task(s)", "check": "regex", "pattern": "job_type:\\s*(sync|reset)" },
+    { "text": "No host or port value is written as a literal task parameter — the self-hosted host/port belongs on the Orchestra Airbyte Server connection, not duplicated as a parameter", "check": "no_hardcoded_secret", "extra_keys": ["host", "port"] }
+  ]
+}

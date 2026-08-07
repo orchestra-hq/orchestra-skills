@@ -1,0 +1,9 @@
+{
+  "category": "alerts",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "At least one alert destination is configured somewhere in the pipeline", "check": "regex", "pattern": "destinations:", "min_count": 1 },
+    { "text": "Alert names are unique within their scope (no two alerts on the same pipeline/task share a name)" },
+    { "text": "custom_message, when present, stays within Orchestra's 200-character limit" }
+  ]
+}

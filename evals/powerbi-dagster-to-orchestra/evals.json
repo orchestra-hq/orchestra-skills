@@ -1,0 +1,22 @@
+{
+  "skill_name": "powerbi-dagster-to-orchestra",
+  "description": "Given a Dagster job/asset that refreshes a Power BI dataset or dataflow (via dagster-powerbi or a custom resource), convert it to an Orchestra pipeline YAML task with the correct integration_job (POWER_BI_REFRESH_DATASET vs. POWER_BI_REFRESH_DATAFLOW), correctly-named parameters, and credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "dagster-powerbi-dataflow-fallback",
+      "prompt": "Convert this Dagster job (marketing_dataflow_job) to Orchestra pipeline YAML. Note this is a Power BI DATAFLOW refresh (not a dataset/semantic-model refresh), hand-rolled via a custom ConfigurableResource since dagster-powerbi has no official dataflow support. Write the pipeline YAML to pipeline.yml in the current directory — no live calls, no deploy.\n\n```python\nimport os\nimport requests\nfrom dagster import op, job, ConfigurableResource\n\nclass PowerBIDataflowResource(ConfigurableResource):\n    tenant_id: str\n    client_id: str\n    client_secret: str\n    workspace_id: str\n\n    def _token(self):\n        return \"FAKE_TOKEN\"  # msal client-credential flow omitted for brevity\n\n    def refresh_dataflow(self, dataflow_id: str):\n        token = self._token()\n        headers = {\"Authorization\": f\"Bearer {token}\"}\n        resp = requests.post(\n            f\"https://api.powerbi.com/v1.0/myorg/groups/{self.workspace_id}/dataflows/{dataflow_id}/refreshes\",\n            headers=headers,\n        )\n        resp.raise_for_status()\n\n@op\ndef refresh_marketing_dataflow(powerbi: PowerBIDataflowResource):\n    powerbi.refresh_dataflow(dataflow_id=os.environ[\"MARKETING_DATAFLOW_ID\"])\n\n@job\ndef marketing_dataflow_job():\n    refresh_marketing_dataflow()\n```",
+      "expected_output": "Orchestra YAML with integration: POWER_BI, integration_job: POWER_BI_REFRESH_DATAFLOW, parameters.dataflow_id and parameters.workspace_id (not dataset_id or group_id), connection: field for the Azure service principal (not raw tenant_id/client_secret in YAML).",
+      "files": [],
+      "assertions": [
+        { "text": "Every task uses the POWER_BI integration", "check": "every_task", "field": "integration", "equals": "POWER_BI" },
+        { "text": "integration_job is POWER_BI_REFRESH_DATAFLOW, not POWER_BI_REFRESH_DATASET", "check": "some_task", "field": "integration_job", "equals": "POWER_BI_REFRESH_DATAFLOW" },
+        { "text": "integration_job only ever takes a valid Power BI value", "check": "valid_enum", "field": "integration_job", "allowed": ["POWER_BI_REFRESH_DATASET", "POWER_BI_REFRESH_DATAFLOW"] },
+        { "text": "parameters use dataflow_id, not dataset_id (dataflow, not dataset, refresh)", "check": "regex", "pattern": "dataflow_id", "min_count": 1 },
+        { "text": "No literal tenant_id/client_id/client_secret values are written into the YAML — the Azure service principal is represented via a connection: field", "check": "no_hardcoded_secret", "extra_keys": ["tenant_id", "client_id"] },
+        { "text": "parameters use workspace_id (not an invented key like group_id) for the workspace" },
+        { "text": "No parameter keys are invented beyond dataflow_id, workspace_id, refresh_type, apply_refresh_policy" }
+      ]
+    }
+  ]
+}
