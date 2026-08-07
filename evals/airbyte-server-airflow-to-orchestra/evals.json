@@ -1,0 +1,33 @@
+{
+  "skill_name": "airbyte-server-airflow-to-orchestra",
+  "description": "Given an Airflow task that uses AirbyteTriggerSyncOperator, AirbyteSensor, or AirbyteHook pointed at a self-hosted Airbyte Server instance, convert it to an Orchestra pipeline YAML task under the AIRBYTE_SERVER integration, with connection_id carried over verbatim into parameters.connection_id and the self-hosted host/credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airbyte-server-airflow-single-sync",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/airbyte_server_single_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_SERVER task running AIRBYTE_SERVER_JOB, with parameters.connection_id set to 2b4c6d8e-0a1b-4c2d-8e3f-4a5b6c7d8e9f (copied verbatim), parameters.job_type: sync (from asynchronous=False), and a connection: field representing the airbyte_self_hosted Airflow connection — the integration is AIRBYTE_SERVER, not AIRBYTE_CLOUD, since the connection points at airbyte-internal.mycorp.com, not api.airbyte.com.",
+      "files": ["airbyte_server_single_sync.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "connection_id 2b4c6d8e-0a1b-4c2d-8e3f-4a5b6c7d8e9f is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "2b4c6d8e-0a1b-4c2d-8e3f-4a5b6c7d8e9f" },
+        { "text": "job_type is sync, matching asynchronous=False with no reset", "check": "some_task", "field": "parameters.job_type", "equals": "sync" },
+        { "text": "The integration is AIRBYTE_SERVER, not AIRBYTE_CLOUD — the self-hosted airbyte_self_hosted connection is not api.airbyte.com", "check": "every_task", "field": "integration", "equals": "AIRBYTE_SERVER" },
+        { "text": "The host airbyte-internal.mycorp.com and port 8000 are not written as literal task parameters — they belong on the Orchestra Airbyte Server connection, not duplicated as parameters" }
+      ]
+    },
+    {
+      "id": "airbyte-server-airflow-reset",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/airbyte_server_reset_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_SERVER task running AIRBYTE_SERVER_JOB, with parameters.connection_id set to 99887766-5544-3322-1100-ffeeddccbbaa (copied verbatim) and parameters.job_type: reset (from the submit_reset_connection full-reload call, not a plain sync), plus a connection: field for the airbyte_self_hosted_billing self-hosted resource.",
+      "files": ["airbyte_server_reset_sync.py"],
+      "assertions_ref": ["airbyte_server", "connections"],
+      "assertions": [
+        { "text": "connection_id 99887766-5544-3322-1100-ffeeddccbbaa is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "99887766-5544-3322-1100-ffeeddccbbaa" },
+        { "text": "submit_reset_connection (full reload) correctly maps to job_type: reset, not sync", "check": "some_task", "field": "parameters.job_type", "equals": "reset" },
+        { "text": "The integration is AIRBYTE_SERVER, not AIRBYTE_CLOUD", "check": "every_task", "field": "integration", "equals": "AIRBYTE_SERVER" },
+        { "text": "The host airbyte.onprem.internal and port 8001 are not written as literal task parameters, and no separate polling/sensor task is added since AIRBYTE_SERVER_JOB already waits for the reset to complete" }
+      ]
+    }
+  ]
+}

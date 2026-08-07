@@ -1,0 +1,47 @@
+{
+  "skill_name": "airflow-alerts-to-orchestra",
+  "description": "Given Airflow on_failure_callback/on_success_callback, EmailOperator, or PagerdutyEventsHook notification patterns, author the matching Orchestra alerts: block — pipeline-level for default_args-scoped callbacks, task-level for a callback set on a single task — with the correct required field per destination type (destination for SLACK/EMAIL, connection_id for PAGER_DUTY/TEAMS/WEBHOOK/DATADOG).",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "callback-multi-destination-slack-pagerduty",
+      "prompt": "Convert this Airflow on_failure_callback to an Orchestra pipeline-level alert (see files/callback_multi_destination.py). It posts to the #incidents Slack channel and also pages PagerDuty on any task failure. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with two destinations: SLACK (destination: '#incidents', no connection_id field) and PAGER_DUTY (connection_id: pagerduty_prod_12345, no destination field), since default_args['on_failure_callback'] applies to the whole DAG.",
+      "files": ["callback_multi_destination.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The SLACK destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The PAGER_DUTY destination sets connection_id (PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)", "check": "alert_destination_requires", "integration": "PAGER_DUTY", "field": "connection_id" },
+        { "text": "The #incidents channel is carried over as the SLACK destination value", "check": "regex", "pattern": "#incidents" },
+        { "text": "pagerduty_prod_12345 is carried over as the PAGER_DUTY connection_id", "check": "regex", "pattern": "pagerduty_prod_12345" },
+        { "text": "The alert is placed at the pipeline root, not on an individual task, since on_failure_callback is set in default_args and applies DAG-wide" }
+      ]
+    },
+    {
+      "id": "email-operator-completion",
+      "prompt": "Convert this Airflow EmailOperator completion notification to an Orchestra pipeline-level alert (see files/email_completion_notification.py) — it should fire on success, not be left as a pipeline task. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on SUCCEEDED with a single EMAIL destination (destination: 'data-team@example.com', no connection_id field), replacing the send_completion_email task entirely rather than keeping it as a pipeline step.",
+      "files": ["email_completion_notification.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on SUCCEEDED", "check": "alerts_status", "status": "SUCCEEDED" },
+        { "text": "The EMAIL destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "EMAIL", "field": "destination" },
+        { "text": "data-team@example.com is carried over as the EMAIL destination value", "check": "regex", "pattern": "data-team@example\\.com" },
+        { "text": "The EmailOperator task is converted into an alerts: destination rather than kept as a pipeline task, since its entire job is sending a completion notification" }
+      ]
+    },
+    {
+      "id": "pagerduty-hook-task-level",
+      "prompt": "Convert this Airflow on_failure_callback to an Orchestra task-level alert on the critical_load task only — it should not fire for the whole DAG (see files/pagerduty_hook_callback.py). Write the pipeline YAML to pipeline.yml in the current directory — no live paging, no deploy.",
+      "expected_output": "A task-level alerts: entry on the critical-load task (not the pipeline root) firing on FAILED with a PAGER_DUTY destination (connection_id: pagerduty_oncall_67890, no destination field), since the callback is attached to that one task, not default_args.",
+      "files": ["pagerduty_hook_callback.py"],
+      "assertions": [
+        { "text": "A PAGER_DUTY destination is present", "check": "regex", "pattern": "integration:\\s*PAGER_DUTY", "min_count": 1 },
+        { "text": "pagerduty_oncall_67890 is carried over as the connection_id", "check": "regex", "pattern": "pagerduty_oncall_67890" },
+        { "text": "The alert is placed on the critical-load TaskModel (task-level), not the pipeline root alerts: block — matching the task-scoped on_failure_callback rather than a DAG-wide default_args callback" },
+        { "text": "stage_data and downstream_report, which have no callback, do not also get this alert" }
+      ]
+    }
+  ]
+}

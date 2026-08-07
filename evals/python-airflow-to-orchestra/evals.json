@@ -1,0 +1,50 @@
+{
+  "skill_name": "python-airflow-to-orchestra",
+  "description": "Given an Airflow PythonOperator/PythonVirtualenvOperator/@task running arbitrary Python (pandas, requests, boto3), author the matching Orchestra PYTHON_EXECUTE_SCRIPT task — defaulting to parameters.source: INLINE with the callable body copied verbatim into parameters.code, mapping op_kwargs into inline literals or parameters.environment_variables, and correctly declining to convert a task whose entire body is actually a Slack notification.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "pandas-inline-no-creds",
+      "prompt": "Convert this Airflow task to an Orchestra pipeline task (see files/clean_inventory_snapshot.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE and parameters.code containing the drop_duplicates/available_units/filter/to_parquet body verbatim, parameters.build_command installing pandas, and connection: null since the callable needs no external credentials.",
+      "files": ["clean_inventory_snapshot.py"],
+      "assertions_ref": ["python"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "connection is left null — no credentials are needed", "check": "some_task", "field": "connection", "equals": null },
+        { "text": "build_command installs pandas for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*pandas", "ignore_case": true },
+        { "text": "The copied code preserves the actual transform logic (dropping duplicate skus, available_units = on_hand_units - reserved_units, keeping only non-negative available_units, writing to the curated-bucket parquet path) rather than a paraphrased summary" }
+      ]
+    },
+    {
+      "id": "op-kwargs-env-vars",
+      "prompt": "Convert this Airflow task to an Orchestra pipeline task, including how op_kwargs and the API key should come through (see files/region_sales_rollup.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT with parameters.source: INLINE, the requests-based body copied into parameters.code, build_command installing requests, and the op_kwargs (region='us-east-1', lookback_days=7) threaded through either as inline literals in code or via parameters.environment_variables (a JSON string) rather than dropped, with SALES_API_KEY read via os.environ rather than hardcoded.",
+      "files": ["region_sales_rollup.py"],
+      "assertions_ref": ["python", "connections"],
+      "assertions": [
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "build_command installs requests for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*requests", "ignore_case": true },
+        { "text": "the region op_kwarg value is threaded through somewhere in the YAML", "check": "regex", "pattern": "region", "ignore_case": true },
+        { "text": "the lookback_days op_kwarg value is threaded through somewhere in the YAML", "check": "regex", "pattern": "lookback_days", "ignore_case": true },
+        { "text": "region ('us-east-1') and lookback_days (7) are represented as concrete inline literals in code or as parameters.environment_variables entries, not left as unresolved op_kwargs references or silently dropped" },
+        { "text": "SALES_API_KEY is read via os.environ in the code (matching the source) and is not written as a literal API key value anywhere in the YAML" }
+      ]
+    },
+    {
+      "id": "disguised-slack-notify",
+      "prompt": "Convert this Airflow task to an Orchestra pipeline task (see files/disguised_slack_notify.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "The task's entire body posts a message via slack_sdk.WebClient(...).chat_postMessage(...) with no dedicated Slack operator — per the skill's own 'check it isn't actually a Slack task' callout, this should NOT be converted as a PYTHON_EXECUTE_SCRIPT task. It should be recognized as a Slack notification and produced as (or flagged to become, per slack-airflow-to-orchestra) a SLACK task using integration_job: SEND_SLACK_MESSAGE with parameters.channel_name '#data-alerts', not a PYTHON task with the WebClient call pasted into parameters.code. SLACK_BOT_TOKEN is never written as a literal value.",
+      "files": ["disguised_slack_notify.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "A SLACK task is present rather than the notification being left as PYTHON_EXECUTE_SCRIPT", "check": "some_task", "field": "integration", "equals": "SLACK" },
+        { "text": "The Slack task runs SEND_SLACK_MESSAGE", "check": "some_task", "field": "integration_job", "equals": "SEND_SLACK_MESSAGE" },
+        { "text": "parameters.channel_name is present", "check": "regex", "pattern": "channel_name" },
+        { "text": "The conversion correctly declines to treat this as generic Python — it does not paste the slack_sdk.WebClient(...).chat_postMessage(...) call into a PYTHON_EXECUTE_SCRIPT task's parameters.code, and instead flags/converts it per slack-airflow-to-orchestra as an integration: SLACK task, recognizing that the absence of a dedicated Slack operator doesn't make this generic Python" },
+        { "text": "SLACK_BOT_TOKEN is not written as a literal token value in the YAML — it's represented via a connection: reference instead" }
+      ]
+    }
+  ]
+}

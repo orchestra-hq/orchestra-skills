@@ -5,7 +5,7 @@ Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra]
 This repo is a **plugin marketplace** with two plugins, installed independently into both Claude Code and Cursor from the manifests at the repo root (see [Install](#install-for-humans)):
 
 - **`orchestra`** — diagnose/fix/triage runs, author pipeline YAML, dbt Slim CI, data-quality tests, account health.
-- **`migrate-to-orchestra`** — convert pipelines from another orchestrator (Dagster today; Airflow and Prefect are planned) into Orchestra pipeline YAML.
+- **`migrate-to-orchestra`** — convert pipelines from another orchestrator (Dagster, Prefect, and Airflow) into Orchestra pipeline YAML.
 
 ## What is in this repo
 
@@ -58,7 +58,7 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 ### Migrate to Orchestra
 
-A separate plugin (`migrate-to-orchestra`) for converting pipelines from another orchestrator into Orchestra pipeline YAML. Point your client at the source project (Dagster or Prefect code today) and describe what you want migrated — each skill auto-triggers off the APIs it recognizes. Start with `dagster-definitions-to-orchestra` (Dagster) or `prefect-flow-structure-to-orchestra` (Prefect) for any whole-job/whole-flow conversion; it establishes the pipeline root that the task-level skills below build on.
+A separate plugin (`migrate-to-orchestra`) for converting pipelines from another orchestrator into Orchestra pipeline YAML. Point your client at the source project (Dagster, Prefect, or Airflow code) and describe what you want migrated — each skill auto-triggers off the APIs it recognizes. Start with `dagster-definitions-to-orchestra` (Dagster), `prefect-flow-structure-to-orchestra` (Prefect), or `airflow-dag-structure-to-orchestra` (Airflow) for any whole-job/whole-flow/whole-DAG conversion; it establishes the pipeline root that the task-level skills below build on.
 
 _Not yet in `.tessl-plugin/plugin.json` — intentionally excluded from Tessl publishing for now._
 
@@ -116,7 +116,35 @@ _Not yet in `.tessl-plugin/plugin.json` — intentionally excluded from Tessl pu
 | [`airbyte-cloud-prefect-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-cloud-prefect-to-orchestra/SKILL.md) | Converts `AirbyteConnection` tasks pointed at `api.airbyte.com` into an Orchestra `AIRBYTE_CLOUD` task. |
 | [`airbyte-server-prefect-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-server-prefect-to-orchestra/SKILL.md) | Converts `AirbyteConnection` tasks pointed at a self-hosted host into an Orchestra `AIRBYTE_SERVER` task. |
 
-**To get going:** install the `migrate-to-orchestra` plugin (see [Install](#install-for-humans)), open a Claude/Cursor session in the source Dagster or Prefect project, and describe the migration — no upload step needed, the skills read the project's own source files directly.
+#### Airflow
+
+| Skill | What it does |
+|-------|--------------|
+| [`airflow-dag-structure-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-dag-structure-to-orchestra/SKILL.md) | Converts `schedule_interval`/`default_args`/`max_active_runs`/`TaskGroup`/`params` into the Orchestra pipeline root (`schedule`, `configuration`, `inputs`). Apply first, before any task-level skill. |
+| [`airflow-connections-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-connections-to-orchestra/SKILL.md) | Maps Airflow's `conn_id`/`_conn_id=` idioms, `BaseHook.get_connection()`, `AIRFLOW_CONN_*`, and Secrets Backends to Orchestra connections; distinguishes them from `Variable`/`AIRFLOW_VAR_*`. |
+| [`airflow-alerts-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-alerts-to-orchestra/SKILL.md) | Converts `on_failure_callback`/`on_success_callback`/`EmailOperator`/`PagerDutyEventsHook` into Orchestra's `alerts:` block across all six destination types. |
+| [`airflow-sensors-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-sensors-to-orchestra/SKILL.md) | Converts `S3KeySensor`/`SqlSensor`/`ExternalTaskSensor`/`FileSensor` polling into Orchestra `sensors:`. |
+| [`airflow-cross-dag-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-cross-dag-to-orchestra/SKILL.md) | Converts `TriggerDagRunOperator`/`ExternalTaskSensor`/`SubDagOperator`/Datasets into Orchestra `TRIGGER_PIPELINE` tasks and `trigger_events:`. |
+| [`airflow-conditions-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-conditions-to-orchestra/SKILL.md) | Converts `trigger_rule`/`BranchPythonOperator`/`ShortCircuitOperator`/`LatestOnlyOperator` into Orchestra `condition:` expressions. |
+| [`airflow-testing-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-testing-to-orchestra/SKILL.md) | Converts `SqlCheckOperator`/`SQLThresholdCheckOperator`/Great Expectations/Soda into Orchestra DQ test tasks. |
+| [`airflow-xcoms-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-xcoms-to-orchestra/SKILL.md) | Converts `xcom_push`/`xcom_pull`/TaskFlow return values into Orchestra task `OUTPUTS`/`${{ }}` data passing. |
+| [`airflow-dynamic-task-mapping-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-dynamic-task-mapping-to-orchestra/SKILL.md) | Converts `.expand()`/`.partial()`/`expand_kwargs()` dynamic task mapping into Orchestra `matrix:` task groups. |
+| [`airflow-bash-ssh-to-orchestra`](skills/migrate-to-orchestra/skills/airflow-bash-ssh-to-orchestra/SKILL.md) | Converts non-dbt `BashOperator`/`SSHOperator`/`WinRMOperator`/`KubernetesPodOperator` into Orchestra `PYTHON`/`LINUX_SSH`/`WINDOWS_SSH`/container tasks. |
+
+#### Integration & task conversion (Airflow)
+
+| Skill | What it does |
+|-------|--------------|
+| [`dbt-core-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/dbt-core-airflow-to-orchestra/SKILL.md) | Converts dbt Core run via `BashOperator`/`SSHOperator`/`KubernetesPodOperator`/Astronomer Cosmos into an Orchestra `DBT_CORE` task. |
+| [`python-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/python-airflow-to-orchestra/SKILL.md) | Converts `PythonOperator`/`PythonVirtualenvOperator`/`@task` logic into an Orchestra `PYTHON` task. |
+| [`slack-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/slack-airflow-to-orchestra/SKILL.md) | Converts `SlackAPIOperator`/`SlackWebhookOperator`/raw `slack_sdk` calls into an Orchestra `SLACK` alert or task. |
+| [`tableau-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/tableau-airflow-to-orchestra/SKILL.md) | Converts `TableauOperator`/`TableauRefreshWorkbookOperator` into an Orchestra `TABLEAU_CLOUD` task. |
+| [`powerbi-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/powerbi-airflow-to-orchestra/SKILL.md) | Converts `PowerBIDatasetRefreshOperator` (and hand-rolled dataflow refresh calls) into an Orchestra `POWER_BI` task. |
+| [`fivetran-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/fivetran-airflow-to-orchestra/SKILL.md) | Converts `FivetranOperator`/`FivetranSensor` into an Orchestra `FIVETRAN` task. |
+| [`airbyte-cloud-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-cloud-airflow-to-orchestra/SKILL.md) | Converts `AirbyteTriggerSyncOperator`/`AirbyteSensor` pointed at Airbyte Cloud into an Orchestra `AIRBYTE_CLOUD` task. |
+| [`airbyte-server-airflow-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-server-airflow-to-orchestra/SKILL.md) | Converts `AirbyteTriggerSyncOperator`/`AirbyteSensor` pointed at a self-hosted Airbyte Server into an Orchestra `AIRBYTE_SERVER` task. |
+
+**To get going:** install the `migrate-to-orchestra` plugin (see [Install](#install-for-humans)), open a Claude/Cursor session in the source Dagster, Prefect, or Airflow project, and describe the migration — no upload step needed, the skills read the project's own source files directly.
 
 ### Reference library
 
@@ -159,7 +187,7 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 
 - Skills live under [`skills/orchestra/skills/`](skills/orchestra/skills/) (the `orchestra` plugin) and [`skills/migrate-to-orchestra/skills/`](skills/migrate-to-orchestra/skills/) (the `migrate-to-orchestra` plugin), each its own plugin bundle with its own `.claude-plugin/plugin.json`/`.cursor-plugin/plugin.json`. Shared Orchestra pipeline/schema material lives under [`skills/orchestra/references/orchestra/`](skills/orchestra/references/orchestra/) and is the single source of truth for pipeline YAML schema/validation — migration skills should link to it rather than re-deriving schema tables locally, to avoid two sources drifting apart.
 - To add a skill, create `skills/<plugin>/skills/<skill-name>/SKILL.md` with `name` + `description` frontmatter, put any supporting `references/`/`templates/` in the same folder, and add it to the relevant category table under [Skills](#skills) (or [Migrate to Orchestra](#migrate-to-orchestra)). The plugin exposes it automatically — bump the `version` in that plugin's `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add its path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — this isn't auto-generated, so a skill left out here silently stops showing up in Tessl's published listing (Tessl has no plugin concept, so both plugins show up in one flat list there — the `skills/<plugin>/...` path prefix is the only separation). CI (`Validate Skills`) checks the frontmatter, that `SKILL.md` stays under ~500 lines, that the manifests are valid JSON, and that every skill on disk lives inside some plugin's `skills/` directory. Write skills to be client-agnostic — describe capabilities (e.g. "if your client can schedule a wake-up…") rather than naming a specific tool.
-- To add a new orchestrator's migration skills (Airflow, …) alongside Dagster's and Prefect's, add them under `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention — one plugin covers all source orchestrators, so no new plugin/marketplace entry is needed. If a shared/reused skill from another orchestrator's set (e.g. a `connections`-style skill) doesn't have a same-orchestrator equivalent, author a new one rather than pointing the new orchestrator's skills at another orchestrator's vocabulary.
+- To add a new orchestrator's migration skills alongside Dagster's, Prefect's, and Airflow's, add them under `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention — one plugin covers all source orchestrators, so no new plugin/marketplace entry is needed. If a shared/reused skill from another orchestrator's set (e.g. a `connections`-style skill) doesn't have a same-orchestrator equivalent, author or complete a self-contained one rather than pointing the new orchestrator's skills at another orchestrator's vocabulary.
 - Recording fixes is optional and deferred to your client's persistent memory — never commit workspace-specific fix history. Extend [`pipeline/diagnosis-patterns.md`](skills/orchestra/references/orchestra/pipeline/diagnosis-patterns.md) only with generic, reusable patterns.
 - **Evals.** Skill evals live under [`evals/`](evals/) — an eval-driven harness that runs a skill with and without it via the headless `claude` CLI and grades the output. Currently wired up for `write-snowflake-dq-tests`. See [`evals/README.md`](evals/README.md) for setup and how to run, grade, and add a suite.
 - Do not commit API keys, `.env` files, or other secrets.

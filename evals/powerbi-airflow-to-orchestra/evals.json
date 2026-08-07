@@ -1,0 +1,42 @@
+{
+  "skill_name": "powerbi-airflow-to-orchestra",
+  "description": "Given an Airflow DAG that refreshes a Power BI dataset (via PowerBIDatasetRefreshOperator) or a hand-rolled dataflow refresh (no dedicated operator exists), convert it to an Orchestra pipeline YAML task with the correct integration_job (POWER_BI_REFRESH_DATASET vs. POWER_BI_REFRESH_DATAFLOW), the group_id→workspace_id rename, correctly-named parameters, and credentials represented via a connection: field rather than inline.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airflow-powerbi-dataset-refresh-slack",
+      "prompt": "Convert this Airflow DAG (reporting_powerbi_slack) to Orchestra pipeline YAML: a PowerBIDatasetRefreshOperator refreshing a dataset, chained to a SlackAPIPostOperator notification (see files/reporting_powerbi_slack.py). A prior run of this conversion before this skill existed scored 58/100 with a hard error, because it had to guess integration_job/parameters and used group_id instead of workspace_id — don't repeat those mistakes. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "Orchestra YAML with integration: POWER_BI, integration_job: POWER_BI_REFRESH_DATASET, parameters.dataset_id and parameters.workspace_id (not group_id), connection: field for the Azure service principal, and the Slack task converting cleanly to SLACK / SEND_SLACK_MESSAGE with depends_on wiring intact.",
+      "files": ["reporting_powerbi_slack.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "The refresh task uses the POWER_BI integration", "check": "some_task", "field": "integration", "equals": "POWER_BI" },
+        { "text": "integration_job is POWER_BI_REFRESH_DATASET, not POWER_BI_REFRESH_DATAFLOW", "check": "some_task", "field": "integration_job", "equals": "POWER_BI_REFRESH_DATASET" },
+        { "text": "integration_job only ever takes a valid Power BI value", "check": "valid_enum", "field": "integration_job", "allowed": ["POWER_BI_REFRESH_DATASET", "POWER_BI_REFRESH_DATAFLOW"] },
+        { "text": "parameters use dataset_id, not dataflow_id (dataset, not dataflow, refresh)", "check": "regex", "pattern": "dataset_id", "min_count": 1 },
+        { "text": "The Slack notification task converts to the SLACK integration", "check": "some_task", "field": "integration", "equals": "SLACK" },
+        { "text": "No literal tenant_id/client_id/client_secret values are written into the YAML — the Azure service principal is represented via a connection: field", "check": "no_hardcoded_secret", "extra_keys": ["tenant_id", "client_id"] },
+        { "text": "parameters use workspace_id, not the invented key group_id — the baseline run before this skill existed got exactly this wrong" },
+        { "text": "No parameter keys are invented beyond dataset_id, workspace_id, refresh_type, apply_refresh_policy" },
+        { "text": "The Slack task's depends_on references the Power BI refresh task, preserving the original refresh_dashboard_dataset >> notify_slack chain, and there is no hard error-level issue about a missing/undocumented Power BI integration the way the pre-skill baseline had" }
+      ]
+    },
+    {
+      "id": "airflow-powerbi-dataflow-refresh",
+      "prompt": "Convert this Airflow DAG (marketing_dataflow_refresh) to Orchestra pipeline YAML. Note this is a Power BI DATAFLOW refresh (not a dataset/semantic-model refresh), hand-rolled via a PythonOperator calling the Power BI REST API directly since there's no dedicated dataflow-refresh operator in apache-airflow-providers-microsoft-azure (see files/marketing_dataflow_refresh.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "Orchestra YAML with integration: POWER_BI, integration_job: POWER_BI_REFRESH_DATAFLOW, parameters.dataflow_id and parameters.workspace_id (not dataset_id or group_id), and a connection: field for the Azure service principal rather than raw credentials in the YAML.",
+      "files": ["marketing_dataflow_refresh.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Every task uses the POWER_BI integration", "check": "every_task", "field": "integration", "equals": "POWER_BI" },
+        { "text": "integration_job is POWER_BI_REFRESH_DATAFLOW, not POWER_BI_REFRESH_DATASET", "check": "some_task", "field": "integration_job", "equals": "POWER_BI_REFRESH_DATAFLOW" },
+        { "text": "integration_job only ever takes a valid Power BI value", "check": "valid_enum", "field": "integration_job", "allowed": ["POWER_BI_REFRESH_DATASET", "POWER_BI_REFRESH_DATAFLOW"] },
+        { "text": "parameters use dataflow_id, not dataset_id (dataflow, not dataset, refresh)", "check": "regex", "pattern": "dataflow_id", "min_count": 1 },
+        { "text": "No literal tenant_id/client_id/client_secret values are written into the YAML — the Azure service principal is represented via a connection: field", "check": "no_hardcoded_secret", "extra_keys": ["tenant_id", "client_id"] },
+        { "text": "parameters use workspace_id (not an invented key like group_id) for the workspace" },
+        { "text": "No dataset_id parameter appears on this dataflow-refresh task — the correct id field for POWER_BI_REFRESH_DATAFLOW is dataflow_id, never dataset_id" },
+        { "text": "The hand-rolled PythonOperator REST call is correctly treated as the dataflow-refresh equivalent rather than left unconverted or mistaken for a nonexistent PowerBIDataflowRefreshOperator, and no parameter keys are invented beyond dataflow_id, workspace_id, refresh_type, apply_refresh_policy" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "skill_name": "airflow-sensors-to-orchestra",
+  "description": "Given an Airflow sensor operator (S3KeySensor, SqlSensor, ExternalTaskSensor, etc.) that polls external state before allowing downstream tasks to run, author the matching Orchestra sensors: block at the pipeline root with a cron window, polling frequency clamped to 60-600s, timeout_mins capped at Orchestra's 7200-minute maximum, and the correct SensorChecksEnum check for the polled system.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "s3-key-sensor",
+      "prompt": "Convert this Airflow S3KeySensor to an Orchestra sensor (see files/s3_key_sensor.py). It waits for the daily orders file to land in the daily-uploads bucket under the orders/ prefix before triggering the orders processing task. Write the pipeline YAML to pipeline.yml in the current directory — no live AWS access, no deploy.",
+      "expected_output": "A top-level sensors: block with a check using integration: AWS_S3 and sensor_type: AWS_S3_FILE, parameters.bucket_name: daily-uploads and parameters.prefix: orders/, frequency_secs carried over from the 90s poke_interval (already within the 60-600 range), timeout_mins at or under the 60-minute equivalent of the 3600s Airflow timeout, with process_orders still represented as a pipeline: task.",
+      "files": ["s3_key_sensor.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An AWS_S3_FILE sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*AWS_S3_FILE" },
+        { "text": "The check's integration is AWS_S3", "check": "regex", "pattern": "integration:\\s*AWS_S3\\b" },
+        { "text": "The S3 bucket name daily-uploads is carried over", "check": "regex", "pattern": "daily-uploads" },
+        { "text": "The S3 prefix orders/ is carried over", "check": "regex", "pattern": "orders/" },
+        { "text": "The 90s poke_interval is carried over as frequency_secs unchanged, since it already falls within the 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*90\\b" },
+        { "text": "The sensor is not modeled as a pipeline task (no integration/integration_job task fields for the file check) — it lives only in the sensors: block, matching the 'sensors are triggers, not tasks' rule" },
+        { "text": "A sensible cron window is chosen for a daily file-arrival check rather than an arbitrary or overly wide window, and timeout_mins stays under the cron interval" }
+      ]
+    },
+    {
+      "id": "snowflake-sql-sensor-clamped-and-capped",
+      "prompt": "Convert this Airflow SqlSensor against Snowflake to an Orchestra sensor (see files/sql_sensor_snowflake.py). It waits for the month-end close batch to fully land, checked on a weekly reconciliation window, before triggering the close processing task. Write the pipeline YAML to pipeline.yml in the current directory — no live Snowflake queries, no deploy.",
+      "expected_output": "A top-level sensors: block with a weekly cron window, a check using integration: SNOWFLAKE and sensor_type: SNOWFLAKE_QUERY whose parameters.query mirrors the COUNT(*) ... CURRENT_DATE check, with frequency_secs clamped up to Orchestra's 60-second minimum since the source's 45s poke_interval falls below the allowed 60-600 range, and timeout_mins capped at Orchestra's 7200-minute maximum (5 days) — under the weekly cron interval — since the source's 500000s (~8333 min) timeout exceeds that cap.",
+      "files": ["sql_sensor_snowflake.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "A SNOWFLAKE_QUERY sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*SNOWFLAKE_QUERY" },
+        { "text": "The check's integration is SNOWFLAKE", "check": "regex", "pattern": "integration:\\s*SNOWFLAKE\\b" },
+        { "text": "The query references the raw.orders table and CURRENT_DATE", "check": "regex", "pattern": "raw\\.orders", "ignore_case": true },
+        { "text": "frequency_secs is clamped up to Orchestra's 60-second minimum since the source's 45s poke_interval falls below the allowed 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*60\\b" },
+        { "text": "timeout_mins is capped at Orchestra's 7200-minute maximum rather than a naive 500000s/60 conversion (~8333 min) — this cap is specific to this skill (7200), not Prefect's 1440-minute cap, so it should not be copied from a Prefect example", "check": "regex", "pattern": "timeout_mins:\\s*7200\\b" },
+        { "text": "A weekly (or otherwise sufficiently wide) cron window is chosen so that the capped 7200-minute (5-day) timeout_mins still stays below the cron interval, rather than pairing it with a daily cron that it would exceed" },
+        { "text": "A connection reference is used rather than a literal Snowflake account/user credential", "check": "no_hardcoded_secret" },
+        { "text": "Does not invent an additional check the source sensor didn't specify" },
+        { "text": "The sensor lives only under sensors:, not duplicated as a pipeline: task" }
+      ]
+    },
+    {
+      "id": "external-task-sensor-upstream-pipeline",
+      "prompt": "Convert this Airflow ExternalTaskSensor to Orchestra (see files/external_task_sensor.py). It waits for the whole nightly_elt DAG to finish before building the revenue report. nightly_elt has already been migrated to its own Orchestra pipeline with id 7a1c9e40-3333-4b22-8888-abcdef987654. Wire the revenue_report pipeline to run once that upstream pipeline succeeds. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "Either a trigger_events: entry referencing pipeline_id 7a1c9e40-3333-4b22-8888-abcdef987654 with statuses including SUCCEEDED (preferred per this skill's guidance for an upstream pipeline already in Orchestra), or a sensors: block with an ORCHESTRA_PIPELINE_STATUS check against that same pipeline_id — not an AWS_S3_FILE or SQL-query check, since the dependency is on another pipeline's completion rather than external file/row state.",
+      "files": ["external_task_sensor.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "Models the dependency as either trigger_events or an ORCHESTRA_PIPELINE_STATUS sensor check, matching another-Orchestra-pipeline completion rather than external file/row state", "check": "regex", "pattern": "trigger_events|ORCHESTRA_PIPELINE_STATUS" },
+        { "text": "The upstream pipeline id 7a1c9e40-3333-4b22-8888-abcdef987654 is carried over", "check": "regex", "pattern": "7a1c9e40-3333-4b22-8888-abcdef987654" },
+        { "text": "Does not model this as an AWS_S3_FILE or SQL-query sensor check, since the dependency is on another pipeline's completion, not external file/row state" },
+        { "text": "If trigger_events is used, its statuses include SUCCEEDED, matching the ExternalTaskSensor only allowing downstream work after a successful upstream DAG run" },
+        { "text": "If an ORCHESTRA_PIPELINE_STATUS sensor is used instead, timeout_mins does not exceed Orchestra's 7200-minute cap" },
+        { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
+      ]
+    }
+  ]
+}

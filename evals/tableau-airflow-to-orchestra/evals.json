@@ -1,0 +1,37 @@
+{
+  "skill_name": "tableau-airflow-to-orchestra",
+  "description": "Given an Airflow TableauOperator/TableauRefreshWorkbookOperator refreshing a Tableau Cloud workbook or datasource, convert it to an Orchestra pipeline YAML task under the TABLEAU_CLOUD integration with the correct integration_job (TABLEAU_REFRESH_WORKBOOK vs. TABLEAU_REFRESH_EXTRACT), the required project_name parameter, and credentials represented via a connection: field rather than a raw tableau_conn_id.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "workbook-refresh-operator",
+      "prompt": "Convert this Airflow task to an Orchestra pipeline task (see files/refresh_sales_dashboard.py). Write the pipeline YAML to pipeline.yml in the current directory — no live refresh, no deploy.",
+      "expected_output": "A single TABLEAU_CLOUD task using integration_job TABLEAU_REFRESH_WORKBOOK, with parameters.workbook_name 'Sales Dashboard' and a required parameters.project_name, connection: referencing an Orchestra Tableau Cloud connection rather than the raw tableau_conn_id string, and no site_id/blocking_refresh parameter on the task (site is configured on the connection and Orchestra always waits for completion).",
+      "files": ["refresh_sales_dashboard.py"],
+      "assertions_ref": ["tableau", "connections"],
+      "assertions": [
+        { "text": "integration_job is TABLEAU_REFRESH_WORKBOOK", "check": "some_task", "field": "integration_job", "equals": "TABLEAU_REFRESH_WORKBOOK" },
+        { "text": "parameters.workbook_name is present", "check": "regex", "pattern": "workbook_name" },
+        { "text": "parameters.project_name is present", "check": "regex", "pattern": "project_name" },
+        { "text": "Targets the Sales Dashboard workbook", "check": "regex", "pattern": "Sales Dashboard" },
+        { "text": "The task does not invent a datasource_name field — this is a workbook refresh, not an extract refresh" },
+        { "text": "tableau_conn_id ('tableau_cloud_prod') is not written as a literal parameter value in the YAML — it's represented by a connection: reference, and blocking_refresh is dropped since Orchestra always waits for job completion" }
+      ]
+    },
+    {
+      "id": "datasource-extract-refresh-operator",
+      "prompt": "Convert this Airflow task to an Orchestra pipeline task, noting it refreshes a published Tableau datasource extract, not a workbook (see files/refresh_finance_extract.py). Write the pipeline YAML to pipeline.yml in the current directory — no live refresh, no deploy.",
+      "expected_output": "A single TABLEAU_CLOUD task using integration_job TABLEAU_REFRESH_EXTRACT (because resource=\"datasources\"), with parameters.datasource_name 'Finance Extract' and a required parameters.project_name, connection: referencing an Orchestra Tableau Cloud connection rather than the raw tableau_conn_id string, and no invented workbook_name field.",
+      "files": ["refresh_finance_extract.py"],
+      "assertions_ref": ["tableau", "connections"],
+      "assertions": [
+        { "text": "integration_job is TABLEAU_REFRESH_EXTRACT, not TABLEAU_REFRESH_WORKBOOK", "check": "some_task", "field": "integration_job", "equals": "TABLEAU_REFRESH_EXTRACT" },
+        { "text": "parameters.datasource_name is present", "check": "regex", "pattern": "datasource_name" },
+        { "text": "parameters.project_name is present", "check": "regex", "pattern": "project_name" },
+        { "text": "Targets the Finance Extract datasource", "check": "regex", "pattern": "Finance Extract" },
+        { "text": "The task's parameters do not invent a workbook_name field — resource=\"datasources\" maps to a datasource/extract refresh, so only project_name and datasource_name are set" },
+        { "text": "tableau_conn_id ('tableau_cloud_prod') is not written as a literal parameter value in the YAML — it's represented by a connection: reference" }
+      ]
+    }
+  ]
+}

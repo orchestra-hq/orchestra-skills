@@ -1,0 +1,32 @@
+{
+  "skill_name": "airbyte-cloud-airflow-to-orchestra",
+  "description": "Given an Airflow task that uses AirbyteTriggerSyncOperator or AirbyteSensor (apache-airflow-providers-airbyte) pointed at Airbyte Cloud, convert it to an Orchestra pipeline YAML task under the AIRBYTE_CLOUD integration, with connection_id carried over verbatim into parameters.connection_id and any paired AirbyteSensor collapsed into the single sync task rather than producing a second task.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "airbyte-cloud-airflow-single-sync",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/airbyte_cloud_single_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_CLOUD task running AIRBYTE_CLOUD_JOB, with parameters.connection_id set to 5f3a2b1c-9d8e-4f7a-b6c5-d4e3f2a1b0c9 (copied verbatim), parameters.job_type: sync (from asynchronous=False), and a connection: field representing the airbyte_cloud_prod Airflow connection — the UUID never appears on the connection: field.",
+      "files": ["airbyte_cloud_single_sync.py"],
+      "assertions_ref": ["airbyte_cloud", "connections"],
+      "assertions": [
+        { "text": "connection_id 5f3a2b1c-9d8e-4f7a-b6c5-d4e3f2a1b0c9 is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "5f3a2b1c-9d8e-4f7a-b6c5-d4e3f2a1b0c9" },
+        { "text": "job_type is sync, matching asynchronous=False with no reset", "check": "some_task", "field": "parameters.job_type", "equals": "sync" },
+        { "text": "The connection_id UUID is set on parameters.connection_id, not on the connection: field — connection: instead holds the Orchestra Airbyte Cloud connection name for the airbyte_cloud_prod Airflow connection" }
+      ]
+    },
+    {
+      "id": "airbyte-cloud-airflow-async-sensor-collapse",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/airbyte_cloud_async_sensor.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single AIRBYTE_CLOUD task running AIRBYTE_CLOUD_JOB, with parameters.connection_id set to 8c4d5e6f-1a2b-4c3d-9e8f-7a6b5c4d3e2f (copied verbatim) and parameters.job_type: sync. The asynchronous=True AirbyteTriggerSyncOperator and its paired AirbyteSensor collapse into this one task — Orchestra's AIRBYTE_CLOUD_JOB already polls for completion, so no second task or sensor equivalent is produced.",
+      "files": ["airbyte_cloud_async_sensor.py"],
+      "assertions_ref": ["airbyte_cloud", "connections"],
+      "assertions": [
+        { "text": "connection_id 8c4d5e6f-1a2b-4c3d-9e8f-7a6b5c4d3e2f is carried over verbatim into parameters.connection_id", "check": "regex", "pattern": "8c4d5e6f-1a2b-4c3d-9e8f-7a6b5c4d3e2f" },
+        { "text": "Only a single Airbyte task is produced for the trigger+sensor pair (connection_id appears exactly once)", "check": "regex", "pattern": "connection_id", "min_count": 1 },
+        { "text": "job_type is sync, matching the underlying sync job the sensor was waiting on", "check": "some_task", "field": "parameters.job_type", "equals": "sync" },
+        { "text": "The paired AirbyteSensor (wait_marketing_sync) is dropped/merged into the single sync task rather than being emitted as its own Orchestra task — the pipeline has exactly one task for this connection, not a trigger task plus a separate polling task" }
+      ]
+    }
+  ]
+}

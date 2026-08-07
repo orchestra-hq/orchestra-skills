@@ -1,0 +1,33 @@
+{
+  "skill_name": "airflow-connections-to-orchestra",
+  "description": "Given Airflow's conn_id idioms (a dedicated `_conn_id=` kwarg on an operator/hook, or `BaseHook.get_connection(...)`), map each to the matching Orchestra connection type, referenced by name/${{ ENV.* }} in pipeline YAML — never inlined — and correctly distinguish `Variable.get()`/`AIRFLOW_VAR_*` (non-secret config -> inputs:) from Connection-backed credentials (-> connection:).",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "snowflake-operator-conn-id-basic",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task, focusing on how the SnowflakeOperator's snowflake_conn_id should be represented (see files/snowflake_operator_dag.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A SNOWFLAKE task whose connection: references either a name_XXXXX connection (e.g. snowflake_prod_XXXXX) or a ${{ ENV.* }} variable derived from snowflake_conn_id='snowflake_prod' — never a literal account/user/password. warehouse/database/role are not written as task parameters since they belong to the connection, not duplicated per task, because the source doesn't vary them.",
+      "files": ["snowflake_operator_dag.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "The task uses the SNOWFLAKE integration", "check": "some_task", "field": "integration", "equals": "SNOWFLAKE" },
+        { "text": "snowflake_conn_id='snowflake_prod' is referenced in the connection: value (e.g. as part of a snowflake_prod_XXXXX name or an ${{ ENV.* }} var), not dropped or replaced with an invented name unrelated to the source conn_id", "check": "regex", "pattern": "snowflake_prod", "ignore_case": true, "min_count": 1 },
+        { "text": "warehouse='ANALYTICS_WH', database='ANALYTICS', and role='TRANSFORMER' are not duplicated as literal task parameters — they belong on the connection and the source never varies them per task" }
+      ]
+    },
+    {
+      "id": "variable-vs-connection-distinction",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline tasks, making sure Variable.get() values land in inputs: and BaseHook.get_connection()/conn_id= values land in connection: — they must not be conflated (see files/orders_pipeline_dag.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "inputs.target_table (from Variable.get('target_table', default_var='orders')) and inputs.alerts_channel (from Variable.get('alerts_channel', default_var='#data-alerts')) are declared under inputs: with their defaults. The load_orders task's connection: is derived from snowflake_conn_id='snowflake_prod', and the notify_slack task's connection: is derived from BaseHook.get_connection('slack_alerts') — neither Variable value is written as a connection:, and neither conn_id/connection name is written as an inputs: field.",
+      "files": ["orders_pipeline_dag.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "inputs.target_table is declared with default 'orders'", "check": "yaml_eq", "path": "inputs.target_table.default", "value": "orders" },
+        { "text": "inputs.alerts_channel is declared with default '#data-alerts'", "check": "yaml_eq", "path": "inputs.alerts_channel.default", "value": "#data-alerts" },
+        { "text": "slack_alerts (from BaseHook.get_connection('slack_alerts')) is referenced as part of a connection: value", "check": "regex", "pattern": "slack_alerts", "ignore_case": true, "min_count": 1 },
+        { "text": "target_table and alerts_channel — both sourced from Variable.get() — land under inputs:, not as a connection: value or a hardcoded literal disconnected from the input" },
+        { "text": "snowflake_prod and slack_alerts — both sourced from a conn_id/BaseHook.get_connection() pointer — land as connection: references, not as inputs: fields or literal secret values" }
+      ]
+    }
+  ]
+}

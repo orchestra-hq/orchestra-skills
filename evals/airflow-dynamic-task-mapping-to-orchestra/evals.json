@@ -1,0 +1,51 @@
+{
+  "skill_name": "airflow-dynamic-task-mapping-to-orchestra",
+  "description": "Given an Airflow DAG using task.expand(), task.expand(param=XComArg(...)), or task.partial(...).expand(...) for dynamic task mapping, author the matching Orchestra pipeline YAML using a matrix task group (TaskGroupModel.matrix) that fans out the whole stage, referencing the current iteration's value via ${{ matrix.<input_name> }}.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "static-list-expand-two-params",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/process_file_static_expand.py). process_file.expand() is called with two static lists at once — filename (3 values) and region (2 values) — so Airflow computes their cross product and runs 6 mapped task instances. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a matrix: block on the process-file stage. Since Orchestra's matrix.inputs supports only one input key, the correct answer should NOT invent a two-key matrix.inputs block (that isn't valid) and should NOT silently drop the region param — it should call out the single-input-key limitation and apply one of the skill's documented workarounds (e.g. precomputing the cross product as one composite list in a preceding Python task, or moving one param to static parameters if it's effectively constant).",
+      "files": ["process_file_static_expand.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "A matrix: block is present, replacing Airflow's .expand() fan-out", "check": "regex", "pattern": "matrix:", "min_count": 1 },
+        { "text": "The matrix block declares an inputs: key", "check": "regex", "pattern": "inputs:", "min_count": 1 },
+        { "text": "The matrix block does not declare two separate top-level keys under matrix.inputs (e.g. both a bare 'filename:' and a bare 'region:' list directly under inputs) — Orchestra's matrix.inputs supports only one input key, so a literal two-key mapping would be invalid and must not appear" },
+        { "text": "The output explicitly acknowledges (in a YAML comment or the accompanying explanation) that Orchestra's matrix currently supports only one input key and that the two Airflow expand() params (filename x region) can't map 1:1 onto matrix.inputs, rather than silently dropping the region param or fabricating an unsupported multi-key matrix schema" },
+        { "text": "A concrete workaround from the skill is applied: either the cross product of filename x region is precomputed as a single composite list (e.g. via a preceding Python task) and used as the one matrix input, or one of the two params is demoted to a plain static parameters: value with a note that this changes the original fan-out behavior — not just a vague acknowledgement with no actual YAML fix" }
+      ]
+    },
+    {
+      "id": "xcomarg-expand-dynamic-list",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/process_file_xcomarg_expand.py). list_files is a @task that returns a list of S3 keys, and process_file.expand(filename=files) fans out over that upstream task's return value — the number of mapped instances isn't known until list_files actually runs. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a PYTHON task for list_files that sets parameters.set_outputs: true and returns a JSON list, and a downstream stage with a matrix: block whose matrix.inputs.filename is an expression referencing the list_files task's OUTPUTS via ORCHESTRA.PIPELINE_RUN_TASKS templating, rather than a literal list.",
+      "files": ["process_file_xcomarg_expand.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (list_files and the mapped process_file stage)", "check": "min_task_groups", "min": 2 },
+        { "text": "The list_files task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "A matrix: block is present on the process_file stage", "check": "regex", "pattern": "matrix:", "min_count": 1 },
+        { "text": "The mapped stage depends on the list_files stage", "check": "groups_chained" },
+        { "text": "The matrix input is an expression referencing the upstream list_files task's output via ORCHESTRA.PIPELINE_RUN_TASKS[...].OUTPUTS[...] templating, not a hardcoded literal list of filenames", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\['list-files'\\]\\.OUTPUTS\\[", "ignore_case": true, "min_count": 1 },
+        { "text": "The matrix fan-out is expressed as a stage-level matrix: block (repeating the whole stage), not as some per-task looping field or a Python for-loop generating N separately-authored task definitions" }
+      ]
+    },
+    {
+      "id": "partial-and-expand-mixed-args",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/process_file_partial_and_expand.py). process_file.partial(bucket='my-bucket', dry_run=False).expand(filename=['a.csv', 'b.csv']) — bucket and dry_run are constant across every mapped instance, only filename varies. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a matrix: block whose matrix.inputs.filename holds the two static filenames, and the process-file task's ordinary parameters: carry the .partial() args (bucket, dry_run) as constant static values alongside a ${{ matrix.filename }} reference for the mapped value.",
+      "files": ["process_file_partial_and_expand.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "A matrix: block is present on the process-file stage", "check": "regex", "pattern": "matrix:", "min_count": 1 },
+        { "text": "The mapped value is referenced via a ${{ matrix.filename }} template expression somewhere in the task's parameters", "check": "regex", "pattern": "\\$\\{\\{\\s*matrix\\.filename\\s*\\}\\}", "min_count": 1 },
+        { "text": "The .partial() constant 'my-bucket' value is carried through as a static parameter value", "check": "regex", "pattern": "my-bucket", "ignore_case": true, "min_count": 1 },
+        { "text": "The .partial() constant dry_run value is carried through as a static parameter (not folded into the matrix inputs)", "check": "regex", "pattern": "dry_run", "ignore_case": true, "min_count": 1 },
+        { "text": "bucket and dry_run are NOT expressed as a second matrix input key — Orchestra's matrix.inputs supports only one key, so the .partial() constants must land in ordinary static parameters:, not as additional matrix.inputs entries" },
+        { "text": "Only the filename value varies per mapped iteration in the final YAML — bucket and dry_run are identical literal values across the task definition (there is exactly one task definition parameterized by matrix.filename, not multiple hand-authored task copies)" }
+      ]
+    }
+  ]
+}
