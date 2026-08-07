@@ -90,10 +90,20 @@ jobs:
           # later as a `tessl plugin publish` failure rather than at PR time). Only
           # covers skills/orchestra — migrate-to-orchestra is deliberately excluded
           # from Tessl for now (see AGENTS.md).
+          #
+          # NOT_YET_IN_TESSL: skills that exist on disk but are deliberately withheld
+          # from the manifest (not ready to publish yet) — same rationale as
+          # migrate-to-orchestra, documented in AGENTS.md. Add a skill here only when
+          # that's a real, intentional decision, not to silence this check.
+          NOT_YET_IN_TESSL="databricks-cost-audit databricks-cost-drivers"
           failed=0
           for skill in skills/orchestra/skills/*/; do
             [ -f "$skill/SKILL.md" ] || continue
-            name="skills/orchestra/skills/$(basename "$skill")"
+            base="$(basename "$skill")"
+            case " $NOT_YET_IN_TESSL " in
+              *" $base "*) continue ;;
+            esac
+            name="skills/orchestra/skills/$base"
             if ! python3 -c "import json,sys; sys.exit(0 if sys.argv[1] in json.load(open('.tessl-plugin/plugin.json'))['skills'] else 1)" "$name"; then
               echo "✗ $name has a SKILL.md but is missing from .tessl-plugin/plugin.json's skills array"
               failed=1
