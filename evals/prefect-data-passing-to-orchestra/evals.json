@@ -1,0 +1,53 @@
+{
+  "skill_name": "prefect-data-passing-to-orchestra",
+  "description": "Given a Prefect flow that passes data between tasks via return values, .submit()/.result(), or .map() fan-out, author the matching Orchestra pipeline YAML using explicit set_outputs: true tasks with an instantiated OrchestraSDK client's client.set_output() calls, referenced downstream via ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...].OUTPUTS[...] }}.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "scalar-return-value",
+      "prompt": "Convert this Prefect flow to Orchestra pipeline YAML (see files/order_total_scalar_return.py). compute_order_total returns a float that's consumed directly by post_total_to_finance as a plain Python return value. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a task for compute_order_total that sets parameters.set_outputs: true and calls client.set_output() on an instantiated OrchestraSDK client, and a downstream task for post_total_to_finance that references the total via the OUTPUTS templating syntax rather than a bare Python variable.",
+      "files": ["order_total_scalar_return.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (one to compute the total, one to post it)", "check": "min_task_groups", "min": 2 },
+        { "text": "The upstream task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The downstream task depends on the upstream compute task", "check": "groups_chained" },
+        { "text": "The script or inline code for the upstream task instantiates OrchestraSDK (e.g. `client = OrchestraSDK(api_key=os.environ.get(\"ORCHESTRA_API_KEY\"))`) and calls client.set_output(...) rather than importing a bare set_output function", "check": "regex", "pattern": "OrchestraSDK\\(", "min_count": 1 },
+        { "text": "client.set_output( is called on the instantiated client, not used as a standalone imported function", "check": "regex", "pattern": "client\\.set_output\\(", "min_count": 1 },
+        { "text": "The implicit Prefect return-value/argument passing (compute_order_total() -> post_total_to_finance(total)) is fully replaced by the explicit set_output/OUTPUTS mechanism, with no bare Python variable crossing the two Orchestra tasks" }
+      ]
+    },
+    {
+      "id": "map-fanout-region-files",
+      "prompt": "Convert this Prefect flow to Orchestra pipeline YAML (see files/region_files_map_fanout.py). process_region_file.map() fans out over a hardcoded list of four regions, and combine_region_reports consumes the list of resulting paths. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a matrix: block fanning the per-region task out over the four regions via inputs:, and a downstream task that combines the per-region outputs, referencing them via the OUTPUTS templating syntax.",
+      "files": ["region_files_map_fanout.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (per-region processing and the combine step)", "check": "min_task_groups", "min": 2 },
+        { "text": "A matrix: block is present on the per-region task group, replacing Prefect's .map() fan-out", "check": "regex", "pattern": "matrix:", "min_count": 1 },
+        { "text": "The combine task depends on the matrix/fan-out task group", "check": "groups_chained" },
+        { "text": "The four regions (us-east, us-west, eu-central, ap-southeast) appear as the matrix input list rather than being expanded into four separately-authored, hardcoded task definitions", "check": "regex", "pattern": "us-east", "min_count": 1 },
+        { "text": "Each matrix iteration references the current item via a ${{ matrix.* }} template expression rather than a Python loop variable", "check": "regex", "pattern": "matrix\\.", "min_count": 1 },
+        { "text": "The per-region task does not hardcode a separate task definition per region — a single task definition is parameterized by the matrix input" },
+        { "text": "combine_region_reports's consumption of the list of paths is represented via output references (or an equivalent aggregation over the matrix outputs) rather than assuming an in-process Python list still exists" }
+      ]
+    },
+    {
+      "id": "conditional-branch-low-stock",
+      "prompt": "Convert this Prefect flow to Orchestra pipeline YAML (see files/inventory_check_conditional_branch.py). check_low_stock_count returns an int via .submit().result(), and trigger_reorder_workflow only actually reorders when that count is greater than zero. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a task for check_low_stock_count that sets parameters.set_outputs: true, and a downstream trigger_reorder_workflow task/stage gated by a condition: expression referencing the low_stock_count output being greater than zero, using an instantiated OrchestraSDK client for set_output().",
+      "files": ["inventory_check_conditional_branch.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (the count check and the reorder trigger)", "check": "min_task_groups", "min": 2 },
+        { "text": "The count-check task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "A condition: field is present somewhere in the YAML gating the downstream reorder task/stage", "check": "regex", "pattern": "condition:", "min_count": 1 },
+        { "text": "The condition references the upstream task's OUTPUTS via the ORCHESTRA.PIPELINE_RUN_TASKS templating syntax rather than a bare Python variable", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[", "min_count": 1 },
+        { "text": "The script for the count-check task instantiates OrchestraSDK and calls client.set_output(...) rather than a bare imported set_output function", "check": "regex", "pattern": "OrchestraSDK\\(", "min_count": 1 },
+        { "text": "The original Python-level `if low_stock_count > 0` branching logic is preserved as an Orchestra condition, not silently dropped or turned into an always-run task" }
+      ]
+    }
+  ]
+}

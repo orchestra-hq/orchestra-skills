@@ -1,0 +1,54 @@
+{
+  "skill_name": "prefect-cross-flow-to-orchestra",
+  "description": "Given Prefect cross-flow coordination patterns — run_deployment() fire-and-wait, run_deployment() with parameters, or a subflow called inside a parent flow — author the matching Orchestra trigger_events: block on the downstream pipeline, since TRIGGER_PIPELINE is not a verified integration_job in this skill.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "run-deployment-fire-and-wait-trigger-events",
+      "prompt": "Convert this Prefect run_deployment() fire-and-wait call to Orchestra (see files/run_deployment_fire_and_wait.py). daily_report_orchestrator triggers nightly-elt/prod and blocks until it finishes before running build_report. Author the daily-report pipeline's trigger_events: block that reacts to nightly-elt completing. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A daily-report pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id a placeholder UUID for nightly-elt, statuses including SUCCEEDED) plus a pipeline: block for the build-report task — not a TRIGGER_PIPELINE task, since this skill treats TRIGGER_PIPELINE as unverified in IntegrationJobsEnum and maps even a blocking run_deployment() call to reactive trigger_events on the downstream pipeline.",
+      "files": ["run_deployment_fire_and_wait.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "A pipeline: block with tasks is still present alongside trigger_events", "check": "yaml_present", "path": "pipeline" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "SUCCEEDED is among the trigger statuses", "check": "regex", "pattern": "SUCCEEDED" },
+        { "text": "The pipeline_id is a UUID-shaped placeholder for nightly-elt, never the literal string 'nightly-elt' or 'nightly-elt/prod'" },
+        { "text": "No TRIGGER_PIPELINE task is used for this case — per this skill, TRIGGER_PIPELINE is not in the verified IntegrationJobsEnum, so even a fire-and-wait run_deployment() call converts to a reactive trigger_events: block rather than a waiting task" }
+      ]
+    },
+    {
+      "id": "run-deployment-with-parameters-run-inputs",
+      "prompt": "Convert this Prefect run_deployment() call with parameters to Orchestra (see files/run_deployment_with_parameters.py). daily_report_orchestrator triggers daily-report/prod, passing env and report_date parameters. Author the daily-report pipeline's trigger_events: block, carrying the parameters over as run_inputs. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A daily-report pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id a placeholder UUID for the orchestrator/upstream pipeline, statuses including SUCCEEDED) whose run_inputs carry over env: prod and report_date: '{{ scheduled_start_time }}' from the run_deployment(parameters=...) call, plus a pipeline: block for the report task — not a TRIGGER_PIPELINE task.",
+      "files": ["run_deployment_with_parameters.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "A pipeline_id field is set on the trigger_events entry", "check": "regex", "pattern": "pipeline_id" },
+        { "text": "run_inputs carries over the env: prod parameter from run_deployment(parameters=...)", "check": "regex", "pattern": "(?s)run_inputs:.*?env:\\s*prod" },
+        { "text": "run_inputs also carries over the report_date parameter", "check": "regex", "pattern": "(?s)run_inputs:.*?report_date" },
+        { "text": "The pipeline_id is a UUID-shaped placeholder, never a literal deployment name string like 'daily-report/prod'" },
+        { "text": "No TRIGGER_PIPELINE task is used for this case — the parameters map onto run_inputs under trigger_events:, not a task's parameters block" }
+      ]
+    },
+    {
+      "id": "subflow-child-flow-trigger-events",
+      "prompt": "Convert this Prefect subflow pattern to Orchestra (see files/subflow_child_flow.py). child_ingest_flow is called directly inside parent_pipeline_flow — a subflow, not a separate deployment triggered via run_deployment(). Model child_ingest_flow as its own Orchestra pipeline that runs once parent_pipeline_flow completes, via trigger_events. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A child-ingest pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id a placeholder UUID for parent_pipeline_flow, statuses including SUCCEEDED) and run_inputs carrying over env: prod from the child_ingest_flow(env=\"prod\") call, plus its own pipeline: block — not a TRIGGER_PIPELINE task and not an inline sub-pipeline, since Prefect subflows become separate Orchestra pipelines connected via trigger_events.",
+      "files": ["subflow_child_flow.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "A pipeline: block with tasks is still present alongside trigger_events", "check": "yaml_present", "path": "pipeline" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "SUCCEEDED is among the trigger statuses", "check": "regex", "pattern": "SUCCEEDED" },
+        { "text": "run_inputs carries over the env: prod argument from the child_ingest_flow(env=\"prod\") subflow call", "check": "regex", "pattern": "(?s)run_inputs:.*?env:\\s*prod" },
+        { "text": "The subflow is modeled as its own separate pipeline (not an inline nested task group within parent_pipeline_flow's pipeline), matching this skill's rule that Prefect subflows become separate Orchestra pipelines" },
+        { "text": "No TRIGGER_PIPELINE task is used for this case — the subflow relationship is expressed only via trigger_events on the child pipeline" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "skill_name": "dbt-core-prefect-to-orchestra",
+  "description": "Given a Prefect dbt integration (DbtCoreOperation, ShellOperation running dbt CLI, or DbtCloudJob), author the matching Orchestra pipeline YAML — DBT_CORE/DBT_CORE_EXECUTE for dbt Core, DBT/DBT_RUNJOB for dbt Cloud — consolidating a commands list into a semicolon-joined string and carrying project_dir/package_manager over as real task parameters.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "dbt-core-operation-poetry-multistage",
+      "prompt": "Convert this Prefect dbt flow to an Orchestra pipeline task (see files/dbt_core_operation_poetry.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task whose commands consolidate the seed, run --select tag:daily --target prod, and test --select tag:daily calls into one semicolon-joined string ('dbt seed; dbt run --select tag:daily --target prod; dbt test --select tag:daily;'), package_manager: POETRY (from the pyproject.toml/poetry.lock signal), and project_dir: dbt_project.",
+      "files": ["dbt_core_operation_poetry.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "commands includes the seed step", "check": "regex", "pattern": "dbt seed", "min_count": 1 },
+        { "text": "commands includes the selective, targeted run step", "check": "regex", "pattern": "dbt run --select tag:daily --target prod", "min_count": 1 },
+        { "text": "commands includes the selective test step", "check": "regex", "pattern": "dbt test --select tag:daily", "min_count": 1 },
+        { "text": "package_manager is set to POETRY based on the pyproject.toml/poetry.lock signal in the source comment", "check": "regex", "pattern": "package_manager:\\s*POETRY" },
+        { "text": "project_dir is carried over as 'dbt_project', matching DbtCoreOperation(project_dir=\"dbt_project\")", "check": "regex", "pattern": "project_dir:\\s*['\"]?dbt_project['\"]?" },
+        { "text": "The three list items passed to DbtCoreOperation(commands=[...]) are consolidated into a single DBT_CORE_EXECUTE task's semicolon-joined commands string rather than split into three separate tasks" }
+      ]
+    },
+    {
+      "id": "shell-operation-dbt-build-no-package-manager-signal",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task (see files/dbt_shell_operation_build.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task (ShellOperation running dbt CLI is treated identically to DbtCoreOperation) with commands: 'dbt build --select tag:nightly;', project_dir set to 'transform' (from the working_dir), and package_manager flagged with a # MANUAL: comment since no lockfile/requirements.txt is visible anywhere in the source to infer PIP/POETRY/UV.",
+      "files": ["dbt_shell_operation_build.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "The build command with its --select flag is preserved in commands", "check": "regex", "pattern": "dbt build --select tag:nightly", "min_count": 1 },
+        { "text": "project_dir is carried over as 'transform', matching ShellOperation(working_dir=\"transform\")", "check": "regex", "pattern": "project_dir:\\s*['\"]?transform['\"]?" },
+        { "text": "package_manager is flagged with a MANUAL comment for the user to confirm, rather than silently defaulting to PIP with no supporting signal", "check": "regex", "pattern": "MANUAL", "ignore_case": true, "min_count": 1 },
+        { "text": "The ShellOperation(commands=[\"dbt build ...\"]) call is converted to integration DBT_CORE / integration_job DBT_CORE_EXECUTE exactly as if it had been a DbtCoreOperation, not treated as a generic shell/Python task" }
+      ]
+    },
+    {
+      "id": "dbt-cloud-job-trigger",
+      "prompt": "Convert this Prefect flow to an Orchestra pipeline task (see files/dbt_cloud_job_trigger.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single task with integration: DBT and integration_job: DBT_RUNJOB (the dbt Cloud pair, not DBT_CORE/DBT_CORE_EXECUTE), parameters.job_id: '987654' carried over from DbtCloudJob(job_id=987654), with account_id (54321) represented on the dbt Cloud connection rather than as a task parameter.",
+      "files": ["dbt_cloud_job_trigger.py"],
+      "assertions_ref": ["connections"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "The task uses the DBT integration (dbt Cloud pair), not DBT_CORE", "check": "some_task", "field": "integration", "equals": "DBT" },
+        { "text": "The task runs the DBT_RUNJOB job", "check": "some_task", "field": "integration_job", "equals": "DBT_RUNJOB" },
+        { "text": "job_id 987654 is carried over into parameters.job_id", "check": "regex", "pattern": "job_id:\\s*['\"]?987654['\"]?" },
+        { "text": "account_id (54321) is not invented as a task parameter — it belongs on the dbt Cloud connection, not duplicated in parameters" },
+        { "text": "No DBT_CORE/DBT_CORE_EXECUTE task is produced for this dbt Cloud job — the Cloud and Core integration pairs are not conflated" }
+      ]
+    }
+  ]
+}

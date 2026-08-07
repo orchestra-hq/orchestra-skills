@@ -1,0 +1,48 @@
+{
+  "skill_name": "prefect-alerts-to-orchestra",
+  "description": "Given Prefect flow/task on_failure and on_completion hooks, or Prefect Automation notification actions, author the matching Orchestra alerts: block — pipeline-level for flow-scoped hooks, task-level for task-scoped hooks — with the correct required field per destination type (destination for SLACK/EMAIL, connection_id for PAGER_DUTY/TEAMS/WEBHOOK/DATADOG).",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "flow-failure-hook-pagerduty-slack",
+      "prompt": "Convert this Prefect flow failure hook to an Orchestra pipeline-level alert (see files/flow_failure_hook_pagerduty_slack.py). It pages PagerDuty and also posts to the #incidents Slack channel on failure. Write the pipeline YAML to pipeline.yml in the current directory — no live paging, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with two destinations: PAGER_DUTY (connection_id set, no destination field) and SLACK (destination: '#incidents', no connection_id field).",
+      "files": ["flow_failure_hook_pagerduty_slack.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The PAGER_DUTY destination sets connection_id (SLACK/EMAIL require destination; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)", "check": "alert_destination_requires", "integration": "PAGER_DUTY", "field": "connection_id" },
+        { "text": "A SLACK destination targeting #incidents is present", "check": "regex", "pattern": "#incidents" }
+      ]
+    },
+    {
+      "id": "email-and-teams-automation-multi",
+      "prompt": "Convert these Prefect failure notifications to Orchestra pipeline-level alerts (see files/email_and_teams_notifications.py) — both the email failure hook and the Microsoft Teams Automation it mentions. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry (or entries) firing on FAILED with an EMAIL destination (destination: 'data-team@example.com') and a MICROSOFT_TEAMS destination (connection_id: teams_webhook_54321).",
+      "files": ["email_and_teams_notifications.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The EMAIL destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "EMAIL", "field": "destination" },
+        { "text": "The MICROSOFT_TEAMS destination sets connection_id", "check": "alert_destination_requires", "integration": "MICROSOFT_TEAMS", "field": "connection_id" },
+        { "text": "data-team@example.com is carried over as the EMAIL destination value", "check": "regex", "pattern": "data-team@example\\.com" },
+        { "text": "teams_webhook_54321 is carried over as the MICROSOFT_TEAMS connection_id", "check": "regex", "pattern": "teams_webhook_54321" }
+      ]
+    },
+    {
+      "id": "task-failure-hook-datadog",
+      "prompt": "Convert this Prefect task-level failure hook to an Orchestra task-level alert on the critical_transform task only — it should not fire for the whole flow (see files/task_failure_hook_datadog.py). Write the pipeline YAML to pipeline.yml in the current directory — no live events, no deploy.",
+      "expected_output": "A task-level alerts: entry on the critical-transform task (not the pipeline root) firing on FAILED with a DATADOG destination (connection_id set, parameters.priority present), since task-scoped hooks map to task-level alerts, not flow-wide hooks.",
+      "files": ["task_failure_hook_datadog.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The DATADOG destination sets connection_id (SLACK/EMAIL require destination; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)", "check": "alert_destination_requires", "integration": "DATADOG", "field": "connection_id" },
+        { "text": "The DATADOG destination sets a parameters.priority value", "check": "regex", "pattern": "priority", "min_count": 1 },
+        { "text": "The alert is placed on the critical-transform TaskModel (task-level), not the pipeline root alerts: block — matching the task-scoped @task(on_failure=...) hook rather than a flow-wide hook" },
+        { "text": "downstream_report, which has no hook, does not also get this alert" },
+        { "text": "The DATADOG connection_id follows the name_XXXXX suffix convention (a plausible placeholder) rather than being left as a bare invented name, or is flagged as needing a real value from the user" }
+      ]
+    }
+  ]
+}

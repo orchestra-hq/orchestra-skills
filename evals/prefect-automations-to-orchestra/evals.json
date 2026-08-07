@@ -1,0 +1,55 @@
+{
+  "skill_name": "prefect-automations-to-orchestra",
+  "description": "Given a Prefect Automation (storage event, DB polling, scheduled, or webhook trigger) or its Python polling equivalent, author the matching Orchestra sensors: block at the pipeline root with a cron window, polling frequency clamped to 60-600s, and the correct SensorChecksEnum check for the polled system.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "s3-automation-file-arrival",
+      "prompt": "Convert this Prefect S3 file-arrival trigger to an Orchestra sensor (see files/s3_automation_trigger.py). The Automation (UI-configured, described in the comment) fires the process-orders/prod deployment when files land in raw-uploads/orders/; the Python task below it shows the equivalent polling logic at a 120-second interval. Write the pipeline YAML to pipeline.yml in the current directory — no live AWS access, no deploy.",
+      "expected_output": "A top-level sensors: block with a check using integration: AWS_S3 and sensor_type: AWS_S3_FILE, parameters.bucket_name: raw-uploads and parameters.prefix: orders/, frequency_secs carried over from the 120s poll interval (already within the 60-600 range), with process_orders still represented as a pipeline: task.",
+      "files": ["s3_automation_trigger.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An AWS_S3_FILE sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*AWS_S3_FILE" },
+        { "text": "The check's integration is AWS_S3", "check": "regex", "pattern": "integration:\\s*AWS_S3\\b" },
+        { "text": "The S3 bucket name raw-uploads is carried over", "check": "regex", "pattern": "raw-uploads" },
+        { "text": "The S3 prefix orders/ is carried over", "check": "regex", "pattern": "orders/" },
+        { "text": "The 120s poll interval is carried over as frequency_secs unchanged, since it already falls within the 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*120\\b" },
+        { "text": "The sensor is not modeled as a pipeline task (no integration/integration_job task fields for the file check) — it lives only in the sensors: block, matching the 'sensors are triggers, not tasks' rule" },
+        { "text": "A sensible cron window is chosen for the file-arrival check rather than an arbitrary or overly wide window" }
+      ]
+    },
+    {
+      "id": "snowflake-polling-clamped-interval",
+      "prompt": "Convert this Prefect Snowflake polling flow to an Orchestra sensor (see files/snowflake_polling_flow.py). It waits for today's orders to land, polling every 30 seconds, before triggering the daily processing flow. Write the pipeline YAML to pipeline.yml in the current directory — no live Snowflake queries, no deploy.",
+      "expected_output": "A top-level sensors: block with a check using integration: SNOWFLAKE and sensor_type: SNOWFLAKE_QUERY whose parameters.query mirrors the COUNT(*) ... CURRENT_DATE check, with frequency_secs clamped up to Orchestra's 60-second minimum since the source's 30-second poll interval falls below the allowed 60-600 range, and timeout_mins kept at or under Orchestra's 1440-minute (24h) cap for a Prefect-sourced sensor.",
+      "files": ["snowflake_polling_flow.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "A SNOWFLAKE_QUERY sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*SNOWFLAKE_QUERY" },
+        { "text": "The check's integration is SNOWFLAKE", "check": "regex", "pattern": "integration:\\s*SNOWFLAKE\\b" },
+        { "text": "The query references the raw.orders table and CURRENT_DATE", "check": "regex", "pattern": "raw\\.orders", "ignore_case": true },
+        { "text": "frequency_secs is clamped up to Orchestra's 60-second minimum since the source's 30s poll interval falls below the allowed 60-600 range", "check": "regex", "pattern": "frequency_secs:\\s*60\\b" },
+        { "text": "A connection reference is used rather than a literal Snowflake account/user credential", "check": "no_hardcoded_secret" },
+        { "text": "timeout_mins does not exceed Orchestra's 1440-minute (24h) cap for a Prefect-sourced sensor — note this cap differs from Dagster's 7200-minute cap, so it should not simply be copied from a Dagster example" },
+        { "text": "Does not invent an additional check the source polling task didn't specify" },
+        { "text": "The sensor lives only under sensors:, not duplicated as a pipeline: task" }
+      ]
+    },
+    {
+      "id": "webhook-upstream-pipeline-trigger",
+      "prompt": "Convert this Prefect webhook-triggered flow to Orchestra (see files/webhook_upstream_pipeline_trigger.py). The Automation is a webhook trigger, but per the comment it only exists because the upstream job — raw-orders-etl — already lives in Orchestra as pipeline 4b71c930-9999-4a11-8888-abcdef654321 and calls this webhook on completion. Since both jobs are now Orchestra pipelines, wire build-revenue-report to run directly off that upstream pipeline's completion rather than keeping a generic webhook trigger. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "Either a trigger_events: entry referencing pipeline_id 4b71c930-9999-4a11-8888-abcdef654321 with statuses including SUCCEEDED, or a sensors: block with an ORCHESTRA_PIPELINE_STATUS check against that same pipeline_id — not a bare webhook: {enabled: true} block and not an AWS_S3_FILE or SQL-query check, since the dependency is on another Orchestra pipeline's completion rather than an external event or polled state.",
+      "files": ["webhook_upstream_pipeline_trigger.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "Models the dependency as either trigger_events or an ORCHESTRA_PIPELINE_STATUS sensor check, matching another-Orchestra-pipeline completion rather than a generic webhook or external file/row state", "check": "regex", "pattern": "trigger_events|ORCHESTRA_PIPELINE_STATUS" },
+        { "text": "The upstream pipeline id 4b71c930-9999-4a11-8888-abcdef654321 is carried over", "check": "regex", "pattern": "4b71c930-9999-4a11-8888-abcdef654321" },
+        { "text": "Does not fall back to a bare webhook: {enabled: true} block once the dependency is recognized as another Orchestra pipeline's completion — that mapping is only correct for a genuinely external caller" },
+        { "text": "Does not model this as an AWS_S3_FILE or SQL-query sensor check, since the dependency is on another pipeline's completion, not external file/row state" },
+        { "text": "If trigger_events is used, its statuses include SUCCEEDED, matching the Automation firing only after the upstream pipeline completes successfully" },
+        { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
+      ]
+    }
+  ]
+}
