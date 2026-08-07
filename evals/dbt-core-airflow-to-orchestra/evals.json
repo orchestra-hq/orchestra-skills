@@ -1,0 +1,48 @@
+{
+  "skill_name": "dbt-core-airflow-to-orchestra",
+  "description": "Given an Airflow task that runs dbt Core commands (BashOperator, SSHOperator, or Astronomer Cosmos DbtTaskGroup/DbtRunOperator), author the matching Orchestra pipeline YAML with a single DBT_CORE_EXECUTE task, consolidating chained dbt CLI calls into a semicolon-joined commands string, carrying project_dir/package_manager over as real task parameters, and never falling back to a literal LINUX_SSH translation just because the source operator is SSH-based.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "dbt-seed-build-poetry-bash-project-dir",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/dbt_seed_build_poetry_bash.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task whose commands consolidate the seed and build steps into one semicolon-joined string ('dbt seed; dbt build --select tag:daily --target prod;'), package_manager: POETRY (from the pyproject.toml/poetry.lock signal in the source comment), and project_dir: warehouse/dbt carried over from the --project-dir flag on both BashOperator tasks — the two chained BashOperator tasks (dbt_seed >> dbt_build_daily) collapse into one Orchestra task rather than two.",
+      "files": ["dbt_seed_build_poetry_bash.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "commands includes the seed step", "check": "regex", "pattern": "dbt seed", "min_count": 1 },
+        { "text": "commands includes the selective, targeted build step", "check": "regex", "pattern": "dbt build --select tag:daily --target prod", "min_count": 1 },
+        { "text": "package_manager is set to POETRY based on the pyproject.toml/poetry.lock signal in the source comment", "check": "regex", "pattern": "package_manager:\\s*POETRY" },
+        { "text": "project_dir is carried over as 'warehouse/dbt', matching the --project-dir flag on both BashOperator tasks", "check": "regex", "pattern": "project_dir:\\s*['\"]?warehouse/dbt['\"]?" },
+        { "text": "The two chained BashOperator tasks (dbt_seed >> dbt_build_daily) are consolidated into a single DBT_CORE_EXECUTE task's commands string rather than emitted as two separate tasks" }
+      ]
+    },
+    {
+      "id": "dbt-run-ssh-remote-server-not-linux-ssh",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/dbt_run_ssh_remote.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task (not a LINUX_SSH task) with commands: 'dbt run --select tag:core --target prod;', project_dir: transform carried over from the --project-dir flag (the cd and --profiles-dir are stripped), the ssh_conn_id 'dbt_build_server' dropped entirely rather than represented as a connection, and package_manager flagged with a # MANUAL: comment since no lockfile/requirements.txt is visible anywhere in the source to infer PIP/POETRY/UV.",
+      "files": ["dbt_run_ssh_remote.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "commands includes the selective, targeted run step", "check": "regex", "pattern": "dbt run --select tag:core --target prod", "min_count": 1 },
+        { "text": "project_dir is carried over as 'transform', matching the --project-dir flag in the SSHOperator's command", "check": "regex", "pattern": "project_dir:\\s*['\"]?transform['\"]?" },
+        { "text": "package_manager is flagged with a MANUAL comment for the user to confirm, rather than silently defaulting to PIP with no supporting signal", "check": "regex", "pattern": "MANUAL", "ignore_case": true, "min_count": 1 },
+        { "text": "The task uses integration DBT_CORE / integration_job DBT_CORE_EXECUTE — it does NOT become a LINUX_SSH task, and the ssh_conn_id 'dbt_build_server' does not appear anywhere in the YAML as a connection or parameter; the remote server was Airflow's way of reaching the dbt project, and Orchestra reaches it instead via a Git-backed dbt Core connection, so the SSH connection itself is dropped from the conversion" }
+      ]
+    },
+    {
+      "id": "dbt-cosmos-task-group-finance",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/dbt_cosmos_task_group_finance.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task with commands: 'dbt run --select tag:finance --exclude tag:deprecated;', package_manager: PIP (from the requirements.txt signal in the source comment), and project_dir: finance/transform (the subfolder inside the cloned repo where the dbt project actually lives) — the Cosmos DbtTaskGroup, which internally creates one Airflow task per dbt model, collapses to this single Orchestra task rather than one task per model.",
+      "files": ["dbt_cosmos_task_group_finance.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "commands includes the select flag", "check": "regex", "pattern": "--select tag:finance", "min_count": 1 },
+        { "text": "commands includes the exclude flag", "check": "regex", "pattern": "--exclude tag:deprecated", "min_count": 1 },
+        { "text": "package_manager is set to PIP based on the requirements.txt signal in the source comment", "check": "regex", "pattern": "package_manager:\\s*PIP" },
+        { "text": "project_dir is carried over as 'finance/transform' — the subfolder within the cloned repo — not the full local clone path '/usr/local/airflow/clone/finance/transform'", "check": "regex", "pattern": "project_dir:\\s*['\"]?finance/transform['\"]?" },
+        { "text": "The Cosmos DbtTaskGroup is represented as exactly one DBT_CORE_EXECUTE task, not split into one task per dbt model/test, and the local clone path /usr/local/airflow/clone does not appear anywhere in the YAML as a literal task parameter" }
+      ]
+    }
+  ]
+}

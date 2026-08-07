@@ -13,7 +13,7 @@
     },
     {
       "name": "migrate-to-orchestra",
-      "description": "Skills for converting Dagster and Prefect (and, in future, Airflow) pipelines into Orchestra pipeline YAML — schedules and retries, dbt/Python/Airbyte/Fivetran/Tableau/Power BI/Slack tasks, connections and secrets, alerts, sensors/automations, branching/conditions, cross-job/cross-flow dependencies, asset checks/testing, and data passing.",
+      "description": "Skills for converting Dagster, Prefect, and Airflow pipelines into Orchestra pipeline YAML — schedules and retries, dbt/Python/Airbyte/Fivetran/Tableau/Power BI/Slack tasks, connections and secrets, alerts, sensors/automations, branching/conditions, cross-job/cross-flow/cross-DAG dependencies, asset checks/testing, and data passing.",
       "source": "./skills/migrate-to-orchestra"
     }
   ]

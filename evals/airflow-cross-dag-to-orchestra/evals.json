@@ -1,0 +1,54 @@
+{
+  "skill_name": "airflow-cross-dag-to-orchestra",
+  "description": "Given Airflow cross-DAG triggering patterns — TriggerDagRunOperator, ExternalTaskSensor, or a Dataset-based schedule — author the matching Orchestra mechanism: a TRIGGER_PIPELINE task for explicit mid-flow launch-and-wait, or a trigger_events: block for reactive/event-driven patterns.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "trigger-dagrun-wait-for-completion",
+      "prompt": "Convert this Airflow TriggerDagRunOperator to Orchestra (see files/trigger_dagrun_wait.py). It explicitly triggers the daily_reporting DAG with wait_for_completion=True and conf={\"env\": \"prod\"}, and only once that finishes does publish_dashboard run. The daily_reporting DAG has already been migrated to Orchestra as pipeline b2e4f710-1111-4a22-9999-abcdef112233. Model this as a TRIGGER_PIPELINE task inside the orchestration_dag pipeline, sequenced ahead of the dashboard-publishing task. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An orchestration-dag pipeline.yml with an ORCHESTRA/TRIGGER_PIPELINE task (parameters.pipeline_id set to the UUID b2e4f710-1111-4a22-9999-abcdef112233, run_inputs carrying env: prod) that a downstream publish-dashboard task depends_on, since wait_for_completion=True means the source explicitly waits for daily_reporting to finish before continuing — not a trigger_events: block, which would only react rather than block mid-flow.",
+      "files": ["trigger_dagrun_wait.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A task uses the ORCHESTRA integration", "check": "some_task", "field": "integration", "equals": "ORCHESTRA" },
+        { "text": "A task runs the TRIGGER_PIPELINE job", "check": "some_task", "field": "integration_job", "equals": "TRIGGER_PIPELINE" },
+        { "text": "The TRIGGER_PIPELINE task's pipeline_id is the UUID b2e4f710-1111-4a22-9999-abcdef112233", "check": "regex", "pattern": "b2e4f710-1111-4a22-9999-abcdef112233" },
+        { "text": "run_inputs carries over the env: prod value from the source's conf={\"env\": \"prod\"}", "check": "regex", "pattern": "(?s)run_inputs:.*?env:\\s*prod" },
+        { "text": "parameters.pipeline_id is the UUID placeholder, not the literal string 'daily_reporting' — the DAG id is never used as the pipeline_id value" },
+        { "text": "The publish-dashboard task depends_on the TRIGGER_PIPELINE task, preserving the source's launch-and-wait-then-continue ordering" },
+        { "text": "No trigger_events: block is used for this case — wait_for_completion=True explicitly blocks mid-flow, which requires the waiting TRIGGER_PIPELINE task rather than a reactive trigger" }
+      ]
+    },
+    {
+      "id": "external-task-sensor-trigger-events",
+      "prompt": "Convert this Airflow ExternalTaskSensor to Orchestra (see files/external_task_sensor_cross_dag.py). daily_report waits for the whole nightly_elt DAG to finish before building the report. nightly_elt has already been migrated to Orchestra as pipeline 9d3a5c20-4444-4b33-8888-abcdef445566. Per this skill's guidance, prefer trigger_events: over a polling sensor since the upstream is already an Orchestra pipeline. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A daily-report pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id 9d3a5c20-4444-4b33-8888-abcdef445566, statuses including SUCCEEDED) plus a pipeline: block for the build-daily-report task — not a TRIGGER_PIPELINE task, since ExternalTaskSensor maps to a reactive event-driven trigger, not an explicit mid-flow wait.",
+      "files": ["external_task_sensor_cross_dag.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "A pipeline: block with tasks is still present alongside trigger_events", "check": "yaml_present", "path": "pipeline" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "The upstream pipeline id 9d3a5c20-4444-4b33-8888-abcdef445566 is carried over", "check": "regex", "pattern": "9d3a5c20-4444-4b33-8888-abcdef445566" },
+        { "text": "SUCCEEDED is among the trigger statuses", "check": "regex", "pattern": "SUCCEEDED" },
+        { "text": "No TRIGGER_PIPELINE task is used for this case — trigger_events: is preferred over a polling sensor or a waiting task since the upstream DAG is already an Orchestra pipeline" },
+        { "text": "build_daily_report is still represented as a pipeline: task, not folded into the trigger definition itself" }
+      ]
+    },
+    {
+      "id": "dataset-based-cross-dag-trigger-events",
+      "prompt": "Convert this Airflow Dataset-based cross-DAG trigger to Orchestra (see files/dataset_trigger.py). orders_summary_consumer is scheduled on the orders_dataset produced by orders_producer's extract_orders task via outlets=[orders_dataset]. orders_producer has already been migrated to Orchestra as pipeline c4f6a830-5555-4c44-9999-abcdef667788. Author the consumer pipeline's trigger_events: block reacting to the producer pipeline completing. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An orders-summary-consumer pipeline.yml with a root-level trigger_events: entry (type: pipeline, pipeline_id c4f6a830-5555-4c44-9999-abcdef667788, statuses including SUCCEEDED) plus a pipeline: block for the build-order-summary task — not a TRIGGER_PIPELINE task, since Airflow Datasets map to reactive trigger_events on the producing pipeline, not an explicit mid-flow wait.",
+      "files": ["dataset_trigger.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "A trigger_events: block is present at the pipeline root", "check": "yaml_present", "path": "trigger_events" },
+        { "text": "trigger_events entries are typed as pipeline triggers", "check": "regex", "pattern": "type:\\s*pipeline" },
+        { "text": "The producer pipeline id c4f6a830-5555-4c44-9999-abcdef667788 is carried over", "check": "regex", "pattern": "c4f6a830-5555-4c44-9999-abcdef667788" },
+        { "text": "SUCCEEDED is among the (explicit or default) trigger statuses" },
+        { "text": "The trigger targets the orders_producer pipeline specifically, matching the Dataset dependency on extract_orders' outlets — not a same-pipeline dependency or a TRIGGER_PIPELINE task" },
+        { "text": "build_order_summary is still represented as a pipeline: task, not folded into the trigger definition itself" }
+      ]
+    }
+  ]
+}

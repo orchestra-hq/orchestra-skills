@@ -1,0 +1,50 @@
+{
+  "skill_name": "slack-airflow-to-orchestra",
+  "description": "Given Airflow Slack notifications — SlackWebhookOperator/SlackAPIOperator fired from on_failure_callback/on_success_callback, or a plain PythonOperator calling slack_sdk directly — determine whether the message is a run-status notification (pipeline- or task-scoped Orchestra alerts: block, destination not connection_id) or an explicit mid-DAG pipeline step (SLACK integration task with SEND_SLACK_MESSAGE), and author the corresponding YAML.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "callback-dag-failure-pipeline-alert",
+      "prompt": "Convert this Airflow Slack failure callback to an Orchestra pipeline-level alert (see files/slack_callback_dag_failure.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with a single SLACK destination (destination: '#eng-oncall', no connection_id field) — the literal channel carried straight through, since default_args['on_failure_callback'] applies DAG-wide.",
+      "files": ["slack_callback_dag_failure.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The SLACK destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The #eng-oncall channel is carried over as the SLACK destination value", "check": "regex", "pattern": "#eng-oncall" },
+        { "text": "connection_id is NOT set on the SLACK destination — Slack alerts resolve from the workspace Slack connection; connection_id is only required for PAGER_DUTY/TEAMS/WEBHOOK/DATADOG" },
+        { "text": "The alert is placed at the pipeline root, not on an individual task, since on_failure_callback is set in default_args and applies DAG-wide" }
+      ]
+    },
+    {
+      "id": "task-success-callback-task-level-alert",
+      "prompt": "Convert this Airflow Slack success callback to an Orchestra task-level alert on the load_warehouse task only — it should not fire for the whole DAG (see files/slack_task_success_callback.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A task-level alerts: entry on the load-warehouse task (not the pipeline root) firing on SUCCEEDED with a SLACK destination (destination: '#warehouse-notifications', no connection_id field), since the callback is attached to that one task, not default_args.",
+      "files": ["slack_task_success_callback.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on SUCCEEDED", "check": "alerts_status", "status": "SUCCEEDED" },
+        { "text": "The SLACK destination sets destination (SLACK/EMAIL require destination, not connection_id)", "check": "alert_destination_requires", "integration": "SLACK", "field": "destination" },
+        { "text": "The #warehouse-notifications channel is carried over as the SLACK destination value", "check": "regex", "pattern": "#warehouse-notifications" },
+        { "text": "The alert is placed on the load-warehouse TaskModel (task-level), not the pipeline root alerts: block — matching the task-scoped on_success_callback rather than a DAG-wide default_args callback" },
+        { "text": "extract_data, which has no callback, does not also get this alert" }
+      ]
+    },
+    {
+      "id": "mid-dag-raw-slack-client-task",
+      "prompt": "This Airflow DAG posts a Slack message mid-run, after the dbt build finishes and before the downstream load starts (see files/slack_mid_dag_raw_client.py). Convert this to the appropriate Orchestra pipeline construct — this is a workflow step, not a status notification, even though it never uses SlackWebhookOperator or SlackAPIOperator. Write the pipeline YAML to pipeline.yml in the current directory — no live sends, no deploy.",
+      "expected_output": "A SLACK pipeline task (integration: SLACK, integration_job: SEND_SLACK_MESSAGE) with parameters.channel_name '#data-team' and text set, wired via depends_on so it runs after the run_dbt_build task and before load_downstream — NOT an alerts: block, since this is an explicit step whose position in the run matters, and the raw slack_sdk.WebClient call inside a plain PythonOperator is still a Slack notification despite not using a dedicated Slack operator.",
+      "files": ["slack_mid_dag_raw_client.py"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "A SLACK integration task is present", "check": "some_task", "field": "integration", "equals": "SLACK" },
+        { "text": "The SLACK task runs SEND_SLACK_MESSAGE", "check": "some_task", "field": "integration_job", "equals": "SEND_SLACK_MESSAGE" },
+        { "text": "The task sets a channel_name parameter", "check": "regex", "pattern": "channel_name" },
+        { "text": "The #data-team channel is carried over as the channel_name value", "check": "regex", "pattern": "#data-team" },
+        { "text": "This is expressed as a SLACK/SEND_SLACK_MESSAGE task wired via depends_on, not an alerts: block, since the message is a positioned mid-run step rather than a run-status notification — despite the source task never importing a dedicated Slack operator" },
+        { "text": "The task's depends_on reflects it firing after the run_dbt_build task and before the load_downstream task, preserving the source's execution order" }
+      ]
+    }
+  ]
+}

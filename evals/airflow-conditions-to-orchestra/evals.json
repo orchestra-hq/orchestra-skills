@@ -1,0 +1,52 @@
+{
+  "skill_name": "airflow-conditions-to-orchestra",
+  "description": "Given an Airflow DAG with a non-default trigger_rule, a BranchPythonOperator, or a ShortCircuitOperator, author the matching Orchestra condition: expression — task_groups[...].all()/.any().status for trigger_rule, inputs.x for a trigger-time branch, and an upstream set_outputs: true Python task feeding a runtime OUTPUTS condition for a short circuit — never conflating the three.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "trigger-rule-none-failed",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/trigger_rule_none_failed.py). build_reporting_tables uses trigger_rule='none_failed' so it should run once both upstream syncs finish, as long as neither outright failed — it's fine if one of them was skipped. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline with an upstream stage running sync_orders and sync_customers, and a downstream stage/task conditioned on ${{ task_groups['<upstream-stage>'].all().status != 'FAILED' }} running build_reporting_tables, sequenced after the sync stage via depends_on.",
+      "files": ["trigger_rule_none_failed.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "A condition uses task_groups[...].all().status compared against FAILED, the none_failed mapping from the skill's trigger_rule table", "check": "regex", "pattern": "task_groups\\[[^\\]]+\\]\\.all\\(\\)\\.status\\s*!=\\s*['\"]FAILED['\"]", "min_count": 1 },
+        { "text": "The reporting stage is sequenced after the sync stage via depends_on", "check": "groups_chained" },
+        { "text": "sync_orders and sync_customers both land in the upstream stage/group that the condition's task_groups[...] reference actually points at", "check": "min_task_groups", "min": 2 },
+        { "text": "none_failed is modeled as 'not FAILED' (tolerating SKIPPED and SUCCEEDED alike), not narrowed to require both upstream tasks to have SUCCEEDED, which would incorrectly reject the one-skipped case trigger_rule=none_failed is meant to allow" },
+        { "text": "The condition is placed on the downstream stage/group (or the build_reporting_tables task) rather than rewritten as inline Python if/else logic inside the task's parameters" }
+      ]
+    },
+    {
+      "id": "branch-python-operator-env-input",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/branch_python_operator_env.py). choose_env decides at trigger time — from the env param — whether run_prod_load or run_staging_load executes; only one of the two ever runs per trigger. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline with an env input, a stage conditioned on ${{ inputs.env == 'prod' }} running run_prod_load, and a mutually-exclusive stage conditioned on the non-prod case running run_staging_load.",
+      "files": ["branch_python_operator_env.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "Pipeline declares an input for the branch decision", "check": "yaml_present", "path": "inputs" },
+        { "text": "env is referenced both as an input and inside a condition expression", "check": "regex", "pattern": "env", "min_count": 2 },
+        { "text": "A condition references inputs.env using Orchestra's interpolation syntax (a trigger-time branch, not a runtime OUTPUTS lookup)", "check": "regex", "pattern": "\\$\\{\\{\\s*inputs\\.env", "min_count": 1 },
+        { "text": "Both branch stages carry a condition key", "check": "all_groups_have", "key": "condition" },
+        { "text": "The two conditions are genuinely mutually exclusive (one tests env == 'prod', the other tests the non-prod/false case) rather than both able to evaluate true, or both false, in the same run" },
+        { "text": "run_prod_load and run_staging_load land as separate tasks under their respective conditioned stages, not merged into a single task with the BranchPythonOperator's if/else routing logic ported over verbatim" }
+      ]
+    },
+    {
+      "id": "short-circuit-gate-downstream",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/short_circuit_new_records.py). check_new_data is a ShortCircuitOperator — when has_new_records() returns False, both process_new_records and send_summary must be skipped entirely, not just the first of the two. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline where check_new_data becomes a PYTHON_EXECUTE_SCRIPT task with set_outputs: true, and the downstream stage(s) running process_new_records and send_summary condition on ${{ ORCHESTRA.PIPELINE_RUN_TASKS['check-new-data'].OUTPUTS['has_data'] == True }}.",
+      "files": ["short_circuit_new_records.py"],
+      "assertions_ref": ["branching"],
+      "assertions": [
+        { "text": "The short-circuit check is a PYTHON task", "check": "some_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The check task runs the PYTHON_EXECUTE_SCRIPT job", "check": "some_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+        { "text": "set_outputs is enabled on the check task so its OrchestraSDK output reaches downstream conditions", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "A downstream condition references the check task's OUTPUTS via ORCHESTRA.PIPELINE_RUN_TASKS", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[[^\\]]+\\]\\.OUTPUTS\\[", "min_count": 1 },
+        { "text": "The downstream stage is sequenced after the check via depends_on", "check": "groups_chained" },
+        { "text": "Both process_new_records and send_summary are gated behind the same short-circuit condition (directly or via a chained downstream stage), matching ShortCircuitOperator skipping everything downstream on False, not just the immediately-following task" },
+        { "text": "The script backing the check is described as using OrchestraSDK(api_key=...).set_output(...) rather than a bare set_output() call, matching the skill's explicit gotcha that set_output is a client method, not an importable function" }
+      ]
+    }
+  ]
+}

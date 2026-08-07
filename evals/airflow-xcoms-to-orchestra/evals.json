@@ -1,0 +1,51 @@
+{
+  "skill_name": "airflow-xcoms-to-orchestra",
+  "description": "Given an Airflow DAG that passes data between tasks via ti.xcom_push/xcom_pull, TaskFlow API @task return values, or an XCom-driven BranchPythonOperator, author the matching Orchestra pipeline YAML using explicit set_outputs: true tasks with an instantiated OrchestraSDK client's client.set_output() calls, referenced downstream via ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...].OUTPUTS[...] }}.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "xcom-push-pull-scalar",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/order_total_xcom_push_pull.py). compute_order_total pushes a float to XCom via ti.xcom_push(key='order_total', value=total), and post_total_to_finance pulls it via ti.xcom_pull(task_ids='compute_order_total', key='order_total'). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a task for compute_order_total that sets parameters.set_outputs: true and calls client.set_output('order_total', total) on an instantiated OrchestraSDK client, and a downstream task for post_total_to_finance that references the total via the OUTPUTS templating syntax rather than an xcom_pull call.",
+      "files": ["order_total_xcom_push_pull.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (one to compute the total, one to post it)", "check": "min_task_groups", "min": 2 },
+        { "text": "The upstream compute task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The downstream task depends on the upstream compute task", "check": "groups_chained" },
+        { "text": "The script for the compute task instantiates OrchestraSDK (e.g. `client = OrchestraSDK(api_key=os.environ.get(\"ORCHESTRA_API_KEY\"))`) rather than importing a bare set_output function", "check": "regex", "pattern": "OrchestraSDK\\(", "min_count": 1 },
+        { "text": "client.set_output( is called on the instantiated client with the 'order_total' key, not used as a standalone imported function", "check": "regex", "pattern": "client\\.set_output\\(", "min_count": 1 },
+        { "text": "ti.xcom_push/ti.xcom_pull is fully replaced by the explicit set_output/OUTPUTS mechanism — no bare ti.xcom_pull call or bare Python variable crosses the two Orchestra tasks" }
+      ]
+    },
+    {
+      "id": "taskflow-return-value-chain",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/region_summary_taskflow_return.py). This uses the TaskFlow API: extract_region_file is a @task that returns a file path, and summarize_region_file is a @task that takes that path as a plain function argument (Airflow captures this as an implicit XCom under the 'return_value' key). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a task for extract_region_file that sets parameters.set_outputs: true and calls client.set_output() with an explicit named key (not 'return_value') for the file path, and a downstream task for summarize_region_file that references that path via the OUTPUTS templating syntax.",
+      "files": ["region_summary_taskflow_return.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (extract then summarize)", "check": "min_task_groups", "min": 2 },
+        { "text": "Both tasks use the PYTHON integration", "check": "every_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The extract task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "The downstream summarize task references the upstream output via ORCHESTRA.PIPELINE_RUN_TASKS templating keyed off the extract task's id, not a hardcoded literal path", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\['extract", "ignore_case": true, "min_count": 1 },
+        { "text": "The implicit TaskFlow return-value capture (Airflow's automatic 'return_value' XCom key) is replaced with an explicit, meaningfully-named client.set_output(...) key rather than a key literally called 'return_value'" }
+      ]
+    },
+    {
+      "id": "xcom-driven-branch-python-operator",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline YAML (see files/inventory_branch_xcom_driven.py). check_low_stock_count pushes a count to XCom, and a BranchPythonOperator (decide_branch) pulls that count and returns the task_id of either trigger_reorder_workflow or skip_reorder depending on whether it's greater than zero. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "An Orchestra pipeline YAML with a task for check_low_stock_count that sets parameters.set_outputs: true, and two downstream stages (trigger_reorder_workflow and skip_reorder) each gated by a condition: expression referencing the low_stock_count output, replacing the BranchPythonOperator's decide_branch function entirely.",
+      "files": ["inventory_branch_xcom_driven.py"],
+      "assertions_ref": ["data_passing"],
+      "assertions": [
+        { "text": "At least two task groups are present (the count check and at least one branch target)", "check": "min_task_groups", "min": 2 },
+        { "text": "The count-check task sets parameters.set_outputs to true", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "A condition: field is present gating the branch stage(s)", "check": "regex", "pattern": "condition:", "min_count": 1 },
+        { "text": "The condition references the upstream task's OUTPUTS via the ORCHESTRA.PIPELINE_RUN_TASKS templating syntax rather than a bare Python variable", "check": "regex", "pattern": "ORCHESTRA\\.PIPELINE_RUN_TASKS\\[", "min_count": 1 },
+        { "text": "There is no standalone BranchPythonOperator-equivalent 'decide_branch' task in the output — the branching decision function is eliminated entirely and replaced by condition: expressions on the two downstream stages" },
+        { "text": "Both the reorder and skip paths are represented (either as two conditioned stages, or one stage with a condition and an explicit else/skip stage), preserving the original DAG's both-branches structure rather than dropping the skip path" }
+      ]
+    }
+  ]
+}

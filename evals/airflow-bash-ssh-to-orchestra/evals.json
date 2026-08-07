@@ -1,0 +1,52 @@
+{
+  "skill_name": "airflow-bash-ssh-to-orchestra",
+  "description": "Given an Airflow DAG that shells out or runs containers (non-dbt) via BashOperator, SSHOperator, or KubernetesPodOperator, map each to the matching Orchestra integration (PYTHON, LINUX_SSH/WINDOWS_SSH, or AWS_EKS/GKE/AKS) and produce valid pipeline YAML.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "bash-operator-python-script",
+      "prompt": "Convert this Airflow DAG that uses BashOperator to run a Python script into an equivalent Orchestra pipeline task (see files/bash_python_script.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON task running PYTHON_EXECUTE_SCRIPT whose command parameter is the flattened 'cd /opt/airflow && python scripts/transform_customers.py --env prod' string, with python_version and package_manager set and a connection reference — not a LINUX_SSH task.",
+      "files": ["bash_python_script.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the PYTHON integration", "check": "some_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The task runs the PYTHON_EXECUTE_SCRIPT job", "check": "some_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+        { "text": "The command references the source script", "check": "regex", "pattern": "transform_customers\\.py" },
+        { "text": "integration_job only ever takes a valid PYTHON value", "check": "valid_enum", "field": "integration_job", "allowed": ["PYTHON_EXECUTE_SCRIPT"] },
+        { "text": "bash_command is not carried over verbatim as a LINUX_SSH command — a BashOperator running a Python script maps to PYTHON, never LINUX_SSH" },
+        { "text": "python_version and package_manager are populated with sensible defaults (e.g. '3.12' / PIP) since BashOperator's bash_command has no equivalent fields to carry over literally" }
+      ]
+    },
+    {
+      "id": "ssh-operator-remote-shell-command",
+      "prompt": "Convert this Airflow DAG that uses SSHOperator to run a genuine remote shell command on a Linux host into an equivalent Orchestra pipeline task (see files/ssh_remote_sync.py). Write the pipeline YAML to pipeline.yml in the current directory — no live SSH access, no deploy.",
+      "expected_output": "A LINUX_SSH task running LINUX_SSH_EXECUTE_COMMAND with parameters.command set to the exact remote shell command, and a connection reference standing in for ssh_conn_id rather than any host/username/key material being inlined.",
+      "files": ["ssh_remote_sync.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the LINUX_SSH integration", "check": "some_task", "field": "integration", "equals": "LINUX_SSH" },
+        { "text": "The task runs the LINUX_SSH_EXECUTE_COMMAND job", "check": "some_task", "field": "integration_job", "equals": "LINUX_SSH_EXECUTE_COMMAND" },
+        { "text": "The command references the remote sync script", "check": "regex", "pattern": "warehouse_sync\\.sh" },
+        { "text": "integration_job only ever takes a valid LINUX_SSH value", "check": "valid_enum", "field": "integration_job", "allowed": ["LINUX_SSH_EXECUTE_COMMAND"] },
+        { "text": "ssh_conn_id (etl_box) is not written into the YAML as a literal parameter value — it is represented purely by the connection: reference" },
+        { "text": "parameters contains only command, matching LINUX_SSH_EXECUTE_COMMAND's parameter model — no invented host/user/key fields are added alongside it" }
+      ]
+    },
+    {
+      "id": "kubernetes-pod-operator-eks",
+      "prompt": "Convert this Airflow DAG that uses KubernetesPodOperator to run a containerised enrichment job on an AWS EKS cluster into an equivalent Orchestra pipeline task (see files/k8s_pod_enrichment.py). Write the pipeline YAML to pipeline.yml in the current directory — no live AWS access, no deploy.",
+      "expected_output": "An AWS_EKS task running AWS_EKS_RUN_JOB whose job_manifest carries over the container image, namespace, and env vars from the KubernetesPodOperator, connecting via a named AWS connection rather than launching an arbitrary image outside a job manifest.",
+      "files": ["k8s_pod_enrichment.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the AWS_EKS integration", "check": "some_task", "field": "integration", "equals": "AWS_EKS" },
+        { "text": "The task runs the AWS_EKS_RUN_JOB job", "check": "some_task", "field": "integration_job", "equals": "AWS_EKS_RUN_JOB" },
+        { "text": "The job name/image from the source is carried over", "check": "regex", "pattern": "enrichment" },
+        { "text": "integration_job only ever takes a valid AWS_EKS value", "check": "valid_enum", "field": "integration_job", "allowed": ["AWS_EKS_RUN_JOB"] },
+        { "text": "The image (123456789012.dkr.ecr.us-east-1.amazonaws.com/enrichment:latest), namespace (data-team), and env_vars (ENV=prod) are reflected in the job_manifest rather than invented or dropped" },
+        { "text": "cluster_context and any AWS credential material are not inlined as literal parameter values — the AWS connection reference stands in for them, and this is represented as running a job manifest (AWS_EKS_RUN_JOB), not as launching an arbitrary image directly" }
+      ]
+    }
+  ]
+}

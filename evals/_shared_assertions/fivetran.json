@@ -2,8 +2,8 @@
   "category": "fivetran",
   "assertions": [
     { "text": "Output is a valid YAML document", "check": "valid_yaml" },
-    { "text": "Every task uses the FIVETRAN integration", "check": "every_task", "field": "integration", "equals": "FIVETRAN" },
-    { "text": "Every task runs the FIVETRAN_SYNC_ALL job", "check": "every_task", "field": "integration_job", "equals": "FIVETRAN_SYNC_ALL" },
+    { "text": "At least one task uses the FIVETRAN integration", "check": "some_task", "field": "integration", "equals": "FIVETRAN" },
+    { "text": "At least one task runs the FIVETRAN_SYNC_ALL job", "check": "some_task", "field": "integration_job", "equals": "FIVETRAN_SYNC_ALL" },
     { "text": "Every task's parameters carry a connector_id copied from the source rather than left blank or invented", "check": "regex", "pattern": "connector_id:\\s*\\S+" }
   ]
 }

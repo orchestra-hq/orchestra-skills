@@ -3,7 +3,7 @@
 This repository is documentation and workflow instructions for AI agents, not an application runtime. It is distributed as a plugin marketplace with two independently-installable plugins, both listed in the manifests at the repo root (`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`):
 
 - **`orchestra`** (`skills/orchestra/`) — diagnose/fix/triage pipeline runs, author pipeline YAML, dbt Slim CI, data-quality tests, account health.
-- **`migrate-to-orchestra`** (`skills/migrate-to-orchestra/`) — convert pipelines from another orchestrator (Dagster and Prefect today; Airflow planned) into Orchestra pipeline YAML.
+- **`migrate-to-orchestra`** (`skills/migrate-to-orchestra/`) — convert pipelines from another orchestrator (Dagster, Prefect, and Airflow) into Orchestra pipeline YAML.
 
 Each plugin is a single source of truth for its own skills — no generated copies. Shared Orchestra pipeline/schema material lives under `skills/orchestra/references/orchestra/`, inside the `orchestra` plugin bundle; `migrate-to-orchestra` skills should link to it for schema/validation rules rather than re-deriving their own copy, to avoid two sources of truth drifting apart.
 
@@ -24,7 +24,7 @@ Read the full `SKILL.md` for the matching skill before changing pipelines, openi
 
 ### Migrating from another orchestrator
 
-Apply `dagster-definitions-to-orchestra` (Dagster) or `prefect-flow-structure-to-orchestra` (Prefect) first for any whole-job/whole-flow conversion — each establishes the pipeline root (`schedule`, `configuration`, `inputs`) that every task-level skill below builds on. All 34 skills (17 Dagster, 17 Prefect) live under `skills/migrate-to-orchestra/skills/` and are listed in the [README's Migrate to Orchestra section](README.md#migrate-to-orchestra); they reference each other by bare skill name (e.g. `dagster-alerts-to-orchestra`, `prefect-alerts-to-orchestra`) since they sit as flat siblings, same as the `orchestra` plugin's skills.
+Apply `dagster-definitions-to-orchestra` (Dagster), `prefect-flow-structure-to-orchestra` (Prefect), or `airflow-dag-structure-to-orchestra` (Airflow) first for any whole-job/whole-flow/whole-DAG conversion — each establishes the pipeline root (`schedule`, `configuration`, `inputs`) that every task-level skill below builds on. All 52 skills (17 Dagster, 17 Prefect, 18 Airflow) live under `skills/migrate-to-orchestra/skills/` and are listed in the [README's Migrate to Orchestra section](README.md#migrate-to-orchestra); they reference each other by bare skill name (e.g. `dagster-alerts-to-orchestra`, `prefect-alerts-to-orchestra`, `airflow-alerts-to-orchestra`) since they sit as flat siblings, same as the `orchestra` plugin's skills.
 
 `migrate-to-orchestra` is intentionally left out of `.tessl-plugin/plugin.json` for now (not yet published via Tessl) — don't add its skill paths there or widen `tessl-skill-checks.yml`'s path filters until that changes.
 
@@ -122,7 +122,24 @@ skills/
       fivetran-prefect-to-orchestra/
       airbyte-cloud-prefect-to-orchestra/
       airbyte-server-prefect-to-orchestra/
-      # airflow-*-to-orchestra planned, same layout
+      airflow-dag-structure-to-orchestra/  # apply first — pipeline root
+      airflow-connections-to-orchestra/
+      airflow-alerts-to-orchestra/
+      airflow-sensors-to-orchestra/
+      airflow-cross-dag-to-orchestra/
+      airflow-conditions-to-orchestra/
+      airflow-testing-to-orchestra/
+      airflow-xcoms-to-orchestra/
+      airflow-dynamic-task-mapping-to-orchestra/
+      airflow-bash-ssh-to-orchestra/
+      dbt-core-airflow-to-orchestra/     # integration/task conversion
+      python-airflow-to-orchestra/
+      slack-airflow-to-orchestra/
+      tableau-airflow-to-orchestra/
+      powerbi-airflow-to-orchestra/
+      fivetran-airflow-to-orchestra/
+      airbyte-cloud-airflow-to-orchestra/
+      airbyte-server-airflow-to-orchestra/
 AGENTS.md
 README.md
 ```
@@ -132,7 +149,7 @@ README.md
 - Change skill workflows directly in `skills/<plugin>/skills/*/SKILL.md` — each plugin is a single skill tree, no generation step. Write skills client-agnostically: describe a capability ("if your client can schedule a wake-up…") rather than naming a specific tool.
 - Change shared playbooks and tool notes under `skills/orchestra/references/orchestra/`. This is the canonical Orchestra pipeline schema/validation source for **both** plugins — if a migration skill needs schema detail (enum values, parameter models), point it here instead of copying a table into `skills/migrate-to-orchestra/`.
 - Adding a skill to an existing plugin: create `skills/<plugin>/skills/<name>/SKILL.md`; it is exposed automatically (no manifest edit needed). Bump the `version` in that plugin's `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add the skill's path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — `tessl-publish.yml` no longer auto-bumps this on every push (see PR #27), so it now needs the same manual bump as the other two manifests or Tessl publishing silently stops reflecting new skills. `validate-skills.yml`'s "registered in the Tessl manifest" check enforces this for every `skills/orchestra` skill *except* an explicit `NOT_YET_IN_TESSL` allowlist in that workflow — `databricks-cost-audit` and `databricks-cost-drivers` are on it (not ready to publish yet); add a skill there only as a deliberate decision, mirroring `migrate-to-orchestra` below.
-- Adding a new source orchestrator to `migrate-to-orchestra` (Airflow, …): add `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention — no new plugin or marketplace entry needed, one plugin covers all source orchestrators. When a name from one orchestrator's skill set doesn't exist for another (e.g. Dagster's `connections-setup-guide` predecessor had no Prefect equivalent skill to reuse), author a new orchestrator-specific skill rather than repurposing another orchestrator's skill or its vocabulary — keeps triggering and terminology accurate per source project.
+- Adding a new source orchestrator to `migrate-to-orchestra`: add `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention (Dagster, Prefect, and Airflow are all covered now) — no new plugin or marketplace entry needed, one plugin covers all source orchestrators. When a name from one orchestrator's skill set doesn't exist for another (e.g. Dagster's original `connections-setup-guide` had no Prefect equivalent to reuse, and Airflow's imported `airflow-connections-to-orchestra` deferred to that same Dagster skill for its actual connection-type table until expanded to stand alone), author or complete an orchestrator-specific skill rather than repurposing another orchestrator's skill or its vocabulary — keeps triggering and terminology accurate per source project.
 - Adding a genuinely new plugin (a different product surface entirely): create `skills/<new-plugin>/` with its own `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json`, then add it to the `plugins` array in both root marketplace manifests — `validate-skills.yml`'s "every skill exposed by a plugin" check will fail until both are done.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.

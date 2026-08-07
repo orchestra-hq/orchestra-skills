@@ -1,0 +1,55 @@
+{
+  "skill_name": "airflow-testing-to-orchestra",
+  "description": "Given an Airflow SqlCheckOperator, SQLThresholdCheckOperator, or a framework check with no native integration (Great Expectations / Soda), author the matching Orchestra test task with correctly inverted pass/fail semantics: Airflow's SqlCheckOperator passes when the SQL is truthy, Orchestra's *_RUN_TEST fails when the threshold expression is met.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "sql-check-operator-count-exists",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/sql_check_row_count_exists.py). check_row_count is a SqlCheckOperator that passes when its SQL returns a truthy result. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a load task for the orders insert, followed by a sequenced SNOWFLAKE_RUN_TEST task for check_row_count whose statement drops the '> 0' comparator down to a bare COUNT(*) and whose error_threshold_expression is the inverted '= 0' form — not a same-direction '> 0' that would leave SqlCheckOperator's truthy-passes semantics uninverted.",
+      "files": ["sql_check_row_count_exists.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A SNOWFLAKE_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
+        { "text": "At least two task groups are present (load + quality)", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on (quality runs after load)", "check": "groups_chained" },
+        { "text": "The check's statement still resolves to a COUNT(*)", "check": "regex", "pattern": "COUNT\\(\\*\\)", "ignore_case": true, "min_count": 1 },
+        { "text": "error_threshold_expression is the inverted '= 0' form (fails when zero rows landed today)", "check": "some_task", "field": "parameters.error_threshold_expression", "equals": "= 0" },
+        { "text": "SqlCheckOperator's truthy-passes semantics are correctly flipped: Airflow's 'SELECT COUNT(*) > 0' (passes when rows exist) becomes a bare COUNT(*) statement with Orchestra failing when the count is zero, using a single '=' comparator rather than a re-used '> 0' or a Python-style '=='" }
+      ]
+    },
+    {
+      "id": "sql-threshold-check-min-max",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/sql_threshold_check_event_volume.py). check_event_volume enforces min_threshold=5000 and max_threshold=200000 on today's event count — it should fail if the count falls outside that range in either direction. Write the pipeline YAML to pipeline.yml in the current directory — no live queries, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a load task for the events insert, followed by a SNOWFLAKE_RUN_TEST task for check_event_volume whose statement collapses both bounds into a single flag value (e.g. a CASE expression emitting 1 when count < 5000 or count > 200000, else 0) with error_threshold_expression '> 0', sequenced after the load task.",
+      "files": ["sql_threshold_check_event_volume.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A SNOWFLAKE_RUN_TEST task is present", "check": "some_task", "field": "integration_job", "equals": "SNOWFLAKE_RUN_TEST" },
+        { "text": "At least two task groups are present (load + quality)", "check": "min_task_groups", "min": 2 },
+        { "text": "Task groups are chained via depends_on (quality runs after load)", "check": "groups_chained" },
+        { "text": "The min_threshold value (5000) is preserved somewhere in the test's statement", "check": "regex", "pattern": "5000", "min_count": 1 },
+        { "text": "The max_threshold value (200000) is preserved somewhere in the test's statement", "check": "regex", "pattern": "200000", "min_count": 1 },
+        { "text": "error_threshold_expression fires on the out-of-bounds flag", "check": "some_task", "field": "parameters.error_threshold_expression", "equals": "> 0" },
+        { "text": "Both bounds are represented in a single statement (e.g. via a CASE expression collapsing both comparisons into one flag) or as two separate *_RUN_TEST tasks — neither the min_threshold=5000 nor the max_threshold=200000 check is silently dropped in the conversion" }
+      ]
+    },
+    {
+      "id": "great-expectations-no-native-integration",
+      "prompt": "Convert this Airflow DAG to Orchestra (see files/great_expectations_checkpoint.py). run_ge_checkpoint executes a Great Expectations checkpoint validating the customer_events table; Orchestra has no native Great Expectations integration. Write the pipeline YAML to pipeline.yml in the current directory — no live checkpoint runs, no deploy.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a PYTHON / PYTHON_EXECUTE_SCRIPT task running a script that invokes the GE checkpoint and surfaces its pass/fail result via set_outputs: true, since there is no native Great Expectations integration.",
+      "files": ["great_expectations_checkpoint.py"],
+      "assertions_ref": ["testing"],
+      "assertions": [
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A PYTHON task is present", "check": "some_task", "field": "integration", "equals": "PYTHON" },
+        { "text": "The task runs the PYTHON_EXECUTE_SCRIPT job", "check": "some_task", "field": "integration_job", "equals": "PYTHON_EXECUTE_SCRIPT" },
+        { "text": "set_outputs is enabled so the checkpoint's pass/fail reaches Orchestra", "check": "some_task", "field": "parameters.set_outputs", "equals": true },
+        { "text": "No native Great Expectations integration is invented — the check is run via a Python script rather than a fabricated GE-specific integration/integration_job" },
+        { "text": "The generated script (or its description) actually surfaces the checkpoint's success/failure signal via OrchestraSDK(api_key=...).set_output(...), matching the skill's gotcha that set_output is a client method rather than a bare importable function, rather than always reporting success" }
+      ]
+    }
+  ]
+}

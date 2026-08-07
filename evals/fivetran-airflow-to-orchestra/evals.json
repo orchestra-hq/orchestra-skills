@@ -1,0 +1,37 @@
+{
+  "skill_name": "fivetran-airflow-to-orchestra",
+  "description": "Given an Airflow FivetranOperator (optionally paired with a FivetranSensor), convert each connector sync into a single FIVETRAN Sync task in Orchestra pipeline YAML — carrying over the connector_id slug verbatim, representing the API key/secret via a connection: reference, and wiring depends_on when a dbt task follows the sync in the same DAG.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "single-connector-sync-wait-for-completion",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/sync_stripe_connector.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "A single FIVETRAN task (integration_job FIVETRAN_SYNC_ALL) with parameters.connector_id: brightly_typical carried over verbatim from the FivetranOperator, and a connection: reference standing in for the 'fivetran_prod' fivetran_conn_id, never a literal API key/secret in the YAML. wait_for_completion=True requires no extra parameter or separate task since Orchestra's Sync task always waits.",
+      "files": ["sync_stripe_connector.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id brightly_typical is carried over verbatim", "check": "regex", "pattern": "brightly_typical" },
+        { "text": "connector_id is treated as a slug, not a UUID — no UUID-formatted value is invented in its place", "check": "regex", "pattern": "connector_id:\\s*['\"]?brightly_typical['\"]?" },
+        { "text": "wait_for_completion=True does not produce a second polling/sensor task or an extra parameter — it collapses to the same single FIVETRAN task, since Orchestra's Sync task always waits for completion" },
+        { "text": "The fivetran_conn_id value 'fivetran_prod' is represented via a connection: reference (or flagged for connection setup), not inlined as a literal API key/secret parameter" }
+      ]
+    },
+    {
+      "id": "fivetran-then-dbt-depends-on",
+      "prompt": "Convert this Airflow DAG to Orchestra pipeline tasks (see files/sync_then_dbt_build.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
+      "expected_output": "Two tasks: a FIVETRAN task with parameters.connector_id: loosely_secondary, and a DBT_CORE/DBT_CORE_EXECUTE task running 'dbt build --select tag:daily;' with project_dir: dbt_project, where the dbt task's depends_on references the Fivetran task so the dbt build only runs after the sync completes (mirroring the sync_netsuite >> dbt_build_marts chain in the source).",
+      "files": ["sync_then_dbt_build.py"],
+      "assertions_ref": ["fivetran", "connections"],
+      "assertions": [
+        { "text": "connector_id loosely_secondary is carried over verbatim", "check": "regex", "pattern": "loosely_secondary" },
+        { "text": "connector_id is a slug, not a UUID", "check": "regex", "pattern": "connector_id:\\s*['\"]?loosely_secondary['\"]?" },
+        { "text": "A DBT_CORE task is present alongside the Fivetran task", "check": "some_task", "field": "integration", "equals": "DBT_CORE" },
+        { "text": "The dbt task runs the DBT_CORE_EXECUTE job", "check": "some_task", "field": "integration_job", "equals": "DBT_CORE_EXECUTE" },
+        { "text": "The dbt build command with its --select flag is preserved", "check": "regex", "pattern": "dbt build --select tag:daily", "min_count": 1 },
+        { "text": "project_dir is carried over as 'dbt_project', matching the --project-dir flag on the BashOperator", "check": "regex", "pattern": "project_dir:\\s*['\"]?dbt_project['\"]?" },
+        { "text": "At least one depends_on list is populated with a reference rather than left empty everywhere", "check": "regex", "pattern": "depends_on:\\s*\\n\\s*-\\s*\\S" },
+        { "text": "The dbt task's depends_on wires it after the Fivetran sync task, reflecting that sync_netsuite >> dbt_build_marts in the source only lets the dbt build run once the sync above it has completed — the two tasks are modeled as separate FIVETRAN and DBT_CORE tasks, not collapsed into one, and not left as unrelated/parallel tasks lacking the dependency link the source's chain implies" }
+      ]
+    }
+  ]
+}
