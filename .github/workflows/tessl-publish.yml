@@ -1,7 +1,22 @@
 name: Publish Tessl
+
+# Only re-publish when the published plugin's own content actually changed — a push to
+# main that only touches evals/, CI config, docs unrelated to the manifest's `docs`
+# field, etc. has nothing new to publish, and previously still ran `tessl plugin publish`
+# unconditionally, failing with "already exists" whenever the manifest version hadn't
+# also been bumped in the same push (see .tessl-plugin/plugin.json's version bump
+# requirement, documented in AGENTS.md). This mirrors tessl-skill-checks.yml's path
+# filter for the same plugin content.
 on:
   push:
     branches: [main]
+    paths:
+      - 'skills/orchestra/skills/**'
+      - 'skills/orchestra/references/orchestra/**'
+      - '.tessl-plugin/plugin.json'
+      - 'tessl.json'
+      - '.tesslignore'
+      - 'README.md'
 
 jobs:
   publish:
