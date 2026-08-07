@@ -9,9 +9,11 @@ name: Skill Evals (live validation)
 # hard failure) when that credential is absent; keeping it off PRs entirely just avoids
 # spending the run on a guaranteed no-op there.
 
+# Temporarily disabled: manual trigger only, until ANTHROPIC_API_KEY (and optionally
+# ORCHESTRA_MCP_CONFIG) are configured. To re-enable automatic runs, restore:
+#   schedule:
+#     - cron: '30 4 * * *'
 on:
-  schedule:
-    - cron: '30 4 * * *'
   workflow_dispatch:
 
 jobs:

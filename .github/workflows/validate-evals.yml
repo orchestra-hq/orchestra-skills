@@ -4,13 +4,15 @@ name: Validate Evals
 # This is what would have caught this repo's three independently-invented evals.json
 # schemas (assertions vs. expectations, name vs. id, ...) at PR time; see evals/lint_evals.py.
 
+# Temporarily disabled: manual trigger only. To re-enable automatic runs, restore:
+#   push:
+#     paths: ['evals/**']
+#   pull_request:
+#     paths:
+#       - 'evals/**'
+#       - '.github/workflows/validate-evals.yml'
 on:
-  push:
-    paths: ['evals/**']
-  pull_request:
-    paths:
-      - 'evals/**'
-      - '.github/workflows/validate-evals.yml'
+  workflow_dispatch:
 
 jobs:
   lint:

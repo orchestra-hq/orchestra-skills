@@ -8,12 +8,14 @@ name: Skill Evals
 # catch regressions from edits to a shared assertions file or a skill's SKILL.md that a
 # changed-suites-only PR matrix would miss.
 
+# Temporarily disabled: manual trigger only, until ANTHROPIC_API_KEY is configured. To
+# re-enable automatic runs, restore:
+#   pull_request:
+#     types: [opened, synchronize, reopened, labeled]
+#     paths: ['evals/**']
+#   schedule:
+#     - cron: '0 4 * * *'
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled]
-    paths: ['evals/**']
-  schedule:
-    - cron: '0 4 * * *'
   workflow_dispatch:
 
 concurrency:
