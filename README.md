@@ -2,7 +2,10 @@
 
 Agent skills and reference docs for diagnosing, fixing, and triaging [Orchestra](https://www.getorchestra.io/) data pipelines with an AI assistant. The workflows assume [Orchestra's cloud MCP server](https://docs.getorchestra.io/docs/mcp) is connected so the agent can list runs, fetch logs and artifacts, and retry pipelines from your workspace.
 
-This repo is a **plugin marketplace**: the single `orchestra` plugin bundles every skill and installs into both Claude Code and Cursor from the manifests at the repo root (see [Install](#install-for-humans)).
+This repo is a **plugin marketplace** with two plugins, installed independently into both Claude Code and Cursor from the manifests at the repo root (see [Install](#install-for-humans)):
+
+- **`orchestra`** — diagnose/fix/triage runs, author pipeline YAML, dbt Slim CI, data-quality tests, account health.
+- **`migrate-to-orchestra`** — convert pipelines from another orchestrator (Dagster today; Airflow and Prefect are planned) into Orchestra pipeline YAML.
 
 ## What is in this repo
 
@@ -53,6 +56,39 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 **To get going:** connect [Orchestra's cloud MCP server](https://docs.getorchestra.io/docs/mcp) (see [Install](#install-for-humans) below), install the `orchestra` plugin so the skills are discoverable by your client (see Install), then just ask.
 
+### Migrate to Orchestra
+
+A separate plugin (`migrate-to-orchestra`) for converting pipelines from another orchestrator into Orchestra pipeline YAML. Point your client at the source project (Dagster code today) and describe what you want migrated — each skill auto-triggers off the Dagster APIs it recognizes. Start with `dagster-definitions-to-orchestra` for any whole-job conversion; it establishes the pipeline root that the task-level skills below build on.
+
+#### Pipeline structure & cross-cutting concerns
+
+| Skill | What it does |
+|-------|--------------|
+| [`dagster-definitions-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-definitions-to-orchestra/SKILL.md) | Converts `Definitions`/`ScheduleDefinition`/`RetryPolicy`/concurrency/`Config` into the Orchestra pipeline root (`schedule`, `configuration`, `inputs`). Apply first, before any task-level skill. |
+| [`dagster-connections-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-connections-to-orchestra/SKILL.md) | Maps Dagster resources (`ConfigurableResource`, `SnowflakeResource`, `EnvVar`, etc.) to Orchestra connections and naming/secrets conventions. |
+| [`dagster-alerts-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-alerts-to-orchestra/SKILL.md) | Converts run-failure/status sensors and success/failure hooks into Orchestra's `alerts:` block across all six destination types. |
+| [`dagster-sensors-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-sensors-to-orchestra/SKILL.md) | Converts `@sensor`/`@asset_sensor`/`@multi_asset_sensor` polling external state into Orchestra `sensors:`. |
+| [`dagster-cross-job-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-cross-job-to-orchestra/SKILL.md) | Converts cross-job/cross-code-location triggers (`@run_status_sensor` yielding `RunRequest`, `@asset_sensor` on another job's asset) into Orchestra pipeline-triggers-pipeline patterns. |
+| [`dagster-branching-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-branching-to-orchestra/SKILL.md) | Converts conditional op branching, `DynamicOut` fan-out, and conditional asset materialization into Orchestra `condition:`/matrix patterns. |
+| [`dagster-asset-checks-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-asset-checks-to-orchestra/SKILL.md) | Converts `@asset_check`/`AssetCheckResult`/dbt-test-via-`dagster-dbt`/`ExpectationResult` into Orchestra DQ test tasks. |
+| [`dagster-io-managers-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-io-managers-to-orchestra/SKILL.md) | Converts op/asset return values, `Out`/`In` wiring, and IO managers into Orchestra task `OUTPUTS`/`${{ }}` data passing. |
+| [`dagster-shell-ssh-to-orchestra`](skills/migrate-to-orchestra/skills/dagster-shell-ssh-to-orchestra/SKILL.md) | Converts non-dbt shell/container execution (`PipesSubprocessClient`, `dagster-shell`, `SSHResource`, `k8s_job_op`) into Orchestra `LINUX_SSH`/container tasks. |
+
+#### Integration & task conversion
+
+| Skill | What it does |
+|-------|--------------|
+| [`dbt-core-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/dbt-core-dagster-to-orchestra/SKILL.md) | Converts `DbtCliResource`/`@dbt_assets`/`dagster-dbt` into an Orchestra `DBT_CORE` task. |
+| [`python-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/python-dagster-to-orchestra/SKILL.md) | Converts plain `@op`/`@asset` Python logic (pandas, boto3, API calls) into an Orchestra `PYTHON` task. |
+| [`slack-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/slack-dagster-to-orchestra/SKILL.md) | Converts `SlackResource` and Slack-posting hooks/sensors into an Orchestra `SLACK` alert or task. |
+| [`tableau-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/tableau-dagster-to-orchestra/SKILL.md) | Converts `TableauCloudWorkspace`/`TableauServerWorkspace` asset materialization into an Orchestra `TABLEAU_CLOUD` task. |
+| [`powerbi-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/powerbi-dagster-to-orchestra/SKILL.md) | Converts `PowerBIWorkspace`/semantic-model refresh assets into an Orchestra `POWER_BI` task. |
+| [`fivetran-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/fivetran-dagster-to-orchestra/SKILL.md) | Converts `FivetranResource`/`FivetranWorkspace` assets into an Orchestra `FIVETRAN` task. |
+| [`airbyte-cloud-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-cloud-dagster-to-orchestra/SKILL.md) | Converts `AirbyteCloudResource` assets into an Orchestra `AIRBYTE_CLOUD` task. |
+| [`airbyte-server-dagster-to-orchestra`](skills/migrate-to-orchestra/skills/airbyte-server-dagster-to-orchestra/SKILL.md) | Converts self-hosted `AirbyteResource(host=,port=)` assets into an Orchestra `AIRBYTE_SERVER` task. |
+
+**To get going:** install the `migrate-to-orchestra` plugin (see [Install](#install-for-humans)), open a Claude/Cursor session in the source Dagster project, and describe the migration — no upload step needed, the skills read the project's own source files directly.
+
 ### Reference library
 
 Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/references/orchestra/README.md). Highlights:
@@ -68,14 +104,15 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 - An Orchestra API key (Orchestra UI → Settings → API Keys)
 
 1. **Connect Orchestra's cloud MCP server.** Point your client at the hosted endpoint following the [cloud MCP docs](https://docs.getorchestra.io/docs/mcp) (`~/.claude/mcp.json` for Claude Code, or Cursor MCP settings) and authenticate with your `ORCHESTRA_API_KEY` — no local install required. Restart/reload so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
-2. **Install the `orchestra` plugin** so the skills are discoverable by your client:
-   - **Claude Code** — add this repo as a marketplace, then install the plugin:
+2. **Install the plugin(s) you need** so the skills are discoverable by your client — the two install independently:
+   - **Claude Code** — add this repo as a marketplace, then install one or both plugins:
      ```
      /plugin marketplace add orchestra-hq/orchestra-skills
      /plugin install orchestra@orchestra-marketplace
+     /plugin install migrate-to-orchestra@orchestra-marketplace
      ```
      (or point at a local clone: `/plugin marketplace add /path/to/orchestra-skills`).
-   - **Cursor** — add the marketplace and install the `orchestra` plugin from `.cursor-plugin/marketplace.json` per [Cursor's plugin docs](https://docs.cursor.com/).
+   - **Cursor** — add the marketplace and install `orchestra` and/or `migrate-to-orchestra` from `.cursor-plugin/marketplace.json` per [Cursor's plugin docs](https://docs.cursor.com/).
    Each skill auto-triggers from a matching prompt once installed.
 3. For agent behavior in this repo, read [`AGENTS.md`](AGENTS.md).
 
@@ -91,8 +128,9 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 
 ## Contributing
 
-- Skills live under [`skills/orchestra/skills/`](skills/orchestra/skills/) and shared Orchestra material under [`skills/orchestra/references/orchestra/`](skills/orchestra/references/orchestra/), all inside the single `orchestra` plugin bundle. There is a single skill tree — no generated copies to keep in sync.
-- To add a skill, create `skills/orchestra/skills/<skill-name>/SKILL.md` with `name` + `description` frontmatter, put any supporting `references/`/`templates/` in the same folder, and add it to the relevant category table under [Skills](#skills). The `orchestra` plugin exposes it automatically — bump the `version` in `skills/orchestra/.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add its path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — this isn't auto-generated, so a skill left out here silently stops showing up in Tessl's published listing. CI (`Validate Skills`) checks the frontmatter, that `SKILL.md` stays under ~500 lines, and that the manifests are valid JSON. Write skills to be client-agnostic — describe capabilities (e.g. "if your client can schedule a wake-up…") rather than naming a specific tool.
+- Skills live under [`skills/orchestra/skills/`](skills/orchestra/skills/) (the `orchestra` plugin) and [`skills/migrate-to-orchestra/skills/`](skills/migrate-to-orchestra/skills/) (the `migrate-to-orchestra` plugin), each its own plugin bundle with its own `.claude-plugin/plugin.json`/`.cursor-plugin/plugin.json`. Shared Orchestra pipeline/schema material lives under [`skills/orchestra/references/orchestra/`](skills/orchestra/references/orchestra/) and is the single source of truth for pipeline YAML schema/validation — migration skills should link to it rather than re-deriving schema tables locally, to avoid two sources drifting apart.
+- To add a skill, create `skills/<plugin>/skills/<skill-name>/SKILL.md` with `name` + `description` frontmatter, put any supporting `references/`/`templates/` in the same folder, and add it to the relevant category table under [Skills](#skills) (or [Migrate to Orchestra](#migrate-to-orchestra)). The plugin exposes it automatically — bump the `version` in that plugin's `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add its path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — this isn't auto-generated, so a skill left out here silently stops showing up in Tessl's published listing (Tessl has no plugin concept, so both plugins show up in one flat list there — the `skills/<plugin>/...` path prefix is the only separation). CI (`Validate Skills`) checks the frontmatter, that `SKILL.md` stays under ~500 lines, that the manifests are valid JSON, and that every skill on disk lives inside some plugin's `skills/` directory. Write skills to be client-agnostic — describe capabilities (e.g. "if your client can schedule a wake-up…") rather than naming a specific tool.
+- To add a new orchestrator's migration skills (Airflow, Prefect, …) alongside Dagster's, add them under `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention — one plugin covers all source orchestrators, so no new plugin/marketplace entry is needed.
 - Recording fixes is optional and deferred to your client's persistent memory — never commit workspace-specific fix history. Extend [`pipeline/diagnosis-patterns.md`](skills/orchestra/references/orchestra/pipeline/diagnosis-patterns.md) only with generic, reusable patterns.
 - **Evals.** Skill evals live under [`evals/`](evals/) — an eval-driven harness that runs a skill with and without it via the headless `claude` CLI and grades the output. Currently wired up for `write-snowflake-dq-tests`. See [`evals/README.md`](evals/README.md) for setup and how to run, grade, and add a suite.
 - Do not commit API keys, `.env` files, or other secrets.

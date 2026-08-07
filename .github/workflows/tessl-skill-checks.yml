@@ -16,7 +16,7 @@ name: Tessl Skill Checks
 on:
   pull_request:
     paths:
-      - 'skills/orchestra/skills/**'
+      - 'skills/*/skills/**'
       - 'skills/orchestra/references/orchestra/**'
       - '.tessl-plugin/plugin.json'
       - 'tessl.json'
@@ -52,14 +52,17 @@ jobs:
 
       - id: detect
         run: |
+          # skills/*/skills/ covers every plugin (skills/orchestra/skills/,
+          # skills/migrate-to-orchestra/skills/, and any added later) — the shell
+          # expands the glob against the checked-out tree before git sees it.
           git diff --name-only \
               "${{ github.event.pull_request.base.sha }}" \
               "${{ github.event.pull_request.head.sha }}" \
-              -- skills/orchestra/skills/ \
-            | awk -F/ 'NF >= 4 { print $4 }' \
+              -- skills/*/skills/ \
+            | awk -F/ 'NF >= 4 { print $1"/"$2"/"$3"/"$4 }' \
             | sort -u \
             | while read -r skill; do
-                [ -d "skills/orchestra/skills/$skill" ] && echo "$skill"
+                [ -d "$skill" ] && echo "$skill"
                 true
               done > changed_skills.txt
 
@@ -96,7 +99,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           tessl review run quality \
-              "skills/orchestra/skills/${{ matrix.skill }}" \
+              "${{ matrix.skill }}" \
               --workspace "${{ vars.TESSL_WORKSPACE || 'orchestra-hq' }}" \
             | tee -a "$GITHUB_STEP_SUMMARY"
 

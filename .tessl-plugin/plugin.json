@@ -1,6 +1,6 @@
 {
   "name": "orchestra-hq/orchestra-skills",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "A curated collection of Agent Skills for working with Orchestra, for agents to effectively implement standards, common workflows, and manage pipelines.",
   "private": false,
   "docs": "README.md",
@@ -20,6 +20,23 @@
     "skills/orchestra/skills/write-bigquery-dq-tests",
     "skills/orchestra/skills/write-clickhouse-dq-tests",
     "skills/orchestra/skills/write-databricks-dq-tests",
-    "skills/orchestra/skills/write-snowflake-dq-tests"
+    "skills/orchestra/skills/write-snowflake-dq-tests",
+    "skills/migrate-to-orchestra/skills/airbyte-cloud-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/airbyte-server-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-alerts-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-asset-checks-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-branching-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-connections-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-cross-job-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-definitions-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-io-managers-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-sensors-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dagster-shell-ssh-to-orchestra",
+    "skills/migrate-to-orchestra/skills/dbt-core-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/fivetran-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/powerbi-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/python-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/slack-dagster-to-orchestra",
+    "skills/migrate-to-orchestra/skills/tableau-dagster-to-orchestra"
   ]
 }

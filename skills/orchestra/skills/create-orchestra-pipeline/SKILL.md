@@ -69,8 +69,17 @@ If only Orchestra MCP is connected, use `validate_pipeline` with the YAML body i
 
 ### Step 5 — Remediate errors
 
-For each validation error, apply the fixes in the table in `yaml-authoring.md`. Re-validate
-until clean.
+For each validation error, apply the fixes in the table in `yaml-authoring.md`. Re-validate,
+patching only what the latest errors report. Cap this at around 5 attempts — if still failing,
+present the YAML with the remaining errors listed rather than continuing indefinitely.
+
+### Step 5.5 — Confirm before deploying yourself
+
+If this skill is calling `create_pipeline`/`update_pipeline` directly (not just writing/validating
+the file for the user to deploy themselves), confirm two things first rather than shipping
+placeholders: every non-null `connection:` value matches a real connection in the account (list
+via MCP `list_integration_connections` and suggest a best match by integration type), and
+`parameters.project_dir` on every `DBT_CORE` task if the dbt project might not be at the repo root.
 
 ### Step 6 — Report
 

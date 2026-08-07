@@ -9,6 +9,11 @@
       "name": "orchestra",
       "description": "Skills for working with Orchestra data pipelines — diagnose and fix failed runs, triage with a merge gate, author pipeline YAML, set up dbt Slim CI, run Snowflake data-quality tests, and review a workspace against best practices. MCP-first.",
       "source": "./skills/orchestra"
+    },
+    {
+      "name": "migrate-to-orchestra",
+      "description": "Skills for converting Dagster (and, in future, Airflow and Prefect) pipelines into Orchestra pipeline YAML — schedules and retries, dbt/Python/Airbyte/Fivetran/Tableau/Power BI/Slack tasks, connections and secrets, alerts, sensors, branching, cross-job dependencies, asset checks, and IO manager data passing.",
+      "source": "./skills/migrate-to-orchestra"
     }
   ]
 }
