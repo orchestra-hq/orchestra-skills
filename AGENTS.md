@@ -89,6 +89,7 @@ skills/
     .cursor-plugin/plugin.json
     references/
       alerts.md              # Orchestra-side alerts: syntax shared by all three *-alerts-to-orchestra skills
+      connections.md         # Orchestra-side connection: syntax shared by all three *-connections-to-orchestra skills
     skills/
       dagster-definitions-to-orchestra/  # apply first — pipeline root
       dagster-connections-to-orchestra/

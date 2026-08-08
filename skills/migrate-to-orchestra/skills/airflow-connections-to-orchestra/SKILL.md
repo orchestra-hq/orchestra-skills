@@ -7,17 +7,11 @@ description: "Use this skill when converting Airflow code that references creden
 
 ## Overview
 
-Airflow never puts credentials directly in DAG code. Instead, every operator or hook takes a `conn_id` (or a provider-specific variant like `snowflake_conn_id`, `aws_conn_id`, `ssh_conn_id`, `slack_conn_id`, `gcp_conn_id`) that is a **pointer** to a `Connection` record — stored in the metadata DB, an `AIRFLOW_CONN_*` env var, or an external Secrets Backend. The DAG source almost never contains the real host/user/password; it only contains the `conn_id` string. This skill teaches how to recognize each of Airflow's idioms for expressing that pointer and map it to an Orchestra connection — including the full connection-type table, naming rules, and secrets handling in one place, the way `dagster-connections-to-orchestra` and `prefect-connections-to-orchestra` do for their own orchestrators.
+Airflow never puts credentials directly in DAG code. Instead, every operator or hook takes a `conn_id` (or a provider-specific variant like `snowflake_conn_id`, `aws_conn_id`, `ssh_conn_id`, `slack_conn_id`, `gcp_conn_id`) that is a **pointer** to a `Connection` record — stored in the metadata DB, an `AIRFLOW_CONN_*` env var, or an external Secrets Backend. The DAG source almost never contains the real host/user/password; it only contains the `conn_id` string. This skill teaches how to recognize each of Airflow's idioms for expressing that pointer and map it to an Orchestra connection, including the full connection-type table below. For the Orchestra-side naming format, `connection: null` fallback, and secrets handling — identical regardless of source orchestrator — see the shared reference: [`../../references/connections.md`](../../references/connections.md).
 
 ---
 
 ## Connection Name Format
-
-```yaml
-connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffix from UI)
-```
-
-The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never invent it.
 
 **No `conn_id` referenced?** If the task doesn't actually take a `_conn_id=`/`conn_id=` kwarg or call `BaseHook.get_connection(...)` — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field:
 
@@ -25,15 +19,9 @@ The 5-digit suffix is assigned by Orchestra when the connection is created — c
 connection: null   # no distinct conn_id in the source; Orchestra uses the workspace default for this integration
 ```
 
-**This extends to task parameters that duplicate connection-level scope, too** — e.g. Power BI's `workspace_id` (from `group_id`), or any other parameter whose value is also stored on the Orchestra connection itself. If the source code just reads the same single value everywhere rather than genuinely varying it per task, leave that parameter `null`/omitted and let the connection's own configured value apply.
+**Power BI specifically:** the workspace scope duplicated between task parameters and the connection shows up as `group_id` on Airflow's `PowerBIDatasetRefreshOperator`, mapping to `workspace_id` on the Orchestra connection — see the shared reference's task-parameter-scope guidance for the general rule.
 
-For environment-specific connections:
-
-```yaml
-connection: ${{ ENV.SNOWFLAKE_CONNECTION_NAME }}
-```
-
-Set `SNOWFLAKE_CONNECTION_NAME=my_snowflake_12345` in Orchestra's environment settings.
+For the full naming format, `connection: null` semantics, and the environment-specific `${{ ENV.VAR }}` pattern, see [`../../references/connections.md`](../../references/connections.md).
 
 ---
 

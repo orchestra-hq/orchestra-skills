@@ -13,29 +13,11 @@ Prefect stores credentials in **blocks** — typically loaded via `Block.load("b
 
 ## Connection Name Format
 
-```yaml
-connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffix from UI)
-```
+For the Orchestra-side naming format, `connection: null` fallback, task-parameter-scope caveat, and
+environment-specific `${{ ENV.VAR }}` pattern, see the shared reference:
+[`../../references/connections.md`](../../references/connections.md).
 
-The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never invent it.
-
-**No block referenced?** If the `@task`/`@flow` doesn't actually load a credentialed block — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field:
-
-```yaml
-connection: null   # no distinct block in the source; Orchestra uses the workspace default for this integration
-```
-
-Only set a specific `name_XXXXX` or `${{ ENV.VAR }}` when the source code actually references a distinct block/credential.
-
-**This extends to task parameters that duplicate connection-level scope, too** — e.g. Power BI's `workspace_id`, or any other parameter whose value is also stored on the Orchestra connection itself. If the source code just reads the same single value everywhere (one env var, one block-level config field) rather than genuinely varying it per task, leave that parameter `null`/omitted and let the connection's own configured value apply. Only carry an explicit value through (literal, input, or `${{ ENV.VAR }}`) when a specific task truly needs to override it — e.g. targeting a different Power BI workspace than the one configured on the connection.
-
-For environment-specific connections:
-
-```yaml
-connection: ${{ ENV.SNOWFLAKE_CONNECTION_NAME }}
-```
-
-Set `SNOWFLAKE_CONNECTION_NAME=my_snowflake_12345` in Orchestra's environment settings.
+**No block referenced?** If the `@task`/`@flow` doesn't actually load a credentialed block — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field. Only set a specific `name_XXXXX` or `${{ ENV.VAR }}` when the source code actually references a distinct block/credential.
 
 ---
 
@@ -88,17 +70,8 @@ Set `SNOWFLAKE_CONNECTION_NAME=my_snowflake_12345` in Orchestra's environment se
 
 ## Secrets Handling
 
-**Never hardcode credentials in YAML.** All credentials go in the Orchestra connection — the YAML references only the connection name.
-
-```yaml
-# Correct
-task-001:
-  integration: SNOWFLAKE
-  integration_job: SNOWFLAKE_RUN_QUERY
-  connection: snowflake_prod_12345
-  parameters:
-    statement: 'SELECT 1'
-```
+Never hardcode credentials in YAML — see the shared reference for the standard pattern:
+[`../../references/connections.md`](../../references/connections.md#secrets-handling).
 
 For secrets stored in a Prefect `Secret` block or `SecretStr` field with no dedicated integration connection (e.g. a bare API token used inside a `PYTHON_EXECUTE_SCRIPT` task), see `prefect-secrets-to-orchestra` for the full checklist-based handoff — this skill covers the connection side, that one covers the "where does each secret land" side.
 
@@ -106,19 +79,8 @@ For secrets stored in a Prefect `Secret` block or `SecretStr` field with no dedi
 
 ## Multi-Environment Pattern
 
-```yaml
-pipeline:
-  stage-001:
-    tasks:
-      task-001:
-        integration: SNOWFLAKE
-        integration_job: SNOWFLAKE_RUN_QUERY
-        connection: ${{ ENV.SNOWFLAKE_CONN }}
-        parameters:
-          statement: 'SELECT * FROM orders LIMIT 10'
-```
-
-In Orchestra: Settings -> Environments -> set `SNOWFLAKE_CONN=snowflake_dev_11111` in dev and `snowflake_prod_22222` in prod. This mirrors how Prefect swaps blocks per deployment (e.g. loading `"snowflake-dev"` vs. `"snowflake-prod"` by name).
+See the shared reference for the `${{ ENV.VAR }}` pattern and full task example:
+[`../../references/connections.md`](../../references/connections.md#environment-specific-connections). This mirrors how Prefect swaps blocks per deployment (e.g. loading `"snowflake-dev"` vs. `"snowflake-prod"` by name).
 
 ---
 
