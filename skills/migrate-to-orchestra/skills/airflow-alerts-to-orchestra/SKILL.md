@@ -7,84 +7,13 @@ description: "Use this skill when an Airflow DAG uses on_failure_callback, on_su
 
 ## Overview
 
-Airflow notifications are spread across callbacks (`on_failure_callback`, `on_success_callback`), dedicated operator tasks (`EmailOperator`, `SlackWebhookOperator`), and hooks (`PagerDutyEventsHook`). Orchestra consolidates all of these into a single `alerts:` block that can appear at the **pipeline root** (fires on overall pipeline status) or on individual **TaskModel** objects (fires on that specific task's status).
+Airflow notifications are spread across callbacks (`on_failure_callback`, `on_success_callback`), dedicated operator tasks (`EmailOperator`, `SlackWebhookOperator`), and hooks (`PagerDutyEventsHook`). Orchestra consolidates all of these into a single `alerts:` block.
+
+For the Orchestra-side syntax (full `AlertModel` schema, all six destination types, status enum, pipeline-level vs task-level placement, gotchas) see the shared reference: [`../../references/alerts.md`](../../references/alerts.md). This skill covers only the Airflow-specific mapping.
 
 ---
 
-## AlertModel — Full Schema
-
-```yaml
-alerts:
-  - name: unique-alert-name       # required, unique within scope
-    statuses:                     # required, at least one
-      - FAILED                    # FAILED | SUCCEEDED | CANCELLED | WARNING | SKIPPED | ANY_COMPLETED
-    destinations:                 # required, at least one
-      - integration: SLACK        # NotificationTypesEnum — see table below
-        destination: '#channel'   # required for SLACK and EMAIL
-        connection_id: null       # required for PAGER_DUTY, TEAMS, WEBHOOK, DATADOG
-        parameters: null          # optional — DATADOG priority, WEBHOOK body
-    custom_message: null          # optional string, max 200 chars
-```
-
----
-
-## Destination Types — Full Reference
-
-### SLACK
-```yaml
-destinations:
-  - integration: SLACK
-    destination: '#data-alerts'    # channel name or member ID — required
-    # connection_id not needed — resolved from workspace-level Slack connection
-```
-
-### EMAIL
-```yaml
-destinations:
-  - integration: EMAIL
-    destination: 'data-team@example.com'   # email address — required
-    # connection_id not needed — uses Orchestra's email connection
-```
-
-### PAGER_DUTY
-```yaml
-destinations:
-  - integration: PAGER_DUTY
-    connection_id: pagerduty_conn_12345    # Orchestra PagerDuty connection — required
-    # destination not used
-```
-
-### MICROSOFT_TEAMS
-```yaml
-destinations:
-  - integration: MICROSOFT_TEAMS
-    connection_id: teams_webhook_12345     # Orchestra Teams connection — required
-    # destination not used
-```
-
-### WEBHOOK
-```yaml
-destinations:
-  - integration: WEBHOOK
-    connection_id: my_webhook_12345        # Orchestra Webhook connection — required
-    parameters:
-      body:                               # optional — custom JSON body
-        event: "pipeline_failed"
-        pipeline: "my-pipeline"
-```
-
-### DATADOG
-```yaml
-destinations:
-  - integration: DATADOG
-    connection_id: datadog_conn_12345      # Orchestra Datadog connection — required
-    parameters:
-      priority: 3                         # optional — integer 1 (highest) to 5 (lowest)
-```
-
----
-
-## Status Values
+## Status Values — Airflow equivalent
 
 | Orchestra status | Airflow equivalent | When it fires |
 |---|---|---|
@@ -169,68 +98,7 @@ alerts:
     custom_message: 'Pipeline failed — oncall required.'
 ```
 
-### Multiple destinations on one alert
-
-```yaml
-# Fire both Slack AND PagerDuty on failure
-alerts:
-  - name: critical-failure
-    statuses: [FAILED]
-    destinations:
-      - integration: SLACK
-        destination: '#incidents'
-      - integration: PAGER_DUTY
-        connection_id: pagerduty_prod_12345
-    custom_message: 'Critical pipeline failure — immediate attention required.'
-```
-
-### Multiple alerts with different statuses and destinations
-
-```yaml
-alerts:
-  - name: notify-slack-on-failure
-    statuses: [FAILED]
-    destinations:
-      - integration: SLACK
-        destination: '#data-alerts'
-
-  - name: page-oncall-on-failure
-    statuses: [FAILED]
-    destinations:
-      - integration: PAGER_DUTY
-        connection_id: pagerduty_prod_12345
-    custom_message: 'Data pipeline down — SLA at risk.'
-
-  - name: email-on-success
-    statuses: [SUCCEEDED]
-    destinations:
-      - integration: EMAIL
-        destination: 'stakeholders@example.com'
-    custom_message: 'Daily report data is ready.'
-
-  - name: webhook-any-completion
-    statuses: [ANY_COMPLETED]
-    destinations:
-      - integration: WEBHOOK
-        connection_id: monitoring_webhook_12345
-```
-
----
-
-## Pipeline-Level vs Task-Level Alerts
-
-**Pipeline-level** — in the `alerts:` key at the top of the YAML. Fires based on the overall pipeline run status.
-
-```yaml
-version: v1
-name: my-pipeline
-alerts:           # ← pipeline-level
-  - name: ...
-pipeline:
-  ...
-```
-
-**Task-level** — in the `alerts:` key on a specific `TaskModel`. Fires when that individual task reaches the status.
+### `on_failure_callback` on an individual task → task-level alert
 
 ```yaml
 pipeline:
@@ -239,7 +107,7 @@ pipeline:
       critical-task:
         integration: DBT_CORE
         integration_job: DBT_CORE_EXECUTE
-        alerts:        # ← task-level
+        alerts:
           - name: dbt-task-failed
             statuses: [FAILED]
             destinations:
@@ -247,21 +115,19 @@ pipeline:
                 connection_id: pagerduty_prod_12345
 ```
 
-Use task-level when you need different alert routing per task (e.g. page on-call only for the most critical transformation, not every step).
+Use task-level when different Airflow tasks register different callbacks — mirror that with
+per-task `alerts:` instead of one pipeline-level block.
 
 ---
 
-## Gotchas
+## Gotchas (Airflow-specific)
 
 - **`sla_miss_callback`** — no Orchestra equivalent. SLA monitoring must be handled via external monitoring tools or a time-based sensor.
 - **`on_retry_callback`** — closest is `WARNING` status, but Orchestra's WARNING fires on quality test warnings, not on task retries. No direct equivalent for retry-specific notifications.
-- **`connection_id` format** — must be the full Orchestra connection name including 5-digit suffix (e.g. `pagerduty_prod_12345`), not just the connection type.
-- **SLACK requires `destination`** — omitting the channel name will fail schema validation.
-- **PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require `connection_id`** — `destination` is not used for these types.
-- **`custom_message` max 200 chars** — longer messages are truncated or rejected.
-- **Alert names must be unique** — within their scope (pipeline-level or per-task). Two pipeline-level alerts cannot share a name.
+
+See the shared reference for Orchestra-side gotchas (`connection_id` format, `custom_message` length, alert name uniqueness, etc.).
 
 ## References
 
-- Orchestra alerts schema: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
+- Shared Orchestra alerts syntax: [`../../references/alerts.md`](../../references/alerts.md)
 - Orchestra Slack alerts: https://docs.getorchestra.io/docs/alerts/slack
