@@ -13,56 +13,22 @@ Key difference: Airflow sensors are inline DAG steps. Orchestra sensors are exte
 
 Sensor checks also carry a `connection:` field — for mapping the sensor's `aws_conn_id=`/`conn_id=` to the right Orchestra connection type, see `airflow-connections-to-orchestra`.
 
+For the full `SensorModel` schema, the `SensorChecksEnum` values table, and the `trigger_events:` vs polling-sensor pattern for waiting on another pipeline — identical regardless of source orchestrator — see the shared reference: [`../../references/sensors.md`](../../references/sensors.md).
+
 ---
 
 ## SensorModel Structure
 
-```yaml
-sensors:
-  <sensor-id>:
-    name: My Sensor                  # required, max 100 chars
-    cron: '0 8 * * ? *'               # required — when the check window opens
-    timezone: UTC                    # required — IANA timezone
-    timeout_mins: 60                 # required — max 7200; must be < cron interval
-    frequency_secs: 60               # optional — polling interval (60–600, default 60)
-    exclude: []                      # optional — YYYY-MM-DD dates to skip
-    run_inputs: {}                   # optional — inputs to pass when sensor triggers
-
-    checks:                          # required — dict of SensorCheckModel
-      <check-id>:
-        integration: SNOWFLAKE       # IntegrationsEnum
-        sensor_type: SNOWFLAKE_QUERY # SensorChecksEnum (see table below)
-        connection: my_snowflake_12345
-        parameters:
-          query: "SELECT COUNT(*) FROM daily_files WHERE date = CURRENT_DATE"
-        map_outputs:                 # optional — pipe check results to pipeline inputs
-          file_count: "result"       # pipeline input name → check output field
-
-    alerts:                          # optional — sensor-level alerts
-      - name: sensor-timed-out
-        statuses: [FAILED]
-        destinations:
-          - integration: SLACK
-            destination: '#data-alerts'
-```
+See the shared reference for the full schema (all fields, required/optional, the `alerts:`
+sub-block, and the cron/timeout/`map_outputs` notes):
+[`../../references/sensors.md`](../../references/sensors.md#sensormodel-schema).
 
 ---
 
 ## Valid SensorChecksEnum Values
 
-| `sensor_type` | Integration | What it checks |
-|---|---|---|
-| `AWS_S3_FILE` | `AWS_S3` | File exists at S3 prefix |
-| `ADLS_FILE` | `AZURE_DATA_LAKE_STORAGE` | File exists in ADLS container |
-| `SFTP_FILE` | `SFTP` | File exists on SFTP server |
-| `SNOWFLAKE_QUERY` | `SNOWFLAKE` | SQL query returns rows (or specific value) |
-| `POSTGRES_QUERY` | `POSTGRES` | SQL query returns rows |
-| `GCP_BIG_QUERY_QUERY` | `GCP_BIG_QUERY` | SQL query returns rows |
-| `SQL_SERVER_QUERY` | `SQL_SERVER` | SQL query returns rows |
-| `DATABRICKS_QUERY` | `DATABRICKS` | SQL query returns rows |
-| `FABRIC_SYNAPSE_QUERY` | `FABRIC_SYNAPSE` | SQL query returns rows |
-| `ORCHESTRA_PIPELINE_STATUS` | `ORCHESTRA` | Another pipeline completed with given status |
-| `ORCHESTRA_WEBHOOK_EVENT` | `ORCHESTRA` | Webhook event received |
+See the shared reference for the full `sensor_type` / integration / check-semantics table:
+[`../../references/sensors.md`](../../references/sensors.md#sensorchecksenum-values).
 
 ---
 
@@ -147,31 +113,9 @@ ExternalTaskSensor(
 )
 ```
 
-```yaml
-# Orchestra — use trigger_events for upstream pipeline completion
-trigger_events:
-  - type: pipeline
-    pipeline_id: "uuid-of-upstream-elt-pipeline"
-    statuses: [SUCCEEDED, WARNING]
-```
-
-Or use a sensor for polling-based wait:
-
-```yaml
-sensors:
-  wait-for-upstream:
-    name: Wait for upstream ELT
-    cron: '0 5 * * ? *'
-    timezone: UTC
-    timeout_mins: 120
-    checks:
-      pipeline-check:
-        integration: ORCHESTRA
-        sensor_type: ORCHESTRA_PIPELINE_STATUS
-        parameters:
-          pipeline_id: "uuid-of-upstream-elt-pipeline"
-          status: SUCCEEDED
-```
+Maps to Orchestra's `trigger_events:` (event-driven, preferred when the upstream is an Orchestra
+pipeline) or an `ORCHESTRA_PIPELINE_STATUS` sensor check (poll-based) — see the shared reference
+for both patterns: [`../../references/sensors.md`](../../references/sensors.md#waiting-on-another-pipeline).
 
 ### ADLS FileSensor → `ADLS_FILE`
 
@@ -269,5 +213,6 @@ pipeline:
 
 ## References
 
+- Shared Orchestra sensors syntax: [`../../references/sensors.md`](../../references/sensors.md)
 - Orchestra sensors: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
 - SensorChecksEnum: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema#sensorchecksmodel
