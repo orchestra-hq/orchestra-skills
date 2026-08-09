@@ -21,33 +21,11 @@ Converts Prefect `@task` functions that use the `tableau-server-client` (TSC) Py
 
 ## Orchestra YAML Structure
 
-```yaml
-integration: TABLEAU_CLOUD
-integration_job: TABLEAU_REFRESH_WORKBOOK   # or TABLEAU_REFRESH_EXTRACT
-name: refresh_sales_dashboard
-connection: tableau_cloud_prod_12345
-parameters:
-  project_name: Sales
-  workbook_name: Sales Dashboard
-depends_on: []
-condition: null
-tags: []
-```
-
-For a datasource extract refresh:
-
-```yaml
-integration: TABLEAU_CLOUD
-integration_job: TABLEAU_REFRESH_EXTRACT
-name: refresh_orders_extract
-connection: tableau_cloud_prod_12345
-parameters:
-  project_name: Sales
-  datasource_name: Orders Extract
-depends_on: []
-condition: null
-tags: []
-```
+See the [shared Tableau task YAML shape](../../references/tableau.md#task-yaml-shape) for the full
+`TABLEAU_CLOUD` task block, the [datasource extract refresh](../../references/tableau.md#datasource-extract-refresh)
+variant, and [connection/job-completion notes](../../references/tableau.md#connection-and-job-completion) —
+identical regardless of source orchestrator. The worked example below shows it populated with values pulled
+from the Prefect TSC calls.
 
 ## Conversion Steps
 

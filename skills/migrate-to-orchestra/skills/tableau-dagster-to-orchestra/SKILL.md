@@ -22,26 +22,13 @@ In Dagster, Tableau is integrated via `dagster-tableau`: a `TableauCloudWorkspac
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: TABLEAU_CLOUD
-        integration_job: TABLEAU_REFRESH_WORKBOOK
-        name: <descriptive name>
-        connection: <orchestra-tableau-cloud-connection-name>
-        parameters:
-          project_name: <tableau-project-name>   # required
-          workbook_name: <tableau-workbook-name>    # required
-        depends_on: []
-        condition: null
-        tags: []
-```
+See the [shared Tableau task YAML shape](../../references/tableau.md#task-yaml-shape) for the full
+`TABLEAU_CLOUD` task block, the [datasource extract refresh](../../references/tableau.md#datasource-extract-refresh)
+variant, and [connection/job-completion notes](../../references/tableau.md#connection-and-job-completion) —
+identical regardless of source orchestrator.
 
-> **Datasource refresh** — for a published datasource, use `integration_job: TABLEAU_REFRESH_EXTRACT` and `parameters.datasource_name`.
+The `name:` field is a descriptive name you choose — Dagster asset keys aren't reused directly since they're
+often not human-readable enough on their own.
 
 ## Conversion Steps
 
