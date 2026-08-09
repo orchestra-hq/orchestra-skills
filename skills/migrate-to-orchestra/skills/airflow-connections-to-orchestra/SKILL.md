@@ -19,7 +19,7 @@ Airflow never puts credentials directly in DAG code. Instead, every operator or 
 connection: null   # no distinct conn_id in the source; Orchestra uses the workspace default for this integration
 ```
 
-**Power BI specifically:** the workspace scope duplicated between task parameters and the connection shows up as `group_id` on Airflow's `PowerBIDatasetRefreshOperator`, mapping to `workspace_id` on the Orchestra connection — see the shared reference's task-parameter-scope guidance for the general rule.
+**Power BI specifically:** Airflow's `PowerBIDatasetRefreshOperator(group_id=...)` maps to the workspace configured on the Orchestra Power BI connection at setup — there is no per-task `workspace_id` parameter to set (`POWER_BI_REFRESH_DATASET`/`POWER_BI_REFRESH_DATAFLOW` don't have one; see `powerbi-airflow-to-orchestra`). If different tasks target different `group_id`s, that needs one Orchestra connection per workspace, not a task-level override.
 
 For the full naming format, `connection: null` semantics, and the environment-specific `${{ ENV.VAR }}` pattern, see [`../../references/connections.md`](../../references/connections.md).
 

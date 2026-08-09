@@ -34,13 +34,21 @@ credential.
 
 ## Don't duplicate connection-level scope into task parameters
 
-This extends to task parameters that duplicate connection-level scope, too — e.g. a Power BI workspace ID,
-or any other parameter whose value is also stored on the Orchestra connection itself. If the source code
-just reads the same single value everywhere (one env var, one resource/block-level config field) rather
-than genuinely varying it per task, leave that parameter `null`/omitted and let the connection's own
+This extends to task parameters that duplicate connection-level scope, too — e.g. Airbyte's optional
+`parameters.workspace_id` (metadata only; the connection itself already scopes which Airbyte workspace is
+used), or any other parameter whose value is also stored on the Orchestra connection itself. If the source
+code just reads the same single value everywhere (one env var, one resource/block-level config field)
+rather than genuinely varying it per task, leave that parameter `null`/omitted and let the connection's own
 configured value apply. Only carry an explicit value through (literal, input, or `${{ ENV.VAR }}`) when a
-specific task truly needs to override it — e.g. targeting a different Power BI workspace than the one
-configured on the connection.
+specific task truly needs to override it.
+
+**Not every integration has a task-level override at all.** Some integrations scope a resource (a
+workspace, a site) entirely on the connection with no matching task parameter to null out — e.g. Power BI:
+there is no `workspace_id` on either `POWER_BI_REFRESH_DATASET` or `POWER_BI_REFRESH_DATAFLOW`
+(`additionalProperties: false` on both — see `skills/orchestra/references/orchestra/schemas/pipeline_schema.json`).
+If the source targets more than one such scope, that requires a separate Orchestra connection per scope, not
+a task-level parameter. Check the actual parameter model for the integration in question before assuming an
+override field exists.
 
 ## Environment-specific connections
 
