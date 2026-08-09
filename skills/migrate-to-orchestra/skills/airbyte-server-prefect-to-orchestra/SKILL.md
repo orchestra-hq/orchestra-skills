@@ -19,18 +19,9 @@ This skill converts Prefect `prefect_airbyte` tasks targeting a self-hosted Airb
 
 ## Orchestra YAML Structure
 
-```yaml
-integration: AIRBYTE_SERVER
-integration_job: AIRBYTE_SERVER_JOB
-name: sync-task
-connection: airbyte_server_prod_12345
-parameters:
-  connection_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-  job_type: sync
-depends_on: []
-condition: null
-tags: []
-```
+For the canonical `AIRBYTE_SERVER` task shape (fields, `job_type` values, and the `connection:`
+vs `parameters.connection_id` distinction), see the shared reference:
+[`../../references/airbyte-server.md`](../../references/airbyte-server.md#task-shape).
 
 ## Conversion Steps
 

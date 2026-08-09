@@ -22,24 +22,11 @@ Self-hosted Airbyte is integrated in Dagster via `dagster-airbyte`'s `AirbyteRes
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: AIRBYTE_SERVER
-        integration_job: AIRBYTE_SERVER_JOB
-        name: <descriptive name>
-        connection: <orchestra-airbyte-server-connection-name>
-        parameters:
-          connection_id: <airbyte-connection-uuid>
-          job_type: sync
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the canonical `AIRBYTE_SERVER` task shape (fields, `job_type` values, and the `connection:`
+vs `parameters.connection_id` distinction), see the shared reference:
+[`../../references/airbyte-server.md`](../../references/airbyte-server.md#task-shape).
+
+`name:` takes a descriptive name derived from the asset key.
 
 ## Conversion Steps
 
