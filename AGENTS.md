@@ -90,6 +90,15 @@ skills/
     references/
       alerts.md              # Orchestra-side alerts: syntax shared by all three *-alerts-to-orchestra skills
       connections.md         # Orchestra-side connection: syntax shared by all three *-connections-to-orchestra skills
+      sensors.md             # Orchestra-side sensors: syntax shared by airflow/dagster-sensors-to-orchestra
+      slack.md                # Orchestra-side SLACK task syntax shared by all three slack-*-to-orchestra skills
+      dbt-core.md             # Orchestra-side DBT_CORE task syntax shared by all three dbt-core-*-to-orchestra skills
+      airbyte-cloud.md        # Orchestra-side AIRBYTE_CLOUD task syntax shared by all three airbyte-cloud-*-to-orchestra skills
+      airbyte-server.md       # Orchestra-side AIRBYTE_SERVER task syntax shared by all three airbyte-server-*-to-orchestra skills
+      fivetran.md             # Orchestra-side FIVETRAN task syntax shared by all three fivetran-*-to-orchestra skills
+      powerbi.md              # Orchestra-side POWER_BI task syntax shared by all three powerbi-*-to-orchestra skills
+      tableau.md              # Orchestra-side TABLEAU_CLOUD task syntax shared by all three tableau-*-to-orchestra skills
+      python-task.md          # Orchestra-side PYTHON task syntax shared by all three python-*-to-orchestra skills
     skills/
       dagster-definitions-to-orchestra/  # apply first — pipeline root
       dagster-connections-to-orchestra/
