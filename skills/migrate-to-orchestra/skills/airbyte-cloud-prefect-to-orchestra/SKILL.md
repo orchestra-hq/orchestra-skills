@@ -5,7 +5,7 @@ description: "Use this skill when the user wants to convert a Prefect task that 
 
 ## Overview
 
-This skill converts Prefect `prefect_airbyte` tasks targeting Airbyte Cloud (api.airbyte.com) into Orchestra pipeline tasks using `integration: AIRBYTE_CLOUD` and `integration_job: AIRBYTE_CLOUD_JOB`. It covers sync and reset job types.
+This skill converts Prefect `prefect_airbyte` tasks targeting Airbyte Cloud (api.airbyte.com) into Orchestra pipeline tasks using `integration: AIRBYTE_CLOUD` and `integration_job: AIRBYTE_CLOUD_JOB` — a task that [polls internally, with no separate sensor step](../../references/airbyte-cloud.md#orchestra-polls-internally). It covers sync and reset job types.
 
 ## Parameter Mapping
 
@@ -19,18 +19,13 @@ This skill converts Prefect `prefect_airbyte` tasks targeting Airbyte Cloud (api
 
 ## Orchestra YAML Structure
 
-```yaml
-integration: AIRBYTE_CLOUD
-integration_job: AIRBYTE_CLOUD_JOB
-name: sync-task
-connection: airbyte_cloud_prod_12345
-parameters:
-  connection_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
-  job_type: sync
-depends_on: []
-condition: null
-tags: []
-```
+For the full `AIRBYTE_CLOUD` task schema, `job_type` values, and the `connection:` vs
+`parameters.connection_id` distinction, see the shared reference:
+[`../../references/airbyte-cloud.md`](../../references/airbyte-cloud.md#airbyte_cloud-task-schema).
+
+The Prefect-specific mapping is: `name:` takes a descriptive name derived from the flow/task, and
+`depends_on:` takes the upstream Orchestra task names/UUIDs derived from flow task dependencies
+(see the full example below).
 
 ## Conversion Steps
 

@@ -7,7 +7,7 @@ description: "Use this skill when the user wants to convert an Airflow task that
 
 ## Overview
 
-An Airflow `AirbyteTriggerSyncOperator` task triggers a connection sync in Airbyte Cloud and optionally waits for completion. In Orchestra the equivalent is a **Sync** task under the `AIRBYTE_CLOUD` integration. Orchestra always polls for completion; there is no separate sensor.
+An Airflow `AirbyteTriggerSyncOperator` task triggers a connection sync in Airbyte Cloud and optionally waits for completion. In Orchestra the equivalent is a single `AIRBYTE_CLOUD` task — see the shared reference for how it polls internally with [no separate sensor](../../references/airbyte-cloud.md#orchestra-polls-internally).
 
 ## Parameter Mapping
 
@@ -24,24 +24,13 @@ An Airflow `AirbyteTriggerSyncOperator` task triggers a connection sync in Airby
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: AIRBYTE_CLOUD
-        integration_job: AIRBYTE_CLOUD_JOB
-        name: <task_id value from Airflow>
-        connection: <orchestra-airbyte-cloud-connection-name>
-        parameters:
-          connection_id: <airbyte-connection-uuid>
-          job_type: sync          # required: "sync" or "reset"
-        depends_on: []   # replace with upstream task names/UUIDs
-        condition: null
-        tags: []
-```
+For the full `AIRBYTE_CLOUD` task schema, `job_type` values, and the `connection:` vs
+`parameters.connection_id` distinction, see the shared reference:
+[`../../references/airbyte-cloud.md`](../../references/airbyte-cloud.md#airbyte_cloud-task-schema).
+
+The Airflow-specific mapping is: `name:` takes the operator's `task_id` value, and `depends_on:`
+takes the upstream task names/UUIDs derived from `>>` / `set_upstream` chains (see the full example
+below).
 
 ## Conversion Steps
 
