@@ -7,7 +7,7 @@ description: "Use this skill when the user wants to convert an Airflow task that
 
 ## Overview
 
-Airflow's `PythonOperator` runs a callable inline in the worker — the code lives right there in the DAG file, not in some separate repo the DAG checks out at runtime. Orchestra's Python integration (**Execute Script**) has two modes: `source: INLINE` runs code pasted directly into the task's `parameters.code`, and `source: GIT` runs a file checked out from a Git repo via `parameters.command`. **Default to `INLINE`** — it's the direct match for what Airflow already does (code inline in the DAG), needs no Git repo or connection wiring, and skips a whole conversion step. Only reach for `GIT` when the callable itself checks out and runs a script that already lives in a separate repo (rare for `PythonOperator` — more of a `BashOperator` pattern).
+Airflow's `PythonOperator` runs a callable inline in the worker — the code lives right there in the DAG file, not in some separate repo the DAG checks out at runtime. For how Orchestra's Python integration handles that (the `INLINE`/`GIT` execution modes and the default choice), see the shared reference: [`../../references/python-task.md`](../../references/python-task.md#inline-vs-git-execution-modes). Reaching for `GIT` is rarer still for `PythonOperator` than for other sources — it's more of a `BashOperator` pattern — since a `PythonOperator` callable checking out and running an already-separate script is unusual.
 
 ## Parameter Mapping
 
@@ -25,29 +25,9 @@ Airflow's `PythonOperator` runs a callable inline in the worker — the code liv
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: PYTHON
-        integration_job: PYTHON_EXECUTE_SCRIPT
-        name: <task_id value from Airflow>
-        connection: null                          # usually null for INLINE — no repo/creds needed unless the code itself needs a specific connection's secrets
-        parameters:
-          source: INLINE                           # default — code already lives in the DAG, no Git repo involved
-          code: |
-            <callable body, copied verbatim>
-          build_command: 'pip install pandas'      # optional — only for non-stdlib imports
-          python_version: '3.12'
-        depends_on: []
-        condition: null
-        tags: []
-```
+See the shared [Task YAML skeleton](../../references/python-task.md#task-yaml-skeleton) for the full field shape (`integration: PYTHON`, `integration_job: PYTHON_EXECUTE_SCRIPT`, `source: INLINE`, `code`, `build_command`, `python_version`). Set `name:` to the Airflow task's `task_id` value.
 
-Use `source: GIT` + `command:` (see `python-dagster-to-orchestra`/`python-prefect-to-orchestra` for the field shape) only when the Airflow task's callable genuinely runs a script that's already checked into a separate Git repo — not just because Orchestra supports it.
+Use `source: GIT` + `command:` only when the Airflow task's callable genuinely runs a script that's already checked into a separate Git repo — not just because Orchestra supports it.
 
 ## Conversion Steps
 
@@ -117,15 +97,13 @@ pipeline:
 ## Gotchas
 
 - **Default to `source: INLINE`, not `GIT`** — the callable's code already lives in the DAG file; pasting it into `parameters.code` is a direct match. Don't reach for `source: GIT` (extracting to a script, committing it, wiring a connection) just because that's the other mode Orchestra supports — it's extra work with no source-fidelity benefit unless the callable genuinely runs a script from an external repo.
-- **Consuming a JSON-shaped upstream output (converted XCom) in `code`?** Wrap the `${{ ...OUTPUTS[...] }}` substitution in Python triple-quotes for `json.loads()`, not single/double — see `airflow-xcoms-to-orchestra`'s Gotchas for why (raw text substitution, no escaping).
+- **Consuming a JSON-shaped upstream output (converted XCom) in `code`?** See the shared reference's [triple-quote guidance](../../references/python-task.md#consuming-a-json-shaped-upstream-output) — and `airflow-xcoms-to-orchestra`'s Gotchas for why the substitution needs it (raw text substitution, no escaping).
 - **Airflow context / Jinja templates**: Airflow macros like `{{ ds }}` are not available in Orchestra. Replace with static values, pipeline variables, or read from environment variables set by Orchestra.
 - **Inline lambdas / closures**: if the callable uses closures or imports from elsewhere in the same DAG file, inline those into `code` too so it's self-contained.
 - **`@task` decorator (TaskFlow API)**: same approach — copy the decorated function body into `code` verbatim.
 - **`PythonVirtualenvOperator` requirements**: list them in `build_command` as a `pip install ...` command.
-- **`environment_variables` is a JSON string, not a nested map** — it's a single string field on the parameters model (e.g. `'{"KEY": "value"}'`), not a YAML mapping.
-- **No specific connection mapped**: `connection: null` is the norm for `INLINE` tasks with no external credentials. Only set a specific connection if the code needs secrets injected from one (e.g. a boto3/Snowflake client reading connection-provided env vars) — never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field.
-- **Secrets**: do not hardcode credentials in `code`. If secrets are needed, use an Orchestra connection's injected env vars.
-- **`source: GIT` still exists for real Git-backed scripts** — if the Airflow task checks out and runs a script from a separate repo, use `GIT` + `parameters.command`, and create/verify a Python connection pointing at that repo (URL, branch, credentials). Orchestra supports sparse checkout for large monorepos, configurable on the connection.
+
+For the `environment_variables` JSON-string format, the `connection: null` default, secrets handling, and using `source: GIT` for real Git-backed scripts, see the shared reference: [`../../references/python-task.md`](../../references/python-task.md).
 
 ## References
 

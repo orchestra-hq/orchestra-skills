@@ -7,7 +7,7 @@ description: "Use this skill when the user wants to convert a Dagster @op or @as
 
 ## Overview
 
-Dagster's `@op` and `@asset` run Python inline in the Dagster executor — the logic lives right there in the op/asset function, not in a separate repo checked out at runtime. Orchestra's Python integration (**Execute Script**) has two modes: `source: INLINE` runs code pasted directly into `parameters.code`, and `source: GIT` runs a file checked out from a Git repo via `parameters.command`. **Default to `INLINE`** — it matches what Dagster already does and skips the extra step of extracting the body to a file and wiring a Git connection. Only use `GIT` when the op/asset itself checks out and runs a script from an already-separate repo.
+Dagster's `@op` and `@asset` run Python inline in the Dagster executor — the logic lives right there in the op/asset function, not in a separate repo checked out at runtime. For how Orchestra's Python integration handles that (the `INLINE`/`GIT` execution modes and the default choice), see the shared reference: [`../../references/python-task.md`](../../references/python-task.md#inline-vs-git-execution-modes).
 
 ## Parameter Mapping
 
@@ -24,27 +24,7 @@ Dagster's `@op` and `@asset` run Python inline in the Dagster executor — the l
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: PYTHON
-        integration_job: PYTHON_EXECUTE_SCRIPT
-        name: <op/asset name>
-        connection: null                          # usually null for INLINE — set only if the code needs a specific connection's secrets
-        parameters:
-          source: INLINE                           # default — code already lives in the op/asset, no Git repo involved
-          code: |
-            <op/asset body, copied verbatim>
-          build_command: 'pip install pandas'      # optional — only for non-stdlib imports
-          python_version: '3.12'
-        depends_on: []
-        condition: null
-        tags: []
-```
+See the shared [Task YAML skeleton](../../references/python-task.md#task-yaml-skeleton) for the full field shape (`integration: PYTHON`, `integration_job: PYTHON_EXECUTE_SCRIPT`, `source: INLINE`, `code`, `build_command`, `python_version`). Set `name:` to the op/asset name.
 
 Use `source: GIT` + `command:` only when the op/asset genuinely runs a script that already lives in a separate Git repo — not by default just because Orchestra supports it.
 
@@ -132,14 +112,13 @@ pipeline:
 
 - **Default to `source: INLINE`, not `GIT`** — the op/asset body already lives in the Dagster code; pasting it into `parameters.code` is a direct match. Reach for `GIT` only when the op genuinely runs a script from an already-separate repo.
 - **Resources / dependency injection** — Dagster ops receive clients via context; the inlined code instantiates its own and reads credentials from connection-injected env vars (only wire `connection:` if this is actually needed).
-- **`Config` -> inline literals or `environment_variables`** — read with `os.environ`; `environment_variables` is a JSON string, not a nested YAML map.
+- **`Config` -> inline literals or `environment_variables`** — read with `os.environ` (see the shared reference for the [`environment_variables` JSON-string format](../../references/python-task.md#environment_variables-is-a-json-string)).
 - **In-memory inputs/outputs** — Orchestra tasks do not share Python objects; pass small values via `set_outputs` or stage data in S3/warehouse.
-- **Consuming a JSON-shaped upstream output in `code`?** Wrap the `${{ ...OUTPUTS[...] }}` substitution in Python triple-quotes for `json.loads()`, not single/double — see `dagster-io-managers-to-orchestra`'s Gotchas for why (raw text substitution, no escaping).
+- **Consuming a JSON-shaped upstream output in `code`?** See the shared reference's [triple-quote guidance](../../references/python-task.md#consuming-a-json-shaped-upstream-output) — and `dagster-io-managers-to-orchestra`'s Gotchas for why the substitution needs it (raw text substitution, no escaping).
 - **IO managers** — replicate any IO-manager persistence explicitly in `code`.
 - **`@multi_asset`** — one op producing several assets becomes one Orchestra PYTHON task.
-- **Secrets** — never hardcode; use Orchestra connection secrets if credentials are actually needed.
-- **No specific connection mapped** — `connection: null` is the norm for `INLINE` tasks with no external credentials. Never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field.
-- **`source: GIT` still exists for real Git-backed scripts** — if the op/asset checks out and runs a script from a separate repo, commit it there and reference by relative path via `command:`, with a Python connection pointing at that repo.
+
+For the `connection: null` default and secrets handling, and using `source: GIT` for real Git-backed scripts, see the shared reference: [`../../references/python-task.md`](../../references/python-task.md).
 
 ## References
 

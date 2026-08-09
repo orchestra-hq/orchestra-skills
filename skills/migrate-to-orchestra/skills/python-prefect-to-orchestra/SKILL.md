@@ -5,7 +5,7 @@ description: "Use this skill when the user wants to convert a Prefect @task func
 
 ## Overview
 
-Converts Prefect `@task` functions into Orchestra `PYTHON_EXECUTE_SCRIPT` pipeline tasks. The function body already lives inline in the flow code, not in a separate repo checked out at runtime — so it maps directly to `source: INLINE` + `parameters.code`, with no Git repo or connection wiring needed unless the task genuinely needs credentials. Only use `source: GIT` + `parameters.command` when the task checks out and runs a script from an already-separate repo. Flow-level inputs become pipeline `inputs:` and are passed via `parameters.environment_variables` (a JSON string) or inlined as literals. Task decorators (`retries`, `timeout_seconds`, `tags`) map to `configuration:` and `tags:`.
+Converts Prefect `@task` functions into Orchestra `PYTHON_EXECUTE_SCRIPT` pipeline tasks. The function body already lives inline in the flow code, not in a separate repo checked out at runtime. For how Orchestra's Python integration handles that (the `INLINE`/`GIT` execution modes and the default choice), see the shared reference: [`../../references/python-task.md`](../../references/python-task.md#inline-vs-git-execution-modes). Flow-level inputs become pipeline `inputs:` and are passed via `parameters.environment_variables` (a JSON string) or inlined as literals. Task decorators (`retries`, `timeout_seconds`, `tags`) map to `configuration:` and `tags:`.
 
 ## Parameter Mapping
 
@@ -24,6 +24,8 @@ Converts Prefect `@task` functions into Orchestra `PYTHON_EXECUTE_SCRIPT` pipeli
 | `@flow` parameters | pipeline `inputs:` block | `type: string/integer/boolean`, optional `default:` |
 
 ## Orchestra YAML Structure
+
+The base task shape matches the shared [Task YAML skeleton](../../references/python-task.md#task-yaml-skeleton) (`integration: PYTHON`, `integration_job: PYTHON_EXECUTE_SCRIPT`, `source: INLINE`, `code`, `build_command`, `python_version`) — set `name:` to the `@task` function name. Prefect flows additionally map `@flow` parameters to a pipeline-level `inputs:` block, and task decorators (`retries`, `retry_delay_seconds`, `timeout_seconds`) to a task-level `configuration:` block:
 
 ```yaml
 version: v1
@@ -144,14 +146,12 @@ pipeline:
 - **Default to `source: INLINE`, not `GIT`** — the `@task` body already lives in the flow code; pasting it into `parameters.code` is a direct match. Reach for `GIT` only when the task genuinely runs a script from an already-separate repo.
 - Prefect blocks inside `@task` (e.g. `SnowflakeConnector.load(...)`) must be **replaced with `os.environ` reads** — credentials live on an Orchestra connection's secrets, not in YAML; only wire `connection:` if this is actually needed
 - Return values don't auto-pass between tasks — use `set_outputs: true` on the task and call `client.set_output("key", value)` in `code`, where `client = OrchestraSDK(api_key=os.environ.get("ORCHESTRA_API_KEY"))` (`set_output` is a method on the client, not a bare importable function); see `prefect-data-passing-to-orchestra`
-- **Consuming a JSON-shaped upstream output in `code`?** Wrap the `${{ ...OUTPUTS[...] }}` substitution in Python triple-quotes for `json.loads()`, not single/double — see `prefect-data-passing-to-orchestra`'s Gotchas for why (raw text substitution, no escaping).
+- **Consuming a JSON-shaped upstream output in `code`?** See the shared reference's [triple-quote guidance](../../references/python-task.md#consuming-a-json-shaped-upstream-output) — and `prefect-data-passing-to-orchestra`'s Gotchas for why the substitution needs it (raw text substitution, no escaping).
 - `cache_key_fn` has no Orchestra equivalent — drop it
 - `retry_delay_seconds` in Prefect becomes `retry_delay` in Orchestra `configuration:` — **the unit changes, not just the key name**: Orchestra's `retry_delay` is integer MINUTES, so divide by 60 (round up). Capped at 120 (minutes); the API rejects anything higher with "Delay between retries cannot be greater than 120 minutes."
 - `timeout_seconds` becomes `timeout` (seconds) in `configuration:`
-- **`environment_variables` is a single JSON string, not a nested map** — e.g. `'{"KEY": "value"}'`, not a YAML mapping under that key
-- Secrets and API keys go on an Orchestra connection's environment, never hardcoded in YAML or `code`
-- **No specific connection mapped** — `connection: null` is the norm for `INLINE` tasks with no external credentials. Never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field
-- **`source: GIT` still exists for real Git-backed scripts** — if the task checks out and runs a script from a separate repo, commit it there and reference by relative path via `command:`, with a Python connection pointing at that repo
+
+For the `environment_variables` JSON-string format, the `connection: null` default, secrets handling, and using `source: GIT` for real Git-backed scripts, see the shared reference: [`../../references/python-task.md`](../../references/python-task.md).
 
 ## References
 
