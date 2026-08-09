@@ -22,29 +22,15 @@ Airflow's `FivetranOperator` triggers a Fivetran connector sync and optionally w
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: FIVETRAN
-        integration_job: FIVETRAN_SYNC_ALL
-        name: <task_id value from Airflow>
-        connection: <orchestra-fivetran-connection-name>
-        parameters:
-          connector_id: <fivetran-connector-id>
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the full FIVETRAN task shape — schema, field names, and where `connector_id` lives — see the
+shared reference: [`../../references/fivetran.md`](../../references/fivetran.md#fivetran-task-schema).
+The task's `name:` is the `task_id` value from the Airflow operator.
 
 ## Conversion Steps
 
 1. **Identify the Airflow task** — locate `FivetranOperator`. Note `connector_id` and `fivetran_conn_id`.
 2. **Verify/create the Orchestra connection** — in Orchestra Settings → Connections, confirm a *Fivetran* connection exists with your API key and secret. Note its name.
-3. **Replace operator with task block** — use the YAML above.
+3. **Replace operator with task block** — use the shape in the shared reference above, filling in the values from steps 1-2.
 4. **Drop any paired `FivetranSensor`** — Orchestra's sync task already polls.
 5. **Wire dependencies** — convert `>>` chains to `depends_on:`.
 6. **Remove scheduling fields** — `reschedule_for`, `schedule_type` are Fivetran-scheduler concepts; Orchestra's pipeline schedule replaces them.

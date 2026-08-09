@@ -18,23 +18,8 @@ Converts Prefect Fivetran sync tasks into Orchestra pipeline YAML. A Prefect `Fi
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: fivetran-flow
-pipeline:
-  stage-001:
-    tasks:
-      task-001:
-        integration: FIVETRAN
-        integration_job: FIVETRAN_SYNC_ALL
-        name: sync_salesforce
-        connection: fivetran_prod_12345
-        parameters:
-          connector_id: bronzing_regularly
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the full FIVETRAN task shape — schema, field names, and where `connector_id` lives — see the
+shared reference: [`../../references/fivetran.md`](../../references/fivetran.md#fivetran-task-schema).
 
 ## Conversion Steps
 

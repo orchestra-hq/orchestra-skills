@@ -22,29 +22,15 @@ In Dagster, Fivetran is integrated via `dagster-fivetran`: a `FivetranResource` 
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: FIVETRAN
-        integration_job: FIVETRAN_SYNC_ALL
-        name: <descriptive name>
-        connection: <orchestra-fivetran-connection-name>
-        parameters:
-          connector_id: <fivetran-connector-id>
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the full FIVETRAN task shape — schema, field names, and where `connector_id` lives — see the
+shared reference: [`../../references/fivetran.md`](../../references/fivetran.md#fivetran-task-schema).
+The task's `name:` is a descriptive name you choose, typically derived from the asset key.
 
 ## Conversion Steps
 
 1. **Find the Fivetran resource** — locate `FivetranResource` and the `connector_id` passed to `build_fivetran_assets`.
 2. **Verify/create the Orchestra connection** — Settings -> Connections -> Fivetran with API key + secret. Note its name.
-3. **Replace assets with a task block** — one task per connector.
+3. **Replace assets with a task block** — one task per connector, using the shape in the shared reference above.
 4. **Wire dependencies** — convert upstream asset deps to `depends_on:`.
 
 ## Before / After Example
