@@ -82,43 +82,9 @@ pipeline:
 
 ## Option 2: Explicit Slack Pipeline Task — for mid-pipeline messages
 
-**`SLACK` IS a valid `integration` value** — use `integration: SLACK` + `integration_job: SEND_SLACK_MESSAGE` to send a Slack message as an explicit pipeline step.
-
-Required parameter: `channel_name`. At least one of `text`, `blocks`, or `attachments` must be provided.
-
-### Orchestra YAML — explicit Slack task
-
-```yaml
-version: v1
-name: my-pipeline
-pipeline:
-  stage-001:
-    tasks:
-      task-001:
-        integration: DBT_CORE
-        integration_job: DBT_CORE_EXECUTE
-        name: dbt_run
-        connection: my_dbt_conn_12345
-        parameters:
-          commands: 'dbt build;'
-          python_version: '3.12'
-        depends_on: []
-        condition: null
-        tags: []
-
-      task-002:
-        integration: SLACK
-        integration_job: SEND_SLACK_MESSAGE
-        name: notify_mid_pipeline
-        connection: slack_prod_12345
-        parameters:
-          channel_name: '#data-team'
-          text: 'dbt build complete — starting downstream loads.'
-        depends_on:
-          - task-001
-        condition: null
-        tags: []
-```
+`SLACK` is a valid pipeline task `integration` value, with `integration_job: SEND_SLACK_MESSAGE` — the
+required parameters and a full example task are in the shared reference:
+[Explicit Slack pipeline task](../../references/slack.md#explicit-slack-pipeline-task).
 
 **When to use a task vs an alert:**
 - Use an **alert** (`alerts:` block) when the message should fire on pipeline/task *status* (FAILED, SUCCEEDED, etc.) — no task slot needed.

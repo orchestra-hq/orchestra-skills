@@ -48,20 +48,8 @@ alerts:
 
 **Option 2 — Explicit Slack pipeline task (mid-flow message, incl. raw slack_sdk calls):**
 
-Required parameter: `channel_name`; at least one of `text`, `blocks`, or `attachments`.
-
-```yaml
-integration: SLACK
-integration_job: SEND_SLACK_MESSAGE
-name: notify_slack
-connection: slack_prod_12345
-parameters:
-  channel_name: '#alert-demos'
-  text: ':bar_chart: Power BI dashboard refreshed — status: Completed.'
-depends_on: [task-001]
-condition: null
-tags: []
-```
+The required parameters and a full example task are in the shared reference:
+[Explicit Slack pipeline task](../../references/slack.md#explicit-slack-pipeline-task).
 
 **Full pipeline example with both patterns:**
 
