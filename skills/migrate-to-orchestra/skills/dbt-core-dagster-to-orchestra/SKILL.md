@@ -27,26 +27,9 @@ In Orchestra, dbt Core is a first-class integration. A single **Execute** task u
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: DBT_CORE
-        integration_job: DBT_CORE_EXECUTE
-        name: <descriptive name>
-        connection: <orchestra-dbt-core-connection-name>
-        parameters:
-          commands: 'dbt seed; dbt build --select tag:daily;'
-          package_manager: PIP
-          python_version: '3.12'
-          project_dir: null   # optional — subdirectory holding dbt_project.yml, e.g. 'dbt' in a monorepo
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the full `DBT_CORE_EXECUTE` task shape (fields, `parameters.commands` joining, `project_dir`
+semantics), see the shared reference:
+[`../../references/dbt-core.md`](../../references/dbt-core.md#dbt_core_execute-task-shape).
 
 ## Conversion Steps
 
@@ -108,11 +91,7 @@ pipeline:
 - **`project_dir` is a real task parameter, not connection config** — carry `DbtProject(project_dir=...)`'s value over to `parameters.project_dir` instead of dropping it. Only `null` it if the dbt project genuinely sits at the repo root.
 - **Partitioned dbt assets / `--vars`** — Orchestra has no backfill; convert vars to `inputs:` or hardcode and flag partition logic.
 - **Manifest** — Dagster needs a compiled `manifest.json`; Orchestra compiles on its runners, so you do not ship the manifest.
-- **Can't infer `package_manager`**: don't just guess `PIP` and move on. Flag it instead:
-  ```yaml
-  package_manager: PIP  # MANUAL: could not detect pip/poetry/uv from the source — confirm/select the correct package manager when setting up the dbt Core connection
-  ```
-  This surfaces as a Manual Review item in the migration checklist, so the user resolves it alongside connection setup rather than deploying a silently-wrong environment.
+- **Can't infer `package_manager`**: see the shared reference for the detection order and the `# MANUAL:` flagging convention — [`../../references/dbt-core.md`](../../references/dbt-core.md#determining-the-package-manager).
 
 ## References
 

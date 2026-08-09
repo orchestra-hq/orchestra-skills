@@ -27,28 +27,9 @@ The `commands` list from Prefect is joined into a single semicolon-delimited str
 
 ## Orchestra YAML Structure
 
-**dbt Core:**
-
-```yaml
-version: v1
-name: dbt-flow
-pipeline:
-  stage-001:
-    tasks:
-      task-001:
-        integration: DBT_CORE
-        integration_job: DBT_CORE_EXECUTE
-        name: dbt_daily_build
-        connection: data_dbt_bigquery_prod_12345
-        parameters:
-          commands: 'dbt seed; dbt build --select tag:daily --target prod;'
-          package_manager: PIP
-          python_version: '3.12'
-          project_dir: null   # optional — subdirectory holding dbt_project.yml, e.g. 'dbt' in a monorepo
-        depends_on: []
-        condition: null
-        tags: []
-```
+**dbt Core:** for the full `DBT_CORE_EXECUTE` task shape (fields, `parameters.commands` joining,
+`project_dir` semantics), see the shared reference:
+[`../../references/dbt-core.md`](../../references/dbt-core.md#dbt_core_execute-task-shape).
 
 **dbt Cloud:**
 
@@ -130,11 +111,7 @@ pipeline:
 - `DbtCloudJob` (Cloud) uses a different integration pair: `integration: DBT`, `integration_job: DBT_RUNJOB`, `parameters: {job_id: "123456"}`
 - `ShellOperation(commands=["dbt build"])` is treated identically to `DbtCoreOperation`
 - `--select`, `--exclude`, and `--target` flags belong inside the `commands` string, not as separate parameters
-- **Can't infer `package_manager`**: don't just guess `PIP` and move on. Flag it instead:
-  ```yaml
-  package_manager: PIP  # MANUAL: could not detect pip/poetry/uv from the source — confirm/select the correct package manager when setting up the dbt Core connection
-  ```
-  This surfaces as a Manual Review item in the migration checklist, so the user resolves it alongside connection setup rather than deploying a silently-wrong environment.
+- **Can't infer `package_manager`**: see the shared reference for the detection order and the `# MANUAL:` flagging convention — [`../../references/dbt-core.md`](../../references/dbt-core.md#determining-the-package-manager).
 
 ## References
 

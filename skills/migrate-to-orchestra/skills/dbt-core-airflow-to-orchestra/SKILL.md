@@ -55,26 +55,9 @@ In Orchestra, dbt Core is a first-class integration. A single **Execute** task u
 
 ## Orchestra YAML Structure
 
-```yaml
-version: v1
-name: <pipeline-name>
-pipeline:
-  <stage-uuid>:
-    tasks:
-      <task-uuid>:
-        integration: DBT_CORE
-        integration_job: DBT_CORE_EXECUTE
-        name: <task_id or descriptive name>
-        connection: <orchestra-dbt-core-connection-name>
-        parameters:
-          commands: 'dbt seed; dbt build --select models tag:daily;'
-          package_manager: PIP       # or POETRY or UV
-          python_version: '3.12'
-          project_dir: null          # optional — subdirectory holding dbt_project.yml, e.g. 'dbt' in a monorepo
-        depends_on: []
-        condition: null
-        tags: []
-```
+For the full `DBT_CORE_EXECUTE` task shape (fields, `parameters.commands` joining, `project_dir`
+semantics), see the shared reference:
+[`../../references/dbt-core.md`](../../references/dbt-core.md#dbt_core_execute-task-shape).
 
 ## Conversion Steps
 
@@ -137,11 +120,7 @@ pipeline:
 - **`--project-dir` is a real task parameter, not connection config**: set `parameters.project_dir` to the subdirectory holding `dbt_project.yml` (e.g. `dbt_project` in a monorepo); leave it `null` if the project is at the repo root. Don't just drop `--project-dir`/`cd <dir> &&` — carry the path over instead of silently discarding it.
 - **Slim CI / state**: if the Airflow DAG uses `dbt build --state` for deferred runs, configure this in Orchestra's dbt Core connection settings (artifact storage).
 - **KubernetesPodOperator**: if dbt runs in a pod, you're likely managing the Docker image. In Orchestra dbt Core, the environment is managed; migrate the `requirements.txt` or `packages.yml` instead.
-- **Can't infer `package_manager`**: don't just guess `PIP` and move on. Flag it instead:
-  ```yaml
-  package_manager: PIP  # MANUAL: could not detect pip/poetry/uv from the source — confirm/select the correct package manager when setting up the dbt Core connection
-  ```
-  This surfaces as a Manual Review item in the migration checklist, so the user resolves it alongside connection setup rather than deploying a silently-wrong environment.
+- **Can't infer `package_manager`**: see the shared reference for the detection order and the `# MANUAL:` flagging convention — [`../../references/dbt-core.md`](../../references/dbt-core.md#determining-the-package-manager).
 
 ## References
 
