@@ -19,11 +19,12 @@ In Orchestra, both cases map to the `POWER_BI` integration.
 
 | Dagster concept | Orchestra YAML field | Notes |
 |---|---|---|
-| `PowerBIWorkspace(workspace_id=...)` | `connection:` (workspace configured on the Orchestra connection) | **No task-parameter equivalent** — `workspace_id` isn't a field on either `POWER_BI_REFRESH_DATASET` or `POWER_BI_REFRESH_DATAFLOW`. It maps entirely to which Orchestra Power BI connection you use, not to a `parameters` key — see Gotchas |
+| `PowerBIWorkspace(workspace_id=...)` | `parameters.workspace_id` | Leave `parameters.workspace_id` blank/`null` unless a specific task targets a different workspace than the one configured on the connection — see Gotchas |
 | `PowerBIServicePrincipal(tenant_id=, client_id=, client_secret=)` | `connection:` | Orchestra Power BI connection (Azure service principal) |
 | semantic model asset's dataset ID (`spec.metadata["dagster-powerbi/id"]` at runtime / `trigger_and_poll_refresh(dataset_id)`) | `parameters.dataset_id` | Required for `POWER_BI_REFRESH_DATASET`. Usually **not visible in static source** — see Overview and Gotchas before assuming you can extract a real value |
-| custom op's `dataflow_id` argument | `parameters.dataflow_id` | Required for `POWER_BI_REFRESH_DATAFLOW`; this job takes no other parameters |
+| custom op's `dataflow_id` argument | `parameters.dataflow_id` | Required for `POWER_BI_REFRESH_DATAFLOW` instead of `dataset_id` |
 | n/a (Dagster always does a default refresh) | `parameters.refresh_type` | Optional, **`POWER_BI_REFRESH_DATASET` only** — one of `Full`, `ClearValues`, `Calculate`, `DataOnly`, `Automatic`, `Defragment`. Leave `null` unless the custom code explicitly requests a specific `DatasetRefreshType`. |
+| n/a | `parameters.apply_refresh_policy` | Optional boolean, `POWER_BI_REFRESH_DATASET` only — accepted only when `refresh_type` is `Full`, `Automatic`, or `DataOnly` (live-verified: rejected otherwise) |
 | asset key / op name | `name:` | Human-readable task name |
 | upstream asset deps | `depends_on:` | |
 
@@ -97,6 +98,7 @@ pipeline:
         connection: power_bi_prod_12345
         parameters:
           dataset_id: REPLACE_WITH_REAL_DATASET_GUID   # MANUAL: load_powerbi_asset_specs discovers datasets live from the Power BI API — no GUID is visible in this source. Look up the real dataset GUID(s) in Power BI (workspace → dataset settings → URL) and replace this. This Dagster code refreshes every discovered semantic model, so you likely need one Orchestra task per real dataset, not just one.
+          workspace_id: null   # the connection is scoped to this workspace already; no per-task override needed here
         depends_on: []
         condition: null
         tags: []
@@ -114,7 +116,8 @@ If instead the source filters `power_bi_specs` down to a specific dataset — by
 - **Asset materialization polling collapses into one task** — `trigger_and_poll_refresh` already waits synchronously in Dagster; Orchestra's task does the same, so there's nothing extra to model.
 - **Never fabricate a value for `dataset_id` — not an `${{ ENV.* }}` reference, and not a made-up-looking literal GUID either.** `load_powerbi_asset_specs` discovers datasets live from the Power BI API; the GUID (`spec.metadata["dagster-powerbi/id"]`) only exists at Dagster runtime and is essentially never written anywhere in the static source. If you can't point to an actual visible GUID/name filter in the code, don't invent one in either direction — use a `# MANUAL:`-flagged placeholder (see the Before/After example) so the user fills in the real value from their Power BI workspace instead of silently deploying a pipeline that refreshes a nonexistent or wrong dataset.
 - **One Dagster asset can mean many real Orchestra tasks** — if the code builds a refresh definition for every spec matching a tag (no per-dataset filter), Dagster is refreshing *every* dataset discovered in the workspace at run time. Orchestra has no equivalent dynamic discovery — say so in the `# MANUAL:` comment, since the user likely needs one `POWER_BI_REFRESH_DATASET` task per real dataset, not the single templated task this skill can produce from source alone.
-- **`PowerBIWorkspace(workspace_id=...)` doesn't carry over to a task parameter at all — don't invent one.** Neither `POWER_BI_REFRESH_DATASET` nor `POWER_BI_REFRESH_DATAFLOW` has a `workspace_id` field (`additionalProperties: false` on both). The workspace is set once on the Orchestra Power BI connection at setup; if the code refreshes datasets/dataflows across more than one workspace, that needs one Orchestra connection per workspace, not a per-task override.
+- **Don't reflexively carry `workspace_id` through as `${{ ENV.POWERBI_WORKSPACE_ID }}`** — `PowerBIWorkspace(workspace_id=...)` just scopes the whole resource to one workspace, which is exactly what the Orchestra Power BI connection is configured with at setup. If every task in the DAG uses that same single workspace, leave `parameters.workspace_id: null` — Orchestra falls back to the connection's workspace. Only set an explicit `workspace_id` value (literal, input, or real `${{ ENV.VAR }}`) when a specific task genuinely targets a *different* workspace than the connection's, since dataset/dataflow IDs are only unique within a workspace.
+- **`apply_refresh_policy` is conditional, not just optional** — live-verified: the backend rejects it unless `refresh_type` is `Full`, `Automatic`, or `DataOnly`. Never set it alongside `ClearValues`/`Calculate`/`Defragment`, and never on `POWER_BI_REFRESH_DATAFLOW`.
 
 ## References
 

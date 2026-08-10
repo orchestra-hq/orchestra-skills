@@ -17,9 +17,10 @@ There is no dedicated Airflow operator for **dataflow** refreshes in `apache-air
 |---|---|---|
 | `conn_id` (e.g. `powerbi_default`) | `connection:` | Orchestra Power BI connection (Azure service principal) |
 | `dataset_id` | `parameters.dataset_id` | Required for `POWER_BI_REFRESH_DATASET` |
-| `group_id` | *(none — see Gotchas)* | **`group_id` has no task-parameter equivalent.** It maps to the workspace configured on the Orchestra Power BI connection at setup, not to a `parameters` field — `POWER_BI_REFRESH_DATASET`/`POWER_BI_REFRESH_DATAFLOW` have no `workspace_id` parameter at all. |
-| (hand-rolled dataflow call) `dataflowId` | `parameters.dataflow_id` | Required for `POWER_BI_REFRESH_DATAFLOW` instead of `dataset_id`; this job has no other parameters |
+| `group_id` | `parameters.workspace_id` | **Airflow's `group_id` is Orchestra's `workspace_id`** — same Power BI workspace GUID, renamed field. Leave `null` unless this task's workspace differs from the one configured on the Orchestra connection — see Gotchas |
+| (hand-rolled dataflow call) `dataflowId` | `parameters.dataflow_id` | Required for `POWER_BI_REFRESH_DATAFLOW` instead of `dataset_id` |
 | n/a (Airflow has no equivalent knob) | `parameters.refresh_type` | Optional, **`POWER_BI_REFRESH_DATASET` only** — one of `Full`, `ClearValues`, `Calculate`, `DataOnly`, `Automatic`, `Defragment` (mirrors Power BI's own `DatasetRefreshType` enum). Leave `null`/omit unless the DAG explicitly requests a non-default refresh type. |
+| n/a | `parameters.apply_refresh_policy` | Optional boolean, `POWER_BI_REFRESH_DATASET` only — but only accepted when `refresh_type` is `Full`, `Automatic`, or `DataOnly` (rejected otherwise, live-verified against `validate_pipeline`). Only set if the source DAG's REST call explicitly passes `applyRefreshPolicy`, and only alongside one of those three refresh types. |
 | `task_id` | `name:` | Human-readable task name |
 | upstream `>>` chains | `depends_on:` | |
 
@@ -29,15 +30,14 @@ For the full `POWER_BI` task shape (dataset refresh and dataflow refresh, the pa
 the `refresh_type` enum), see the shared reference:
 [`../../references/powerbi.md`](../../references/powerbi.md#power-bi-task-yaml-shape).
 
-**Airflow's `group_id` has no task-parameter equivalent** — it's the workspace configured on the
-Orchestra Power BI connection itself, not a `parameters` field on either job (see Gotchas). `name:`
-on the task takes the Airflow `task_id` value.
+**Airflow's `group_id` is Orchestra's `workspace_id`** on both jobs — same Power BI workspace GUID,
+renamed field. `name:` on the task takes the Airflow `task_id` value.
 
 ## Conversion Steps
 
 1. **Identify the Airflow task** — locate `PowerBIDatasetRefreshOperator`. Note `conn_id`, `dataset_id`, and `group_id`.
 2. **Create/verify the Orchestra connection** — Settings → Connections → Power BI. Power BI's API is gated behind an Azure AD service principal (tenant ID, client/application ID, client secret) with Power BI API permissions — the same credential shape as the `Azure` connection type described in `airflow-connections-to-orchestra` (tenant, client ID, client secret), just scoped to Power BI. Reuse that pattern rather than a database-style connection.
-3. **Replace operator with task block** — use the dataset YAML above. `group_id` doesn't carry over to a task parameter; confirm the Orchestra connection is provisioned for that same workspace instead.
+3. **Replace operator with task block** — use the dataset YAML above; rename `group_id` → `workspace_id`.
 4. **Check for a hand-rolled dataflow refresh** — if the DAG separately calls the Power BI REST API for a dataflow (not a dataset), convert that task to `POWER_BI_REFRESH_DATAFLOW` with `dataflow_id` instead of `dataset_id`.
 5. **Wire dependencies** — convert `>>` chains to `depends_on:`.
 
@@ -75,7 +75,7 @@ refresh_dashboard_dataset >> notify_slack
 
 ### Orchestra YAML (after)
 
-`POWERBI_DATASET_ID` is an `os.getenv()`-with-default value identifying which distinct dataset gets refreshed — a real per-environment knob, so per `airflow-dag-structure-to-orchestra`'s `params`/`Variable.get()` → `inputs:` rule it becomes a pipeline input. `SLACK_CHANNEL` is different: it's just a static destination read via `os.getenv()` with nothing in the DAG varying it, so the known value goes in directly as a literal rather than through `inputs:` or `${{ ENV.* }}` (see `slack-airflow-to-orchestra`). `POWERBI_WORKSPACE_ID` doesn't appear in the Orchestra YAML at all — it belongs on the Power BI connection itself (provisioned for that workspace), not on the task:
+`POWERBI_DATASET_ID` is an `os.getenv()`-with-default value identifying which distinct dataset gets refreshed — a real per-environment knob, so per `airflow-dag-structure-to-orchestra`'s `params`/`Variable.get()` → `inputs:` rule it becomes a pipeline input. `SLACK_CHANNEL` is different: it's just a static destination read via `os.getenv()` with nothing in the DAG varying it, so the known value goes in directly as a literal rather than through `inputs:` or `${{ ENV.* }}` (see `slack-airflow-to-orchestra`). `POWERBI_WORKSPACE_ID` is the same single workspace used by every task, which belongs on the Orchestra Power BI connection itself, so it's left `null` here rather than plumbed through as another input:
 
 ```yaml
 version: v1
@@ -96,6 +96,7 @@ pipeline:
         connection: power_bi_prod_12345
         parameters:
           dataset_id: ${{ inputs.powerbi_dataset_id }}
+          workspace_id: null   # single workspace used throughout; configure it on the connection instead
         depends_on: []
         condition: null
         tags: []
@@ -117,8 +118,9 @@ pipeline:
 
 - **`additionalProperties: false`** — Orchestra's `POWER_BI_REFRESH_DATASET` and `POWER_BI_REFRESH_DATAFLOW` parameter models reject any key not listed above. Don't invent parameters like `notify_option` or `refresh_mode` just because the Power BI REST API or an Airflow XCom pattern references them.
 - **Dataset vs. dataflow use different ID field names** — `POWER_BI_REFRESH_DATASET` takes `dataset_id`; `POWER_BI_REFRESH_DATAFLOW` takes `dataflow_id`. Never mix them (`dataflow_id` is invalid on the dataset job and vice versa).
-- **`group_id` has no task-parameter equivalent — don't invent a `workspace_id` field.** Neither `POWER_BI_REFRESH_DATASET` nor `POWER_BI_REFRESH_DATAFLOW` accepts one (`additionalProperties: false` on both). `group_id` maps to the workspace configured on the Orchestra Power BI connection at setup, full stop — never write `parameters.workspace_id` into the YAML.
-- **Different tasks target different `group_id`s?** That needs a separate Orchestra Power BI connection per workspace (each task's `connection:` pointed at the right one) — there's no per-task override to fall back on.
+- **`group_id` → `workspace_id` rename** — Airflow's `PowerBIDatasetRefreshOperator(group_id=...)` is the same GUID as Orchestra's `workspace_id`, a real optional parameter on both jobs.
+- **Don't reflexively carry `workspace_id` through as `${{ ENV.POWERBI_WORKSPACE_ID }}` or an input** — if every task uses the same single `group_id`, that workspace belongs on the Orchestra Power BI connection itself (configured once at connection setup), not repeated per task. Leave `parameters.workspace_id: null` by default — Orchestra falls back to the connection's workspace. Only set an explicit value when a specific task's `group_id` genuinely differs from the connection's workspace, since dataset/dataflow IDs are only unique within a workspace.
+- **`apply_refresh_policy` is conditional, not just optional** — the backend rejects it unless `refresh_type` is `Full`, `Automatic`, or `DataOnly`. Don't set it alongside `ClearValues`/`Calculate`/`Defragment`, and never set it on `POWER_BI_REFRESH_DATAFLOW` at all.
 - **`refresh_type` values are case-sensitive and fixed** — only `Full`, `ClearValues`, `Calculate`, `DataOnly`, `Automatic`, `Defragment` are valid (mirrors Microsoft's own `DatasetRefreshType` enum exactly). Leave it `null` unless the source DAG explicitly requests one.
 - **No dedicated Airflow dataflow operator** — if you see a DAG calling the dataflow refresh REST endpoint via `PythonOperator`/`HttpOperator`/`SimpleHttpOperator`, that's the `POWER_BI_REFRESH_DATAFLOW` equivalent; don't look for a `PowerBIDataflowRefreshOperator` — it doesn't exist in the provider package.
 - **Polling collapses into one task** — Airflow's deferrable operator polls the refresh status itself; Orchestra's task already waits for completion, so there's nothing extra to convert.

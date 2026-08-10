@@ -34,21 +34,21 @@ credential.
 
 ## Don't duplicate connection-level scope into task parameters
 
-This extends to task parameters that duplicate connection-level scope, too — e.g. Airbyte's optional
-`parameters.workspace_id` (metadata only; the connection itself already scopes which Airbyte workspace is
-used), or any other parameter whose value is also stored on the Orchestra connection itself. If the source
-code just reads the same single value everywhere (one env var, one resource/block-level config field)
-rather than genuinely varying it per task, leave that parameter `null`/omitted and let the connection's own
-configured value apply. Only carry an explicit value through (literal, input, or `${{ ENV.VAR }}`) when a
-specific task truly needs to override it.
+This extends to task parameters that duplicate connection-level scope, too — e.g. Power BI's `workspace_id`,
+Airbyte's `workspace_id`, or any other parameter whose value is also stored on the Orchestra connection
+itself. If the source code just reads the same single value everywhere (one env var, one resource/block-level
+config field) rather than genuinely varying it per task, leave that parameter `null`/omitted and let the
+connection's own configured value apply. Only carry an explicit value through (literal, input, or
+`${{ ENV.VAR }}`) when a specific task truly needs to override it — e.g. targeting a different Power BI
+workspace than the one configured on the connection.
 
-**Not every integration has a task-level override at all.** Some integrations scope a resource (a
-workspace, a site) entirely on the connection with no matching task parameter to null out — e.g. Power BI:
-there is no `workspace_id` on either `POWER_BI_REFRESH_DATASET` or `POWER_BI_REFRESH_DATAFLOW`
-(`additionalProperties: false` on both — see `skills/orchestra/references/orchestra/schemas/pipeline_schema.json`).
-If the source targets more than one such scope, that requires a separate Orchestra connection per scope, not
-a task-level parameter. Check the actual parameter model for the integration in question before assuming an
-override field exists.
+**Don't assume a field is missing without checking a live source.** A static schema snapshot can go stale —
+an earlier version of this file claimed Power BI's task parameters had no `workspace_id`/`apply_refresh_policy`
+at all, based on exactly that kind of stale local copy; live-validating against the real Orchestra backend
+(the `validate_pipeline` MCP tool, or `orchestra-cli validate`) proved both fields real, with
+`apply_refresh_policy` additionally gated on `refresh_type` being `Full`/`Automatic`/`DataOnly`. When a
+parameter's presence or absence actually matters for a skill, verify it live rather than trusting a cached
+schema file or a docs page rendering — both can drift or be mis-rendered.
 
 ## Environment-specific connections
 

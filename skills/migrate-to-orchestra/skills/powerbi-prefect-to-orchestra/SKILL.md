@@ -12,10 +12,11 @@ There is no official Prefect Power BI block or collection. Power BI refresh task
 | Prefect construct | Orchestra field | Notes |
 |---|---|---|
 | `msal.ConfidentialClientApplication(client_id, client_credential, authority=f".../{tenant_id}")` | `connection:` | Orchestra Power BI connection holds tenant ID, client ID, and client secret (Azure service principal) |
-| `POST /v1.0/myorg/groups/{group_id}/datasets/{dataset_id}/refreshes` | `integration_job: POWER_BI_REFRESH_DATASET` + `parameters.dataset_id` | `group_id` in the URL path has **no task-parameter equivalent** — see Gotchas |
-| `POST /v1.0/myorg/groups/{group_id}/dataflows/{dataflow_id}/refreshes` | `integration_job: POWER_BI_REFRESH_DATAFLOW` + `parameters.dataflow_id` | Same — `group_id` doesn't carry over to a parameter; this job takes `dataflow_id` alone |
+| `POST /v1.0/myorg/groups/{group_id}/datasets/{dataset_id}/refreshes` | `integration_job: POWER_BI_REFRESH_DATASET` + `parameters.dataset_id` | `group_id` in the URL path maps to `parameters.workspace_id` — leave `null` unless it varies from the connection's workspace, see Gotchas |
+| `POST /v1.0/myorg/groups/{group_id}/dataflows/{dataflow_id}/refreshes` | `integration_job: POWER_BI_REFRESH_DATAFLOW` + `parameters.dataflow_id` | Same `group_id` → `workspace_id` mapping — leave `null` unless it varies from the connection's workspace |
 | JSON body `{"notifyOption": "MailOnFailure"}` or similar | _(dropped)_ | Not a valid Orchestra parameter — Orchestra pipeline `alerts:` replaces failure notification, see below |
 | JSON body `{"type": "Full"}` or `refreshRequest.type` | `parameters.refresh_type` | Optional, **`POWER_BI_REFRESH_DATASET` only** — one of `Full`, `ClearValues`, `Calculate`, `DataOnly`, `Automatic`, `Defragment` |
+| JSON body `{"applyRefreshPolicy": true}` | `parameters.apply_refresh_policy` | Optional, **`POWER_BI_REFRESH_DATASET` only**, and only accepted when `refresh_type` is `Full`, `Automatic`, or `DataOnly` (live-verified: rejected otherwise) |
 | polling loop (`GET .../refreshes/{id}` until `Completed`/`Failed`) | _(always)_ | Orchestra's task already waits for completion |
 | `retries` / `retry_delay_seconds` on `@task` | `configuration.retries` / `configuration.retry_delay` | Under `configuration:` block — `retry_delay` is integer MINUTES (not seconds); convert by dividing by 60, cap at 120 |
 
@@ -100,6 +101,7 @@ pipeline:
         connection: power_bi_prod_12345
         parameters:
           dataset_id: ${{ ENV.POWERBI_DATASET_ID }}
+          workspace_id: null   # single workspace used throughout; connection is already scoped to it, so no per-task override needed
         depends_on: []
         condition: null
         tags: []
@@ -110,7 +112,9 @@ pipeline:
 - **`additionalProperties: false`** — `POWER_BI_REFRESH_DATASET` and `POWER_BI_REFRESH_DATAFLOW` reject any parameter key not in the mapping table above; don't carry over REST-body-only fields like `notifyOption` as top-level parameters.
 - **Dataset vs. dataflow use different ID fields** — `dataset_id` on `POWER_BI_REFRESH_DATASET`, `dataflow_id` on `POWER_BI_REFRESH_DATAFLOW`. Never pass both, and never pass `dataflow_id` on the dataset job or vice versa.
 - **There is no native Prefect Power BI block** — every Power BI refresh in Prefect is a hand-rolled `@task` wrapping `msal` + `requests`/`httpx`; do not look for a `PowerBIBlock` or official collection.
-- **`group_id` in the REST URL has no task-parameter equivalent — don't invent `workspace_id`.** Neither `POWER_BI_REFRESH_DATASET` nor `POWER_BI_REFRESH_DATAFLOW` accepts a `workspace_id` (`additionalProperties: false` on both). The workspace is set once on the Orchestra Power BI connection at setup; if different tasks read different `group_id`s, that needs one Orchestra connection per workspace, not a per-task override.
+- **`group_id` in the REST URL is `workspace_id` in Orchestra** — same GUID, just a naming difference between the raw Power BI REST API and Orchestra's parameter model.
+- **Don't reflexively carry `workspace_id` through as `${{ ENV.POWERBI_WORKSPACE_ID }}`** — if every task reads the same single `group_id`/workspace env var, that workspace belongs on the Orchestra connection itself, not repeated in every task's parameters. Leave `parameters.workspace_id: null` by default; only set an explicit value when a specific task truly targets a workspace different from the connection's.
+- **`apply_refresh_policy` is conditional, not just optional** — live-verified: rejected unless `refresh_type` is `Full`, `Automatic`, or `DataOnly`. Never set it with `ClearValues`/`Calculate`/`Defragment`, and never on `POWER_BI_REFRESH_DATAFLOW`.
 - **Manual polling loops are dropped entirely** — Orchestra's task already waits for the refresh to reach a terminal state; don't try to preserve the `while True: time.sleep(...)` logic.
 - **Only use `${{ ENV.POWERBI_DATASET_ID }}` if the source genuinely reads it that way** — in the example above it's legitimate because `dataset_id = os.environ["POWERBI_DATASET_ID"]` has no literal fallback, so the pipeline really does need that Orchestra environment variable set. If the source instead has a literal/hardcoded dataset ID, or an `os.getenv(..., "default-id")` with a real default, use that literal value directly — don't fabricate an `${{ ENV.VAR }}` reference the source doesn't actually read; it produces a pipeline that fails with no matching value to set.
 - **`refresh_type` values are case-sensitive and fixed** — only `Full`, `ClearValues`, `Calculate`, `DataOnly`, `Automatic`, `Defragment` are valid; leave `null` if the source code didn't set an explicit `type` in the refresh request body.
