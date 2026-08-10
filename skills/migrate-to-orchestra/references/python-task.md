@@ -56,6 +56,12 @@ pipeline:
         tags: []
 ```
 
+## python_version is a fixed enum
+
+`parameters.python_version` only accepts `'3.11'` or `'3.12'` (live-verified; any other value is
+rejected). If the source pins a different Python version, round to the nearest supported one rather
+than copying the source value verbatim.
+
 ## environment_variables is a JSON string
 
 `parameters.environment_variables` is a single string field holding JSON, not a nested YAML

@@ -50,6 +50,9 @@ pipeline:
 - `parameters.commands` — every dbt CLI invocation joined into a single semicolon-separated string, in
   execution order (e.g. `dbt seed; dbt build --select tag:daily --target prod;`). `--select`,
   `--exclude`, and `--target` flags stay inline in this string rather than becoming separate parameters.
+- `parameters.python_version` — a fixed enum, **only `'3.11'` or `'3.12'`** (live-verified; any other
+  value is rejected). If the source pins a different Python version, round to the nearest supported
+  one rather than copying the source value verbatim.
 - `parameters.project_dir` — a real task parameter, not connection config. Set it to the subdirectory
   holding `dbt_project.yml` (e.g. `dbt` in a monorepo); leave it `null` if the dbt project sits at the
   repo root. Whatever mechanism the source uses to point at that subdirectory, carry the path over here
