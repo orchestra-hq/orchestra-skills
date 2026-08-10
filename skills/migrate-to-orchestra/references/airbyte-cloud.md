@@ -26,7 +26,7 @@ pipeline:
         integration: AIRBYTE_CLOUD
         integration_job: AIRBYTE_CLOUD_JOB   # the only job type for this integration
         name: <descriptive task name>
-        connection: <orchestra-airbyte-cloud-connection-name>   # Orchestra connection — see below
+        connection: null  # MANUAL: create the Orchestra Airbyte Cloud connection, then replace with its name_XXXXX — see below
         parameters:
           connection_id: <airbyte-connection-uuid>   # Airbyte Cloud connection UUID — copy verbatim
           job_type: sync          # required: "sync" or "reset"
@@ -58,6 +58,9 @@ These are two different identifiers and are easy to conflate:
 
 - `connection:` — the **Orchestra connection** name (with its 5-digit suffix, e.g.
   `airbyte_cloud_prod_12345`). This is the credential Orchestra uses to call the Airbyte Cloud API.
+  The source never shows this real name — it's assigned when the connection is created in the
+  Orchestra UI. When you can't point to a real one, use `connection: null` with a `# MANUAL:`
+  comment; never invent a plausible-looking name.
 - `parameters.connection_id` — the **Airbyte-side** connection UUID (e.g.
   `a1b2c3d4-e5f6-7890-abcd-ef1234567890`) identifying which Airbyte connection to sync. Copy it
   verbatim from source; it is unrelated to the Orchestra connection name.

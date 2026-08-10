@@ -35,7 +35,7 @@ pipeline:
         integration: POWER_BI
         integration_job: POWER_BI_REFRESH_DATASET
         name: <descriptive task name>
-        connection: <orchestra-power-bi-connection-name>
+        connection: null  # MANUAL: create the Orchestra Power BI connection (Azure service principal), then replace with its name_XXXXX
         parameters:
           dataset_id: <power-bi-dataset-guid>   # required
           workspace_id: null                      # optional — see Workspace scoping below
@@ -76,6 +76,12 @@ unless `refresh_type` is one of `Full`, `Automatic`, or `DataOnly` (`"apply_refr
 supported when refresh_type is Full, Automatic, or DataOnly"`). Only set it alongside one of those
 three `refresh_type` values — never set it with `ClearValues`/`Calculate`/`Defragment`, and never
 set it at all on `POWER_BI_REFRESH_DATAFLOW` (it doesn't exist there).
+
+## Never invent `connection:`
+
+The source never shows the real Orchestra connection name — it's assigned when the connection is
+created in the Orchestra UI. When you can't point to a real one, use `connection: null` with a
+`# MANUAL:` comment; never a plausible-looking invented name.
 
 ## Workspace scoping
 

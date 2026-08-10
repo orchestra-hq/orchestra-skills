@@ -32,7 +32,7 @@ pipeline:
         integration: FIVETRAN
         integration_job: FIVETRAN_SYNC_ALL
         name: <task-name>
-        connection: <orchestra-fivetran-connection-name>
+        connection: null  # MANUAL: create the Orchestra Fivetran connection, then replace with its name_XXXXX
         parameters:
           connector_id: <fivetran-connector-id>
         depends_on: []
@@ -43,6 +43,10 @@ pipeline:
 `FIVETRAN_SYNC_ALL` is the only `integration_job` value for the `FIVETRAN` integration — there is no
 separate "trigger" vs. "wait" job type. A single task always triggers the connector sync and blocks
 until it finishes; there is no parameter to fire-and-forget instead.
+
+**Never invent `connection:`.** The source never shows the real Orchestra connection name — it's
+assigned when the connection is created in the Orchestra UI. When you can't point to a real one,
+use `connection: null` with a `# MANUAL:` comment; never a plausible-looking invented name.
 
 ## References
 

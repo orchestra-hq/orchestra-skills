@@ -28,7 +28,7 @@ pipeline:
         integration: TABLEAU_CLOUD
         integration_job: TABLEAU_REFRESH_WORKBOOK
         name: <descriptive task name>
-        connection: <orchestra-tableau-cloud-connection-name>
+        connection: null  # MANUAL: create the Orchestra Tableau Cloud connection (server URL, site, PAT), then replace with its name_XXXXX
         parameters:
           project_name: <tableau-project-name>     # required
           workbook_name: <tableau-workbook-name>    # required
@@ -39,6 +39,10 @@ pipeline:
 
 `project_name` and `workbook_name` are both required — Orchestra rejects the task without a project name
 even in Tableau sites where the workbook name alone would be unambiguous.
+
+**Never invent `connection:`.** The source never shows the real Orchestra connection name — it's
+assigned when the connection is created in the Orchestra UI. When you can't point to a real one, use
+`connection: null` with a `# MANUAL:` comment; never a plausible-looking invented name.
 
 ## Datasource extract refresh
 

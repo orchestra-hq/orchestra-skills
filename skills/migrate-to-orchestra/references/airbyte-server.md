@@ -30,7 +30,7 @@ pipeline:
         integration: AIRBYTE_SERVER
         integration_job: AIRBYTE_SERVER_JOB
         name: <descriptive task name>
-        connection: <orchestra-airbyte-server-connection-name>   # e.g. airbyte_server_prod_12345
+        connection: null  # MANUAL: create the Orchestra Airbyte Server connection (host + API credentials), then replace with its name_XXXXX
         parameters:
           connection_id: <airbyte-connection-uuid>   # Airbyte's own connection UUID, copied verbatim
           job_type: sync                              # required — "sync" or "reset"
@@ -47,6 +47,9 @@ Server integration.
 - **`connection:`** — the Orchestra connection name (Settings -> Connections, *Airbyte Server*
   type), which stores the server's host URL and API credentials. This is an Orchestra-side name
   (e.g. `airbyte_server_prod_12345`) and is **not** the same value as `parameters.connection_id`.
+  The source never shows this real name — it's assigned when the connection is created in the
+  Orchestra UI. When you can't point to a real one, use `connection: null` with a `# MANUAL:`
+  comment; never invent a plausible-looking name.
 - **`parameters.connection_id`** — Airbyte's own connection UUID (the sync pairing configured
   inside Airbyte itself, between a source and a destination). Copy it verbatim from the source
   code/config — never invent it.
