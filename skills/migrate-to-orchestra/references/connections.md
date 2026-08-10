@@ -18,7 +18,18 @@ connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffi
 ```
 
 The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never
-invent it.
+invent it, and never write the literal placeholder token `XXXXX` (or any bracket-style
+`<connection-name>` placeholder) into real output — both read as syntactically valid YAML and risk
+being deployed as-is.
+
+**The source almost never shows the real Orchestra connection name — that's expected, not a gap to fill
+in.** A credentialed resource being present in source (a `SnowflakeResource`, a `conn_id=`, a
+`Block.load(...)`) tells you a connection is needed and what *type* it is; it does not tell you the
+actual `name_XXXXX` Orchestra will assign, since that's created later in the Orchestra UI. When you
+can't point to a real name visible in source, write `connection: null` with a `# MANUAL:` comment
+asking the user to create the connection and fill in its name — the same convention used for other
+undeterminable-from-source values (e.g. `package_manager` in `dbt-core.md`). This fails validation
+loudly rather than silently deploying a pipeline pointed at a connection that doesn't exist.
 
 ## No credential in source → `connection: null`
 
