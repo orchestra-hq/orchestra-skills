@@ -15,8 +15,10 @@ their wording and specifics differ per source and are not byte-identical across 
 The `alerts:` block shown in each skill's "Adding Alerts" section is also out of scope here — that's
 already covered by the shared [`alerts.md`](alerts.md) reference, not this one.
 
-Source of truth: `FivetranParametersModel` / `IntegrationJobsEnum` in the pipeline schema
-(`skills/orchestra/references/orchestra/schemas/pipeline_schema.json`).
+The shape below (`FivetranParametersModel` / `IntegrationJobsEnum`) is live-verified against the
+real Orchestra backend via the `validate_pipeline` MCP tool — not a cached schema file or docs-page
+rendering, both of which can drift or be mis-rendered. Re-verify the same way if this ever needs
+updating.
 
 ## FIVETRAN task schema
 

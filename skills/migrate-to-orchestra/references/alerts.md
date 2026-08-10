@@ -5,8 +5,10 @@ Canonical Orchestra-side syntax for the `alerts:` block, shared by `airflow-aler
 source-specific mapping (which Airflow/Dagster/Prefect construct produces which alert); this file
 is the Orchestra side only — the part that's identical regardless of source orchestrator.
 
-Source of truth for the enums below: `AlertModel` / `AlertLevelTypes` / `NotificationTypesEnum` in
-the pipeline schema (`skills/orchestra/references/orchestra/schemas/pipeline_schema.json`).
+The enums below (`AlertModel` / `AlertLevelTypes` / `NotificationTypesEnum`) are live-verified
+against the real Orchestra backend via the `validate_pipeline` MCP tool — not a cached schema file
+or docs-page rendering, both of which can drift or be mis-rendered. Re-verify the same way if these
+ever need updating.
 
 ## AlertModel — full schema
 

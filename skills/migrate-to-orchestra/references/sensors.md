@@ -19,8 +19,10 @@ which read similarly but each carry source-specific caveats (e.g. Airflow's `Tim
 `TimeDeltaSensor` having no equivalent, Dagster's `minimum_interval_seconds` → `frequency_secs`
 mapping) that don't cleanly collapse into one shared list.
 
-Source of truth for the schema below: `SensorModel` / `SensorCheckModel` / `SensorChecksEnum` in
-the pipeline schema (`skills/orchestra/references/orchestra/schemas/pipeline_schema.json`).
+The schema below (`SensorModel` / `SensorCheckModel` / `SensorChecksEnum`) is live-verified against
+the real Orchestra backend via the `validate_pipeline` MCP tool — not a cached schema file or
+docs-page rendering, both of which can drift or be mis-rendered. Re-verify the same way if this
+ever needs updating.
 
 ## SensorModel schema
 
@@ -76,6 +78,7 @@ Notes that apply regardless of source orchestrator:
 | `AWS_S3_FILE` | `AWS_S3` | File exists at S3 prefix |
 | `ADLS_FILE` | `AZURE_DATA_LAKE_STORAGE` | File exists in ADLS container |
 | `SFTP_FILE` | `SFTP` | File exists on SFTP server |
+| `CLICKHOUSE_QUERY` | `CLICKHOUSE` | SQL query returns at least one row |
 | `SNOWFLAKE_QUERY` | `SNOWFLAKE` | SQL query returns at least one row |
 | `POSTGRES_QUERY` | `POSTGRES` | SQL query returns at least one row |
 | `GCP_BIG_QUERY_QUERY` | `GCP_BIG_QUERY` | SQL query returns at least one row |
