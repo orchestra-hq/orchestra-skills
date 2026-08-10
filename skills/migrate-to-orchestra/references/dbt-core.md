@@ -25,7 +25,7 @@ pipeline:
         integration: DBT_CORE
         integration_job: DBT_CORE_EXECUTE
         name: <descriptive task name>
-        connection: <orchestra-dbt-core-connection-name>
+        connection: null  # MANUAL: create the Orchestra dbt Core connection (Git repo + warehouse credentials), then replace with its name_XXXXX
         parameters:
           commands: 'dbt seed; dbt build --select tag:daily;'   # semicolon-separated dbt CLI commands
           package_manager: PIP       # PIP | POETRY | UV
@@ -39,6 +39,14 @@ pipeline:
 - `connection:` — an Orchestra dbt Core connection, which stores the Git repo URL/branch and warehouse
   credentials. Warehouse credentials and any `--profiles-dir`/`profiles.yml` equivalent belong on this
   connection, never inline in `parameters.commands`.
+- **Never invent a connection name.** None of Airflow/Dagster/Prefect's source ever contains an actual
+  Orchestra connection name (`descriptive-name_12345`) — that's assigned when the connection is created
+  in the Orchestra UI, so it's essentially never visible in the code you're converting. Don't fill the
+  field with a bracket-style placeholder (`<orchestra-dbt-core-connection-name>`) or a made-up-looking
+  name (`dbt_core_TODO`) — either one reads as valid YAML and risks being deployed as-is. Use
+  `connection: null` with a `# MANUAL:` comment instead, the same convention as the `package_manager`
+  fallback below — it fails validation loudly rather than silently pointing at a connection that doesn't
+  exist.
 - `parameters.commands` — every dbt CLI invocation joined into a single semicolon-separated string, in
   execution order (e.g. `dbt seed; dbt build --select tag:daily --target prod;`). `--select`,
   `--exclude`, and `--target` flags stay inline in this string rather than becoming separate parameters.
