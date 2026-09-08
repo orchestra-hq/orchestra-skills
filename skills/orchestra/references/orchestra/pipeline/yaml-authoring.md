@@ -169,6 +169,11 @@ orchestra-cli validate <path/to/pipeline.yml>
 Prefer MCP `validate_pipeline` when the Orchestra MCP server is connected and you need to
 validate without a local CLI install.
 
+With the `orchestra` plugin installed this happens on its own: a `PostToolUse` hook validates any
+pipeline YAML you write against `/pipelines/schema` and reports the errors back immediately.
+Neither an API key nor a CLI install is required. Set `ORCHESTRA_API_KEY` to also have integration
+connection references checked.
+
 ### Common validation errors
 
 | Error type | Fix |

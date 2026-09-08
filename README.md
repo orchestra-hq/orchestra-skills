@@ -154,11 +154,24 @@ Start at [`skills/orchestra/references/orchestra/README.md`](skills/orchestra/re
 - **State-aware orchestration (dbt SAO)** — source-freshness and `build_after` schemas, enabling `use_state_orchestration`, and a per-warehouse freshness matrix for Snowflake, BigQuery, Databricks, MotherDuck/DuckDB, Redshift, Microsoft Fabric, and Postgres (plus an `other` fallback) ([`dbt-sao/`](skills/orchestra/references/orchestra/dbt-sao/README.md))
 - **MCP** — [cloud MCP](https://docs.getorchestra.io/docs/mcp) setup and tool quick reference
 
+### Pipeline validation hook
+
+The `orchestra` plugin installs a `PostToolUse` hook. After the agent writes or edits a YAML file
+that is an Orchestra pipeline, it is validated against the public `/pipelines/schema` endpoint and
+any errors go straight back to the agent, which fixes them before you ever start a run. Other YAML
+is left alone.
+
+The hook itself needs no API key, no CLI install and no MCP connection, so it works before a
+workspace is configured. Set `ORCHESTRA_API_KEY` and integration connection references get checked
+too. If the endpoint is unreachable, rate limited, or PyYAML is missing, the hook stays silent and
+lets the edit stand.
+
 ## Install for humans
 
 ### Prerequisites
 
-- An Orchestra API key (Orchestra UI → Settings → API Keys)
+- An Orchestra API key (Orchestra UI → Settings → API Keys) — needed for the MCP tools and the
+  skills that call them. The pipeline validation hook works without one.
 
 1. **Connect Orchestra's cloud MCP server.** Point your client at the hosted endpoint following the [cloud MCP docs](https://docs.getorchestra.io/docs/mcp) (`~/.claude/mcp.json` for Claude Code, or Cursor MCP settings) and authenticate with your `ORCHESTRA_API_KEY` — no local install required. Restart/reload so tools such as `list_pipeline_runs` and `list_task_run_logs` appear.
 2. **Install the plugin(s) you need** so the skills are discoverable by your client — the two install independently:
