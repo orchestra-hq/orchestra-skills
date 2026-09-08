@@ -28,11 +28,37 @@ with `$ORCHESTRA_API_KEY` (check the env — it's often already set). If neither
 available, point the user at the Orchestra MCP setup docs (https://docs.getorchestra.io/docs/mcp)
 or ask for an API key, then stop.
 
-- MCP: `list_pipeline_runs`, `list_task_runs`, `list_operations`, `list_task_run_logs`,
-  `download_task_run_log`, `list_task_run_artifacts`, `list_pipelines` — see
-  `../../references/orchestra/mcp/tools-quick-ref.md`.
+- MCP, composite: `whats_broken`, `diagnose`, `pipeline_context` — each answers a whole
+  step below in one call. Prefer them (see §1a).
+- MCP, granular: `list_pipeline_runs`, `list_task_runs`, `list_operations`,
+  `list_task_run_logs`, `download_task_run_log`, `list_task_run_artifacts`,
+  `list_pipelines` — see `../../references/orchestra/mcp/tools-quick-ref.md`.
 - REST base: `https://app.getorchestra.io/api/engine/public` — header
   `Authorization: Bearer $ORCHESTRA_API_KEY`.
+
+If a call comes back 403, the workspace does not have the Metadata API enabled. Say so and
+ask the user to have a workspace admin enable it — do not retry or fall back to guessing.
+
+## 1a. The fast path — two calls, when the composite tools are present
+
+If `whats_broken` and `diagnose` are available, they collapse Steps 1-3 and you should
+reach for them first. Steps 1-3 remain the fallback for a client without them, or for
+anything they do not cover.
+
+| You have | Call | You get |
+|---|---|---|
+| Nothing — "what's broken?" | `whats_broken()` | Every failing run in the last 24h, each with its failed tasks, messages and anomalies. Widen with `window_hours`, narrow with `environment`. |
+| A pipeline run ID or URL | `whats_broken()`, then pick the run by ID | The same digest; the run you want is in it if it failed inside the window |
+| A task run ID | `diagnose(task_run_id)` | Parameters, upstream statuses, log tail, artifact names |
+| A pipeline name, alias or ID | `pipeline_context(alias)` | Definition, integrations, recent outcomes, duration baseline |
+
+The usual sequence is `whats_broken()` → read the digest → `diagnose(<failed task run id>)`
+on the first failed task. That is enough to classify and route in Step 4. Go deeper only
+when it is not: the digest and the log tail say when they were truncated, and
+`download_task_run_log` / `list_operations` take it from there.
+
+Two things to carry across from the digest, since Step 4 needs them: the run's `branch`
+(the feature-branch guard in Step 2 still applies) and the failed task's `integration`.
 
 ## 1. Parse the input → get an ID
 
@@ -50,8 +76,9 @@ The user may give you several forms. Extract the IDs before doing anything else.
   `GET /pipeline_runs?pipeline_run_ids=<id>`). If nothing comes back, treat it as a pipeline ID and
   look up its recent runs.
 - **Pipeline name / alias** — match with `list_pipelines`, then find its latest FAILED run.
-- **"What's broken" with no ID** — `list_pipeline_runs` with `status=FAILED`, default last 7 days.
-  If several pipelines failed, present a one-line-per-pipeline triage table and ask which to take.
+- **"What's broken" with no ID** — `whats_broken()`, or `list_pipeline_runs` with
+  `status=FAILED` as the fallback. If several pipelines failed, present a
+  one-line-per-pipeline triage table and ask which to take.
 - **Error text / Slack alert** — extract the pipeline/task names and find the run; the pasted error
   is evidence you'll use in Step 4, but still fetch the run so the fixer has IDs to work with.
 
@@ -77,7 +104,8 @@ list_task_runs(pipeline_ids=<PID>, status=FAILED)   # also pull status=WARNING f
 GET /task_runs?pipeline_ids=<PID>&page_size=50       # REST: filter to this RID client-side
 ```
 Gotcha: `pipeline_run_ids` does **not** filter `/task_runs` over REST — filter by `pipelineRunId`
-yourself. `/task_runs` returns a 7-day window.
+yourself. `/task_runs` returns a 7-day window, and includes superseded attempts unless you
+pass `include_superseded=false`, so a retried task shows up twice.
 
 Identify the **first** FAILED task (downstream FAILED/SKIPPED tasks are usually symptoms of it).
 Capture, for that task:

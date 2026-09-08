@@ -134,7 +134,10 @@ adjust the downstream layer to match the new logic.
 ### Step 1 — Identify & diagnose (error-first path)
 
 Run the full diagnosis: find the failed run, get task runs, fetch logs/artifacts/operations,
-classify the error, identify root cause. Read `../../references/orchestra/pipeline/diagnosis-patterns.md`;
+classify the error, identify root cause. Where `whats_broken` and `diagnose` are available,
+start with those two — they return the same evidence pre-joined, in two calls instead of
+five or six (see `../../references/orchestra/mcp/tools-quick-ref.md` → Reach for these first).
+Read `../../references/orchestra/pipeline/diagnosis-patterns.md`;
 optionally recall similar past fixes from your client's persistent memory (or a local
 `../../references/orchestra/pipeline/knowledge-store.md` if the user keeps one).
 
