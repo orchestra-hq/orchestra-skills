@@ -61,6 +61,7 @@ skills/
   orchestra/                # plugin bundle: fix/author/audit Orchestra pipelines
     .claude-plugin/plugin.json
     .cursor-plugin/plugin.json
+    hooks/                  # PostToolUse pipeline YAML validation
     skills/
       identify-pipeline-error/          # diagnose & fix
       fix-pipeline-dbt-task/
@@ -151,6 +152,7 @@ README.md
 - Adding a skill to an existing plugin: create `skills/<plugin>/skills/<name>/SKILL.md`; it is exposed automatically (no manifest edit needed). Bump the `version` in that plugin's `.claude-plugin/plugin.json` and `.cursor-plugin/plugin.json`. Also add the skill's path to the `skills` array in `.tessl-plugin/plugin.json` and bump its `version` — `tessl-publish.yml` no longer auto-bumps this on every push (see PR #27), so it now needs the same manual bump as the other two manifests or Tessl publishing silently stops reflecting new skills. `validate-skills.yml`'s "registered in the Tessl manifest" check enforces this for every `skills/orchestra` skill *except* an explicit `NOT_YET_IN_TESSL` allowlist in that workflow — `databricks-cost-audit` and `databricks-cost-drivers` are on it (not ready to publish yet); add a skill there only as a deliberate decision, mirroring `migrate-to-orchestra` below.
 - Adding a new source orchestrator to `migrate-to-orchestra`: add `skills/migrate-to-orchestra/skills/<orchestrator>-*-to-orchestra/` following the existing naming convention (Dagster, Prefect, and Airflow are all covered now) — no new plugin or marketplace entry needed, one plugin covers all source orchestrators. When a name from one orchestrator's skill set doesn't exist for another (e.g. Dagster's original `connections-setup-guide` had no Prefect equivalent to reuse, and Airflow's imported `airflow-connections-to-orchestra` deferred to that same Dagster skill for its actual connection-type table until expanded to stand alone), author or complete an orchestrator-specific skill rather than repurposing another orchestrator's skill or its vocabulary — keeps triggering and terminology accurate per source project.
 - Adding a genuinely new plugin (a different product surface entirely): create `skills/<new-plugin>/` with its own `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json`, then add it to the `plugins` array in both root marketplace manifests — `validate-skills.yml`'s "every skill exposed by a plugin" check will fail until both are done.
+- Hooks live in `skills/<plugin>/hooks/`, registered in that plugin's `hooks/hooks.json`. They are for enforcing what a skill cannot be relied on to remember — a deterministic local event with a cheap, verifiable check. Anything needing a judgement call about *when* to run belongs in a skill instead, since hooks block the agent loop and fire on every matching event. A hook must fail open: never block an edit because a network call failed, a token was stale, or a dependency was missing.
 - Keep user-facing overview in `README.md` and agent routing in this file.
 - Never commit secrets or workspace-specific credentials.
 

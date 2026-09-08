@@ -41,6 +41,11 @@ jobs:
           fi
           exit $failed
 
+      - name: Check pipeline-validation hook
+        run: |
+          pip install pyyaml
+          python3 skills/orchestra/hooks/test_validate_pipeline.py
+
       - name: Validate manifests are valid JSON
         run: |
           failed=0
