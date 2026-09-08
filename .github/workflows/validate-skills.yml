@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install skills-ref
         run: pip install "skills-ref @ git+https://github.com/agentskills/agentskills#subdirectory=skills-ref"
@@ -115,3 +117,76 @@ jobs:
             fi
           done
           exit $failed
+
+      - name: Check every plugin's manifest version was bumped when its content changed
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Each plugin under skills/<plugin>/ ships two manifests
+          # (.claude-plugin/plugin.json, .cursor-plugin/plugin.json) whose `version`
+          # is the only signal a client has that the plugin's content changed — it
+          # isn't auto-derived from disk. A PR that edits a plugin's skills/hooks/
+          # references without also bumping both manifests' version ships silently
+          # stale to Claude/Cursor. This mirrors the Tessl-specific version-bump
+          # check in tessl-skill-checks.yml, generalised to every plugin/manifest
+          # pair instead of just .tessl-plugin/plugin.json.
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+
+          base_sha = os.environ["BASE_SHA"]
+          failed = False
+
+          def read_version(path, ref=None):
+              try:
+                  if ref:
+                      raw = subprocess.run(
+                          ["git", "show", f"{ref}:{path}"],
+                          capture_output=True, text=True, check=True,
+                      ).stdout
+                  elif os.path.isfile(path):
+                      raw = open(path).read()
+                  else:
+                      return None
+                  return json.loads(raw)["version"]
+              except (subprocess.CalledProcessError, json.JSONDecodeError, KeyError):
+                  return None
+
+          def parse(v):
+              return tuple(int(x) for x in v.split("."))
+
+          for plugin_dir in sorted(os.listdir("skills")):
+              root = f"skills/{plugin_dir}"
+              claude_manifest = f"{root}/.claude-plugin/plugin.json"
+              cursor_manifest = f"{root}/.cursor-plugin/plugin.json"
+              if not os.path.isfile(claude_manifest):
+                  continue
+
+              changed = subprocess.run(
+                  ["git", "diff", "--name-only", base_sha, "HEAD", "--", root],
+                  capture_output=True, text=True, check=True,
+              ).stdout.splitlines()
+              content_changed = [f for f in changed if f not in (claude_manifest, cursor_manifest)]
+              if not content_changed:
+                  continue
+
+              print(f"── {root} changed:")
+              for f in content_changed:
+                  print(f"    {f}")
+
+              for manifest in (claude_manifest, cursor_manifest):
+                  base_v = read_version(manifest, base_sha)
+                  head_v = read_version(manifest)
+                  if head_v is None:
+                      print(f"::error file={manifest}::couldn't read a 'version' field")
+                      failed = True
+                  elif base_v is not None and parse(head_v) <= parse(base_v):
+                      print(
+                          f"::error file={manifest}::version wasn't bumped forward "
+                          f"({base_v} -> {head_v}), but {root} content changed in this PR. "
+                          f"Bump 'version' in both {claude_manifest} and {cursor_manifest}."
+                      )
+                      failed = True
+
+          sys.exit(1 if failed else 0)
+          PY
