@@ -43,6 +43,37 @@ jobs:
           token: ${{ secrets.TESSL_TOKEN }}
       - run: tessl skill lint .
 
+  check-version-bump:
+    name: Check Tessl version bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Ensure .tessl-plugin/plugin.json version moved forward
+        run: |
+          # This workflow triggers on the same paths tessl-publish.yml watches, i.e.
+          # this PR changes what `tessl plugin publish` will publish on merge to main.
+          # If the manifest version doesn't move forward in the same PR, publish fails
+          # on merge with "<name>@<version> already exists" (see tessl-publish.yml) —
+          # this has happened repeatedly (PR #27, #39) because the bump was only a
+          # documented manual step (AGENTS.md). Catch it here instead, at PR time.
+          base_version=$(git show "${{ github.event.pull_request.base.sha }}:.tessl-plugin/plugin.json" | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          head_version=$(python3 -c "import json; print(json.load(open('.tessl-plugin/plugin.json'))['version'])")
+
+          echo "base version:  $base_version"
+          echo "head version:  $head_version"
+
+          python3 -c "
+          base = tuple(int(x) for x in '$base_version'.split('.'))
+          head = tuple(int(x) for x in '$head_version'.split('.'))
+          raise SystemExit(0 if head > base else 1)
+          " || {
+            echo "::error file=.tessl-plugin/plugin.json::Version wasn't bumped forward ($base_version -> $head_version), but this PR touches content Tessl publishes (skills/orchestra/skills, skills/orchestra/references/orchestra, README.md, tessl.json, or .tesslignore). Bump 'version' in .tessl-plugin/plugin.json (and skills/orchestra/.claude-plugin/plugin.json + .cursor-plugin/plugin.json, per AGENTS.md) or 'tessl plugin publish' will fail on merge with '<name>@<version> already exists'."
+            exit 1
+          }
+
   detect-changed-skills:
     name: Detect modified skills
     runs-on: ubuntu-latest
