@@ -43,6 +43,20 @@ jobs:
           token: ${{ secrets.TESSL_TOKEN }}
       - run: tessl skill lint .
 
+  check-version-bump:
+    name: Check Tessl version bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Ensure .tessl-plugin/plugin.json version moved forward
+        run: |
+          # Path filters above mean this PR changes what `tessl plugin publish`
+          # publishes on merge — without a version bump, that fails (PR #27, #39).
+          python3 scripts/check_version_bump.py --base "${{ github.event.pull_request.base.sha }}" .tessl-plugin/plugin.json
+
   detect-changed-skills:
     name: Detect modified skills
     runs-on: ubuntu-latest
