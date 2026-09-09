@@ -31,11 +31,14 @@ From the user message, determine:
 
 If no filename is given, derive a short kebab-case name from the pipeline purpose.
 
-When editing an existing pipeline, check whether it's Git-backed or Orchestra-backed
-before deciding how to apply the change — `list_pipelines` metadata includes
+When editing an existing pipeline, read the deployed one before changing it —
+`pipeline_context(<alias>)` returns its full definition alongside its metadata, so there
+is no guessing at the YAML structure it already uses. Check whether it's Git-backed or
+Orchestra-backed before deciding how to apply the change; that metadata includes
 `storageProvider`. For Git-backed pipelines, edit the repo YAML directly (the repo is
-the source of truth); `update_pipeline` cannot write to them. For Orchestra-backed
-pipelines with no local YAML, use the MCP tools instead of authoring a file.
+the source of truth, so read the deployed definition for context only); `update_pipeline`
+cannot write to them. For Orchestra-backed pipelines with no local YAML, use the MCP
+tools instead of authoring a file.
 
 ### Step 2 — Match repo conventions
 
