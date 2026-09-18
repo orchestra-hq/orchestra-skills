@@ -1,0 +1,45 @@
+{
+  "skill_name": "create-orchestra-pipeline",
+  "description": "Given a plain-language request, the skill should author (or edit) an Orchestra v1 pipeline YAML that matches the request -- including, where asked, an `anomalies` block at the correct level (pipeline/task/operation) with the correct type, threshold, and destinations, per the anomaly detection section of yaml-authoring.md.",
+  "output_file": "pipeline.yml",
+  "evals": [
+    {
+      "id": "pipeline-level-above-baseline",
+      "prompt": "Create an Orchestra pipeline called 'Core dbt Build' that runs our dbt Cloud job (job_id 555111) on a cron trigger, daily at 3am UTC. I want to know if the whole run ever takes noticeably longer than usual -- say 25% longer than normal -- and have that posted to our #data-eng-alerts Slack channel. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a DBT (dbt Cloud) task running the given job on a 3am daily cron, plus a pipeline-level `anomalies` block (type `pipeline_duration_above_baseline`, `percentage_above_baseline: 25`) with a SLACK destination targeting #data-eng-alerts. No task-level or operation-level anomaly block, since only overall pipeline duration was asked about.",
+      "files": [],
+      "assertions_ref": ["anomalies"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "An above-baseline pipeline anomaly type is used", "check": "regex", "pattern": "type:\\s*pipeline_duration_above_baseline" },
+        { "text": "Threshold is set to 25%", "check": "regex", "pattern": "percentage_above_baseline:\\s*25\\b" },
+        { "text": "Anomaly notifies the requested Slack channel", "check": "regex", "pattern": "#data-eng-alerts" },
+        { "text": "Uses the DBT integration for the dbt Cloud job", "check": "regex", "pattern": "integration:\\s*DBT\\b" },
+        { "text": "Scheduled daily at 3am UTC", "check": "regex", "pattern": "cron:\\s*0\\s+3\\s" },
+        { "text": "The `anomalies:` block sits at the pipeline's top level (a sibling of `pipeline:`, `schedule:`, `alerts:`), not nested inside a task" },
+        { "text": "Does not add an operation-level (operation_duration_*) anomaly block -- the user only asked about overall pipeline duration, not individual dbt models" },
+        { "text": "Does not add a task-level (task_duration_*) anomaly block in addition to the pipeline-level one -- only the pipeline-level monitor was requested" }
+      ]
+    },
+    {
+      "id": "task-level-below-baseline-existing-pipeline",
+      "prompt": "Here's our existing pipeline in files/orders_sync_pipeline.yml. The nightly Fivetran sync task 'sync_orders' sometimes finishes way faster than usual, which we've learned means it silently picked up zero new rows. Add anomaly detection to that task so we get flagged when it finishes more than 80% faster than its normal baseline -- no Slack needed for this one, just flag it in the UI is fine. Leave the rest of the pipeline as-is. Write the updated pipeline to pipeline.yml.",
+      "expected_output": "The same pipeline as the fixture, unchanged, except the `sync_orders` task now has a task-level `anomalies` block: type `task_duration_below_baseline` (explicit, since type is required for below-baseline), `percentage_below_baseline: 80`, no destinations. The `dbt_build` task, schedule, and failure alert are preserved exactly as in the fixture.",
+      "files": ["orders_sync_pipeline.yml"],
+      "assertions_ref": ["anomalies"],
+      "assertions": [
+        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
+        { "text": "A below-baseline task anomaly type is used", "check": "regex", "pattern": "type:\\s*task_duration_below_baseline" },
+        { "text": "Threshold is set to 80%", "check": "regex", "pattern": "percentage_below_baseline:\\s*80\\b" },
+        { "text": "The sync_orders task is still present", "check": "regex", "pattern": "sync_orders" },
+        { "text": "The unrelated dbt_build task from the fixture is preserved", "check": "regex", "pattern": "dbt_build" },
+        { "text": "The existing failure alert from the fixture is preserved", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The `anomalies:` block is nested under the sync_orders task specifically, not under dbt_build and not left at the pipeline level" },
+        { "text": "No destinations are added to the anomaly block, matching the user's 'just flag it in the UI' request" },
+        { "text": "The 2am UTC schedule and the FIVETRAN/DBT_CORE task configuration from the fixture are otherwise left unmodified" }
+      ]
+    }
+  ]
+}

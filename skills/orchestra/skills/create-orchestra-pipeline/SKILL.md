@@ -27,7 +27,7 @@ From the user message, determine:
 
 - Purpose, integrations, and data flow
 - Target file path (default: `orchestra/<descriptive-name>.yml` in the current repo)
-- Connections, schedules, inputs, alerts, or matrix requirements
+- Connections, schedules, inputs, alerts, matrix, or anomaly detection requirements
 
 If no filename is given, derive a short kebab-case name from the pipeline purpose.
 
@@ -59,6 +59,9 @@ Editorial defaults, unless the user asks otherwise:
 - Add a failure alert as a matter of course — most pipelines should have one.
 - For matrices, define the `inputs` list once on the task group, then reference values in task
   parameters as `${{ MATRIX.key }}` rather than repeating the list per task.
+- Only add an `anomalies` block when the user asks for duration/anomaly monitoring — unlike
+  alerts, it isn't a default addition. It's also a poor fit for short or infrequently-run tasks;
+  say so rather than adding it if the pipeline doesn't suit it.
 
 ### Step 4 — Validate
 

@@ -1,0 +1,14 @@
+{
+  "category": "anomalies",
+  "assertions": [
+    { "text": "Output is a valid YAML document", "check": "valid_yaml" },
+    { "text": "At least one anomalies block is present", "check": "regex", "pattern": "anomalies:", "min_count": 1 },
+    { "text": "Every anomaly type used is one of the six Orchestra supports: pipeline_duration_above_baseline, pipeline_duration_below_baseline, task_duration_above_baseline, task_duration_below_baseline, operation_duration_above_baseline, operation_duration_below_baseline" },
+    { "text": "Every below-baseline anomaly block sets an explicit type: field (an omitted type defaults to above-baseline, not below)" },
+    { "text": "percentage_above_baseline values (where set) stay within 1-1000, and percentage_below_baseline values (where set) stay within 1-99" },
+    { "text": "A pipeline_duration_* anomaly sits at the pipeline's top level, not nested under a task" },
+    { "text": "A task_duration_* or operation_duration_* anomaly is nested under the specific task it monitors, not left at the pipeline level" },
+    { "text": "operation_duration_* blocks are only used on DBT or DBT_CORE tasks" },
+    { "text": "Does not invent an anomaly monitor the user did not ask for and nothing about the pipeline motivates" }
+  ]
+}
