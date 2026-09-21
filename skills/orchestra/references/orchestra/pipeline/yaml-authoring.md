@@ -144,6 +144,59 @@ alerts:
     destination: '#data-alerts'
 ```
 
+**Anomaly detection:**
+
+Flags a pipeline, task, or dbt operation whose duration deviates from its own historical
+baseline (median of its last up-to-100 successful/warning runs, same environment, last 30
+days -- at least 10 qualifying runs are required before any baseline exists, and no anomaly
+can fire before then). No UI control -- git-backed YAML only.
+
+```yaml
+anomalies:                                   # pipeline level
+- type: pipeline_duration_above_baseline     # default if `type` omitted -- see warning below
+  percentage_above_baseline: 20              # 1-1000, default 20
+  destinations:                              # optional, same shape as `alerts` destinations
+  - integration: SLACK
+    destination: '#data-alerts'
+```
+
+```yaml
+tasks:
+  <task_id>:
+    anomalies:                               # task level, nested under the task
+    - type: task_duration_below_baseline     # 1-99, default 75; explicit `type` required
+      percentage_below_baseline: 75
+```
+
+```yaml
+tasks:
+  <task_id>:
+    anomalies:                               # operation level (a dbt node), also nested under the task
+    - type: operation_duration_above_baseline
+      percentage_above_baseline: 20
+      operation_types: [MATERIALISATION]     # TEST nodes are excluded unless added here
+      operation_names: ["fct_*", "dim_*"]
+      max_anomalies: 20
+```
+
+- Six `type` values: `pipeline_duration_above_baseline` / `pipeline_duration_below_baseline`
+  (pipeline level only); `task_duration_above_baseline` / `task_duration_below_baseline`;
+  `operation_duration_above_baseline` / `operation_duration_below_baseline` (dbt Cloud/Core
+  tasks only -- an "operation" is a dbt node).
+- `type` defaults to the above-baseline variant when omitted, so a below-baseline block must
+  set `type` explicitly or it silently behaves as above-baseline instead.
+- `min_baseline_seconds` (default `0`) floors the baseline -- no anomaly fires if the computed
+  median comes in below it.
+- Best suited to runs over ~10 minutes; short/fast tasks are too noisy run-to-run to be a
+  useful signal in either direction.
+- Operation-level detection also needs each dbt model opted in via `meta`
+  (`orchestra_anomaly_detection: true`, with optional `orchestra_anomaly_percentage_above_baseline` /
+  `_percentage_below_baseline` / `_min_baseline_seconds` / `channel` overrides) -- see the dbt Cloud
+  / dbt Core integration docs. Don't add an `operation_*` block unless the user also wants (or
+  already has) that dbt-side opt-in.
+- Operation blocks take no `destinations` of their own -- they notify through the task's `alerts`
+  block instead.
+
 **Matrix (parallel tasks):**
 
 ```yaml

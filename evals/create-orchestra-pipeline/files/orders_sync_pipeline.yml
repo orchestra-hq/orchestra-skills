@@ -1,0 +1,41 @@
+version: v1
+name: 'Nightly Orders Sync #fivetran #orders'
+schedule:
+- name: Nightly 2am
+  cron: 0 2 ? * * *
+  timezone: UTC
+  environment: null
+  branch: null
+pipeline:
+  sync:
+    name: 'Sync'
+    depends_on: []
+    tasks:
+      sync_orders:
+        name: 'Sync Orders'
+        integration: FIVETRAN
+        integration_job: FIVETRAN_SYNC_ALL
+        parameters:
+          connector_id: orders_connector_98abc
+        depends_on: []
+        connection: null
+  build:
+    name: 'Build'
+    depends_on: [sync]
+    tasks:
+      dbt_build:
+        name: 'dbt Build'
+        integration: DBT_CORE
+        integration_job: DBT_CORE_EXECUTE
+        parameters:
+          commands: ['dbt build']
+          package_manager: UV
+          project_dir: dbt
+        depends_on: []
+        connection: null
+alerts:
+- name: On Failure
+  statuses: [FAILED, RUNNING_TIMEOUT]
+  destinations:
+  - integration: SLACK
+    destination: '#data-alerts'
