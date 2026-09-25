@@ -1,0 +1,37 @@
+version: v1
+name: 'Sync Docs into Skills #skills #docs'
+pipeline:
+  sync-skills:
+    tasks:
+      run-docs-sync-agent:
+        integration: ORCHESTRA
+        integration_job: RUN_AGENT
+        parameters:
+          # TODO: replace with the docs-sync agent's ID once it's created in Orchestra.
+          agent_id: 00000000-0000-0000-0000-000000000000
+          prompt: "${{ inputs.trigger_context }}\n\nClone the orchestra-hq/orchestra-skills\
+            \ repository and make its root the working directory. Clone orchestra-hq/orchestra-docs\
+            \ (main) alongside it at ../orchestra-docs.\n\nFollow orchestra/sync-docs.md\
+            \ exactly. If scripts/docs_sync.py exits 0, stop without opening a pull\
+            \ request. Otherwise update the impacted skills, advance the watermark,\
+            \ run the checks it lists, and open (or update) a docs-sync pull request\
+            \ against main for review. Do not push directly to main."
+        depends_on: []
+        name: Run docs sync agent
+        configuration:
+          timeout: 900
+    depends_on: []
+    name: Sync skills
+schedule:
+- name: Weekly backstop
+  cron: 0 7 ? * MON *
+  timezone: UTC
+  environment: null
+  branch: null
+webhook:
+  enabled: false
+inputs:
+  trigger_context:
+    type: string
+    default: 'Triggered by the weekly schedule: catch-up run for docs merges the
+      trigger missed and for published pipeline schema changes.'

@@ -48,6 +48,9 @@ jobs:
           pip install pyyaml
           python3 skills/orchestra/hooks/test_validate_pipeline.py
 
+      - name: Check docs-sync script
+        run: python3 scripts/test_docs_sync.py
+
       - name: Validate manifests are valid JSON
         run: |
           failed=0
