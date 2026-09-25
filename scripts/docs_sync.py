@@ -1,4 +1,4 @@
-"""Report which skill files are behind orchestra-docs and the published pipeline schema.
+"""Report which skill files are behind orchestra-docs.
 
 Run by the `orchestra/sync-docs.yml` pipeline's agent before it edits anything
 (see orchestra/sync-docs.md). Deterministic and cheap, so the agent only spends
@@ -8,27 +8,24 @@ effort when something a skill depends on actually changed.
   (https://docs.getorchestra.io/docs/<path>). Changes are read from
   `git diff <watermark>..HEAD -- docs/` in an orchestra-docs checkout.
 - Dead links: linked pages missing from the docs checkout (moved/renamed pages).
-- Schema: the published pipeline_model.json is compared against the snapshot
-  in scripts/pipeline_model.snapshot.json (enum values + a hash per $def).
+
+Pipeline schema changes arrive the same way: docs/core-concepts/pipelines/schema.mdx
+is regenerated from the published JSON schema, and skills link to it.
 
 Usage:
     python3 scripts/docs_sync.py --docs <orchestra-docs checkout>           # report; exit 2 if anything is stale
-    python3 scripts/docs_sync.py --docs <orchestra-docs checkout> --update  # move watermark + snapshot to now
+    python3 scripts/docs_sync.py --docs <orchestra-docs checkout> --update  # move watermark to docs HEAD
 """
 
 import argparse
-import hashlib
 import json
 import re
 import subprocess
 import sys
-import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 WATERMARK = ROOT / ".docs-sync.json"
-SNAPSHOT = ROOT / "scripts" / "pipeline_model.snapshot.json"
-SCHEMA_URL = "https://orchestra-hq-public-production.s3.eu-west-2.amazonaws.com/jsonschemas/pipeline_model.json"
 DOCS_LINK = re.compile(r"https://docs\.getorchestra\.io/docs/([A-Za-z0-9_\-/.]+)")
 
 
@@ -66,42 +63,18 @@ def docs_pages(docs_dir):
     return {page_key(p) for p in out.splitlines() if re.search(r"\.mdx?$", p)}
 
 
-def schema_summary(schema):
-    """The parts of the schema a sync cares about: every $def's enum values, and a hash of the rest."""
-    return {
-        name: {"enum": sorted(d["enum"])} if "enum" in d else {"sha": hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]}
-        for name, d in schema.get("$defs", {}).items()
-    }
-
-
-def schema_diff(old, new):
-    """Added/removed $defs, added/removed enum values, and other changed $defs, between two summaries."""
-    diff = {"added_defs": sorted(new.keys() - old.keys()), "removed_defs": sorted(old.keys() - new.keys()), "enums": {}, "changed_defs": []}
-    for name in sorted(old.keys() & new.keys()):
-        o, n = old[name], new[name]
-        if o == n:
-            continue
-        if "enum" in o and "enum" in n:
-            diff["enums"][name] = {"added": sorted(set(n["enum"]) - set(o["enum"])), "removed": sorted(set(o["enum"]) - set(n["enum"]))}
-        else:
-            diff["changed_defs"].append(name)
-    return {k: v for k, v in diff.items() if v}
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--docs", required=True, help="path to an orchestra-docs checkout at the commit to sync to")
-    ap.add_argument("--update", action="store_true", help="record docs HEAD and the live schema as synced")
+    ap.add_argument("--update", action="store_true", help="record docs HEAD as synced")
     args = ap.parse_args()
 
     since = json.loads(WATERMARK.read_text())["docs_sha"]
     head = subprocess.run(["git", "-C", args.docs, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-    live = schema_summary(json.load(urllib.request.urlopen(SCHEMA_URL, timeout=30)))
 
     if args.update:
         WATERMARK.write_text(json.dumps({"docs_sha": head}, indent=2) + "\n")
-        SNAPSHOT.write_text(json.dumps(live, indent=2, sort_keys=True) + "\n")
-        print(f"watermark -> {head}, schema snapshot refreshed")
+        print(f"watermark -> {head}")
         return 0
 
     deps = dependency_map()
@@ -119,10 +92,9 @@ def main():
         "impacted": impacted,  # skill file -> changed docs pages it links to
         "unmapped_docs_changes": unmapped,  # changed pages no skill links to — review for new YAML features only
         "dead_links": {k: v for k, v in deps.items() if k not in pages},  # linked pages that no longer exist
-        "schema": schema_diff(json.loads(SNAPSHOT.read_text()), live),
     }
     print(json.dumps(report, indent=2))
-    return 2 if impacted or report["dead_links"] or report["schema"] else 0
+    return 2 if impacted or report["dead_links"] else 0
 
 
 if __name__ == "__main__":

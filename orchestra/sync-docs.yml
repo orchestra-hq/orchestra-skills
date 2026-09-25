@@ -34,4 +34,4 @@ inputs:
   trigger_context:
     type: string
     default: 'Triggered by the weekly schedule: catch-up run for docs merges the
-      trigger missed and for published pipeline schema changes.'
+      trigger missed.'
