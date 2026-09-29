@@ -172,7 +172,7 @@ pipeline:
 
 ## References
 
-- Orchestra Slack alerts: https://docs.getorchestra.io/docs/alerts/slack
+- Orchestra Slack alerts: https://docs.getorchestra.io/docs/core-concepts/alerting/slack
 - Orchestra pipeline schema: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
 - Dagster Slack: https://docs.dagster.io/integrations/libraries/slack
 - dagster-slack API: https://docs.dagster.io/api/python-api/libraries/dagster-slack

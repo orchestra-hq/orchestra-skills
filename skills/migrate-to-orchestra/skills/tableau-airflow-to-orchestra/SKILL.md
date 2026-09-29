@@ -13,7 +13,7 @@ Airflow's `TableauRefreshWorkbookOperator` (or `TableauOperator`) triggers a Tab
 
 | Airflow parameter | Orchestra YAML field | Notes |
 |---|---|---|
-| `tableau_conn_id` | `connection:` | The name of the Orchestra connection to Tableau Cloud (stores server URL, site ID, token) |
+| `tableau_conn_id` | `connection:` | The name of the Orchestra connection to Tableau Cloud (stores server URL, site ID, and PAT or Connected App credentials) |
 | `workbook_name` | `parameters.workbook_name` | Name of the workbook to refresh |
 | `site_id` | Configured on the Orchestra connection | Set the Tableau site on the connection, not per-task |
 | `blocking` / `TableauJobStatusSensor` | _(always)_ | Orchestra always waits for job completion |
@@ -46,7 +46,7 @@ pipeline:
 ## Conversion Steps
 
 1. **Identify the Airflow task** — locate `TableauRefreshWorkbookOperator` or `TableauOperator`. Note `workbook_name`, `site_id`, and `tableau_conn_id`.
-2. **Create/verify the Orchestra connection** — in Orchestra Settings → Connections, create a *Tableau Cloud* connection with server URL, site name, and a Personal Access Token (PAT). The site is configured on the connection, not per-task.
+2. **Create/verify the Orchestra connection** — in Orchestra Settings → Connections, create a *Tableau Cloud* connection with server URL, site name, and either a Personal Access Token (PAT) or a Connected App (direct trust JWT: client ID, secret ID, secret value, and the Tableau username to sign in as). The site is configured on the connection, not per-task.
 3. **Replace operator with task block** — use the YAML above.
 4. **Drop any `TableauJobStatusSensor`** — Orchestra's task already polls for completion.
 5. **Wire dependencies** — convert `>>` chains to `depends_on:`.
@@ -94,7 +94,7 @@ pipeline:
 
 - **Workbook name vs ID**: Orchestra uses the workbook display name. Ensure it matches exactly (case-sensitive) as it appears in Tableau Cloud.
 - **Site ID on the connection**: unlike Airflow where `site_id` is a task parameter, Orchestra stores it on the connection. If you refresh workbooks across multiple Tableau sites, you need one Orchestra connection per site.
-- **Personal Access Token (PAT)**: Tableau Cloud requires PAT-based authentication for API access. Username/password auth is deprecated — update credentials when creating the Orchestra connection.
+- **Auth: PAT or Connected App**: the Orchestra Tableau connection takes `tableau_auth_type` `PAT` (token name + value) or `CONNECTED_APP` (client ID, secret ID, secret value, username). A PAT allows only one in-flight request at a time, so prefer a Connected App when several tasks refresh concurrently through one connection. Connected Apps need Tableau Cloud (Dec 2025 release+) or Tableau Server 2025.3+. Username/password auth isn't an option — move to one of these when creating the Orchestra connection.
 - **`TableauOperator` with `resource="datasources"`**: map to `TABLEAU_REFRESH_EXTRACT` in Orchestra, using `parameters.datasource_name` instead of `workbook_name`.
 - **`blocking_refresh=False` + sensor pattern**: both collapse into one Orchestra task.
 - **Tableau Server (on-prem)**: this skill is for Tableau Cloud. For Tableau Server, confirm whether Orchestra's Tableau Cloud integration supports your Server version via the REST API.
