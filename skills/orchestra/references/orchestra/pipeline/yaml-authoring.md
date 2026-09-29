@@ -1,13 +1,14 @@
 # Orchestra pipeline YAML authoring
 
 Schema reference for creating and editing Orchestra pipeline definitions (`version: v1`).
-Use with the `create-orchestra-pipeline` skill and `orchestra-cli validate`.
+Use with the `create-orchestra-pipeline` skill and the tooling in [Validation](#validation).
 
 Official docs: [docs.getorchestra.io](https://docs.getorchestra.io).
 
 ## File layout
 
 - Default directory in Git-backed repos: `orchestra/<descriptive-name>.yml`
+- Orchestra accepts `.oml`, `.yaml` and `.yml` definitions — match the repo, and see [OML](#oml-oml) below
 - If the repo uses another convention (`pipelines/`, `.orchestra/`), match existing files
 - Derive a short kebab-case filename from the pipeline purpose when the user does not specify one
 
@@ -234,21 +235,62 @@ Reference matrix values in task parameters as `${{ MATRIX.connectors }}`. Matrix
 parallel by default; add `sequential: true` under `matrix` to run them one after another instead
 (e.g. to chain repeated linear flows without hand-writing a task per repetition).
 
+## OML (`.oml`)
+
+[OML](https://docs.getorchestra.io/docs/core-concepts/pipelines/oml) is Orchestra's recommended
+format for pipelines authored in an editor rather than the UI. It describes the same `version` /
+`name` / `pipeline` model as YAML, so everything above applies unchanged. What differs is the
+tooling: the editor extension and `orchestra-lang` also check task dependencies, expressions,
+sensor expressions, anomaly thresholds, cron and per-job parameters, which a JSON Schema can't.
+
+Match whatever the repo already uses. Write `.oml` when the user asks for it or the repo already
+has `.oml` pipelines. Existing YAML pipelines keep working, so don't convert them unprompted.
+
+Syntax differences to know before editing an `.oml` file:
+
+| Syntax | Meaning |
+|---|---|
+| `.` | Closes the current block — optional, but emitted by the formatter and by Orchestra |
+| `=` | Closes the current list |
+| `<>` | Empty list, where YAML uses `[]` |
+| `%sql` … `%%` | Embed block holding code in the named language (also `%python`, `%bash`, `%json`, `%yaml`) |
+
+The trap is quoting: OML is a superset of JSON, not of YAML, so an unquoted string must start with
+a letter or `_`. Values YAML lets you leave bare — cron expressions, UUID-shaped task IDs, dbt
+commands, URLs — have to be quoted. Whitespace isn't structural, so a stray indent can't silently
+re-parent a task the way it can in YAML.
+
 ## Validation
 
-After writing or editing a file:
+After writing or editing a file, validate it with the tool that matches its extension.
+
+For `.yml` / `.yaml`:
 
 ```bash
 orchestra-cli validate <path/to/pipeline.yml>
 ```
 
-Prefer MCP `validate_pipeline` when the Orchestra MCP server is connected and you need to
-validate without a local CLI install.
+For `.oml`, use the `orchestra-lang` package (imported as `oml_lang`). It runs the same checks as
+the editor extension and needs no API key or network access:
 
-With the `orchestra` plugin installed this happens on its own: a `PostToolUse` hook validates any
-pipeline YAML you write against `/pipelines/schema` and reports the errors back immediately.
-Neither an API key nor a CLI install is required. Set `ORCHESTRA_API_KEY` to also have integration
-connection references checked.
+```bash
+pip install orchestra-lang
+```
+
+Report each entry of `oml_lang.analyze(source).errors()` with its line and column. Don't run
+`orchestra-cli validate` on an `.oml` file: it reads its input as YAML, so it can't parse OML
+block terminators or embed blocks. See
+[Pipeline Validation](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/validation).
+
+Prefer MCP `validate_pipeline` when the Orchestra MCP server is connected and you need to
+validate without a local CLI install. It takes the definition as JSON, so convert an `.oml` file
+with `oml_lang.to_json` first.
+
+With the `orchestra` plugin installed, YAML validation happens on its own: a `PostToolUse` hook
+validates any `.yml` / `.yaml` pipeline you write against `/pipelines/schema` and reports the
+errors back immediately. Neither an API key nor a CLI install is required. Set `ORCHESTRA_API_KEY`
+to also have integration connection references checked. The hook doesn't cover `.oml`, so
+validate those yourself with `orchestra-lang`.
 
 ### Common validation errors
 
