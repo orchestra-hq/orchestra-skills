@@ -13,7 +13,7 @@ In Dagster, Tableau is integrated via `dagster-tableau`: a `TableauCloudWorkspac
 
 | Dagster concept | Orchestra YAML field | Notes |
 |---|---|---|
-| `TableauCloudWorkspace(...)` | `connection:` | Orchestra Tableau Cloud connection (server URL, site, token) |
+| `TableauCloudWorkspace(...)` | `connection:` | Orchestra Tableau Cloud connection (server URL, site, and PAT or Connected App credentials) |
 | workbook asset | `parameters.workbook_name` + `parameters.project_name` | Display name + containing project |
 | `site_name` / `pod_name` | Configured on the connection | Not per-task |
 | materialization (refresh) | _(always waits)_ | Orchestra always waits for completion |
@@ -46,7 +46,7 @@ pipeline:
 ## Conversion Steps
 
 1. **Find the workspace + assets** — locate `TableauCloudWorkspace`, `load_tableau_asset_specs`, and the workbook/datasource being refreshed. Note `site_name`/`pod_name` and the workbook display name.
-2. **Create/verify the Orchestra connection** — Settings -> Connections -> Tableau Cloud with server URL, site name, and a PAT. Site lives on the connection.
+2. **Create/verify the Orchestra connection** — Settings -> Connections -> Tableau Cloud with server URL, site name, and either a Personal Access Token (PAT) or a Connected App (direct trust JWT: client ID, secret ID, secret value, and the Tableau username to sign in as). Site lives on the connection.
 3. **Replace the asset with a task block** — use the workbook display name and its project.
 4. **Wire dependencies**.
 
@@ -95,7 +95,7 @@ pipeline:
 - **Workbook name vs ID** — Orchestra uses the display name (case-sensitive). Dagster specs may key by LUID; use the human-readable name.
 - **`project_name` is required** — Orchestra requires it alongside `workbook_name`.
 - **Site / pod on the connection** — `site_name`/`pod_name` map to the Orchestra connection, not per-task. One connection per site.
-- **Connected App vs PAT** — Dagster uses a Connected App; Orchestra typically uses a PAT. Update credentials on the connection.
+- **Auth: PAT or Connected App**: the Orchestra Tableau connection takes `tableau_auth_type` `PAT` (token name + value) or `CONNECTED_APP` (client ID, secret ID, secret value, username). A PAT allows only one in-flight request at a time, so prefer a Connected App when several tasks refresh concurrently through one connection. Connected Apps need Tableau Cloud (Dec 2025 release+) or Tableau Server 2025.3+. `TableauCloudWorkspace`'s `connected_app_client_id` / `_secret_id` / `_secret_value` and `username` carry straight over to a `CONNECTED_APP` connection.
 - **Datasource refresh** — maps to `TABLEAU_REFRESH_EXTRACT` with `datasource_name`.
 - **Server vs Cloud** — `dagster-tableau` supports both; Orchestra's `TABLEAU_CLOUD` covers Cloud and Server (verify Server version support).
 

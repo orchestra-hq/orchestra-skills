@@ -204,6 +204,6 @@ alerts:
 ## References
 
 - Orchestra alerts schema: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
-- Orchestra Slack alerts: https://docs.getorchestra.io/docs/alerts/slack
+- Orchestra Slack alerts: https://docs.getorchestra.io/docs/core-concepts/alerting/slack
 - Dagster run status sensors: https://docs.dagster.io/concepts/automation/sensors#run-status-sensors
 - Dagster hooks: https://docs.dagster.io/concepts/ops-jobs-graphs/op-hooks

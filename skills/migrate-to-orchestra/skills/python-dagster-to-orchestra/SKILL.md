@@ -144,7 +144,7 @@ pipeline:
 ## References
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/python
-- Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/utility/python/execute-script/
+- Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/python/python_execute_script
 - Dagster assets: https://docs.dagster.io/concepts/assets/software-defined-assets
 - Dagster ops: https://docs.dagster.io/concepts/ops-jobs-graphs/ops
 

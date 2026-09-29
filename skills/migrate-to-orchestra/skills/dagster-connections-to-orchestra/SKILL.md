@@ -175,6 +175,6 @@ pipeline:
 
 ## References
 
-- Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/connections
+- Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
 - Dagster resources: https://docs.dagster.io/concepts/resources

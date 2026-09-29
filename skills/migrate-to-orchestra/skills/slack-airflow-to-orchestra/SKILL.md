@@ -211,6 +211,6 @@ pipeline:
 
 ## References
 
-- Orchestra Slack alerts: https://docs.getorchestra.io/docs/alerts/slack
+- Orchestra Slack alerts: https://docs.getorchestra.io/docs/core-concepts/alerting/slack
 - Orchestra pipeline YAML schema: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
 - Airflow Slack provider: https://airflow.apache.org/docs/apache-airflow-providers-slack/stable/

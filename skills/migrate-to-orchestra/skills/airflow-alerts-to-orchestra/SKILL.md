@@ -264,4 +264,4 @@ Use task-level when you need different alert routing per task (e.g. page on-call
 ## References
 
 - Orchestra alerts schema: https://docs.getorchestra.io/docs/core-concepts/pipelines/schema
-- Orchestra Slack alerts: https://docs.getorchestra.io/docs/alerts/slack
+- Orchestra Slack alerts: https://docs.getorchestra.io/docs/core-concepts/alerting/slack

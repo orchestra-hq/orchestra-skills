@@ -60,3 +60,8 @@ Orchestra injects artifacts before each dbt task run from the last **successful*
 - GHA `branch` on `orchestra-hq/run-pipeline` = branch of **pipeline YAML** repo (usually `main`).
 - `run_inputs.dbt_branch` = PR branch for **dbt** checkout on the task.
 - `latest_production` resolves from dbt task branch settings, not pipeline YAML branch.
+
+## Concurrency (shared prod + CI pipeline)
+
+- A fixed `configuration.concurrency.max_active` applies in every environment, so a prod limit of `1` also serialises PR runs. A run blocked by the limit is `SKIPPED`, and `run-pipeline` only logs a warning rather than failing the check. Check its `status` output if a skipped run should block the PR.
+- To give CI and prod separate limits, set `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` and define the variable per Orchestra environment (e.g. `Staging` = 5, `Production` = 1). See [dbt CI/CD](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd) and [run-pipeline outputs](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions).

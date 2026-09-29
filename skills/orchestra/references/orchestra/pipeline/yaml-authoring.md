@@ -86,15 +86,21 @@ configuration:          # pipeline-level default; a task's own configuration: ov
   retry_delay: 5         # integer MINUTES — not seconds, not a timedelta string. Max 120
   timeout: 3600           # integer seconds
   concurrency:
-    max_active: 1          # integer >= 0; null/omit = no limit
+    max_active: 1          # integer >= 0, or ${{ ENV.VAR }}; null/omit = no limit
 ```
+
+`max_active` can reference an environment variable (`${{ ENV.PIPELINE_CONCURRENCY }}`) so one
+pipeline gets a different limit per environment — e.g. several parallel Slim CI runs in staging,
+one at a time in production. See [pipeline concurrency](https://docs.getorchestra.io/docs/core-concepts/pipelines/pipeline-runs).
 
 `retry_delay` is minutes despite sources like Dagster/Airflow/Prefect typically expressing retry
 delay in seconds — convert and round up, and clamp to 120 if the source value is larger.
 
 ## Variable syntax
 
-- Environment / connection refs: `${{ ENV.VAR_NAME }}`
+- Environment / connection refs: `${{ ENV.VAR_NAME }}`. `LIST` and `DICT` environment variables
+  also take `${{ ENV.TARGETS.eu }}` / `${{ ENV.TARGETS['eu'] }}` and `${{ ENV.REGIONS[0] }}`; the bare
+  reference renders the whole value as JSON ([environments](https://docs.getorchestra.io/docs/core-concepts/environments))
 - Pipeline inputs: `${{ inputs.param_name }}`
 - Matrix vars: `${{ MATRIX.key }}`
 - Orchestra system: `${{ ORCHESTRA.TASK_RUN_ID }}`, `${{ ORCHESTRA.CURRENT_TIME }}`
@@ -122,9 +128,15 @@ schedule:
 ```yaml
 inputs:
   param_name:
-    type: string
+    type: string            # string | number | boolean | dict | list
     default: 'default value'
+    options: ['default value', 'other']   # optional, string inputs only
 ```
+
+`options` gives a dropdown of values in the run dialogue and trigger panels. It is a suggestion,
+not a constraint: unlisted values still run. Validation requires at least one unique option, and a
+literal `default` must be one of them (an expression default like `${{ ENV.X }}` is exempt). See
+[inputs](https://docs.getorchestra.io/docs/core-concepts/variables/inputs).
 
 **Webhook:**
 
@@ -143,6 +155,17 @@ alerts:
   - integration: SLACK
     destination: '#data-alerts'
 ```
+
+`max_live_alerts` (integer 1–50, default 1) on an alert raises how many in-flight dbt Core
+model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or
+pipeline finishes ([alerting](https://docs.getorchestra.io/docs/core-concepts/alerting)).
+
+**Pausing:**
+
+`paused: true` on a task or task group keeps it in the pipeline without running it. Downstream tasks
+run as if it weren't there. A condition never sees `"PAUSED"`: a paused task reports `"SUCCEEDED"`
+(or `"SKIPPED"` if it wouldn't have run), and `validate_pipeline` rejects a condition that compares
+against `"PAUSED"` ([pausing tasks](https://docs.getorchestra.io/docs/core-concepts/tasks/pausing-tasks)).
 
 **Anomaly detection:**
 

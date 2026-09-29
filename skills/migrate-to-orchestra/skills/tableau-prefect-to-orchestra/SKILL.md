@@ -11,7 +11,7 @@ Converts Prefect `@task` functions that use the `tableau-server-client` (TSC) Py
 
 | Prefect construct | Orchestra field | Notes |
 |---|---|---|
-| `TSC.Server("https://10ax.online.tableau.com")` + `site_id` | `connection:` | Orchestra Tableau Cloud connection holds server URL, site ID, and PAT |
+| `TSC.Server("https://10ax.online.tableau.com")` + `site_id` | `connection:` | Orchestra Tableau Cloud connection holds server URL, site ID, and PAT (or Connected App) credentials |
 | `server.workbooks.filter(name="Sales Dashboard")` | `parameters.workbook_name` | String value from filter call |
 | project name (from code context or filter chain) | `parameters.project_name` | **REQUIRED** alongside `workbook_name` |
 | `server.workbooks.refresh(workbook)` | `integration_job: TABLEAU_REFRESH_WORKBOOK` | |
@@ -54,7 +54,7 @@ tags: []
 - [ ] Identify whether the task calls `server.workbooks.refresh()` (→ `TABLEAU_REFRESH_WORKBOOK`) or `server.datasources.refresh()` (→ `TABLEAU_REFRESH_EXTRACT`)
 - [ ] Extract the workbook/datasource name from the `.filter(name=...)` call or surrounding code comments
 - [ ] Extract or infer the Tableau project name (check filter chain, variable names, or ask the user)
-- [ ] Create an Orchestra Tableau Cloud connection via Integrations → New Connection → Tableau Cloud (server URL, site ID, PAT name, PAT value)
+- [ ] Create an Orchestra Tableau Cloud connection via Integrations → New Connection → Tableau Cloud (server URL, site ID, and PAT name + value — or Connected App client ID, secret ID, secret value, and username if the flow used `TSC.JWTAuth`)
 - [ ] Note the connection name assigned by Orchestra (e.g. `tableau_cloud_prod_12345`)
 - [ ] Write the Orchestra task YAML using the structure above
 - [ ] Delete the Prefect `@task` function and any TSC imports no longer needed
@@ -108,7 +108,8 @@ pipeline:
 ## Gotchas
 
 - `project_name` is **REQUIRED** in Orchestra alongside `workbook_name` — extract it from filter logic, Tableau UI, or ask the user; the task will fail without it
-- Site ID and PAT credentials belong on the Orchestra Tableau Cloud connection, not in YAML or env vars
+- Site ID and credentials belong on the Orchestra Tableau Cloud connection, not in YAML or env vars
+- **Auth: PAT or Connected App**: the Orchestra Tableau connection takes `tableau_auth_type` `PAT` (token name + value) or `CONNECTED_APP` (client ID, secret ID, secret value, username). A PAT allows only one in-flight request at a time, so prefer a Connected App when several tasks refresh concurrently through one connection. Connected Apps need Tableau Cloud (Dec 2025 release+) or Tableau Server 2025.3+.
 - For datasource refresh: use `integration_job: TABLEAU_REFRESH_EXTRACT` and `parameters.datasource_name` (not `workbook_name`)
 - There is no native Prefect Tableau block — Tableau tasks in Prefect are always a Python `@task` wrapping TSC; do not look for a block reference
 - The TSC `.filter()` call returns a generator — `.pop()` picks the first match; confirm the workbook name is unique in the project before migrating

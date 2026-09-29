@@ -129,7 +129,7 @@ pipeline:
 ## References
 
 - https://docs.prefect.io/v3/develop/blocks
-- https://docs.getorchestra.io/docs/core-concepts/connections
+- https://docs.getorchestra.io/docs/core-concepts/tasks/connections
 
 ## Adding Alerts
 

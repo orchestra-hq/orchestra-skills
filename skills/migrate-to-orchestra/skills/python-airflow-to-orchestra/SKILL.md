@@ -130,7 +130,7 @@ pipeline:
 ## References
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/python
-- Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/utility/python/execute-script/
+- Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/python/python_execute_script
 
 ## Before converting: check it isn't actually a Slack task
 
