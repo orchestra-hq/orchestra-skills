@@ -1,0 +1,111 @@
+{
+  "skill_name": "setup-incident-slack-summary",
+  "description": "Given a request for a scheduled incident digest, fill the skill's pipeline template with the right channel, schedule, filters, agent ID and Slack connection, producing a new valid pipeline. Checked in for reference; the skill depends on Orchestra MCP lookups, so prompts supply those values inline.",
+  "evals": [
+    {
+      "id": "defaults-data-incidents",
+      "prompt": "Setup Scheduled Incident Slack Summary Pipeline. Post it to #data-incidents, defaults are fine. Context (Orchestra MCP is unavailable in this run): your agent ID is 00000000-0000-4000-8000-000000000001; the workspace's only Slack connection is connectionId default_00000 (isDefault true, authStatus SUCCEEDED). Do not deploy - write the pipeline document you would pass to create_pipeline to pipeline.yml.",
+      "expected_output": "Defaults applied: Mondays 09:00 Europe/London (0 9 ? * MON *), lookback 7, statuses OPEN,INVESTIGATING, all severities, channel #data-incidents.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Uses a single ORCHESTRA RUN_AGENT task with agent_id 00000000-0000-4000-8000-000000000001 and set_outputs true"
+        },
+        {
+          "text": "The Slack SEND_SLACK_MESSAGE task uses connection default_00000 and passes the agent's 'blocks' output as blocks and its 'results' output as text"
+        },
+        {
+          "text": "Pipeline is named 'Slack Incidents Digest' and is a new pipeline (no update to an existing one is planned)"
+        },
+        {
+          "text": "Schedule cron has 6 fields with exactly one of day-of-month/day-of-week set to '?'"
+        },
+        {
+          "text": "No input has an empty-string default; name_contains is optional"
+        },
+        {
+          "text": "All ${{ inputs.* }} and ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...] }} expressions from the template are left intact"
+        },
+        {
+          "text": "slack_channel default is #data-incidents"
+        },
+        {
+          "text": "Schedule is 0 9 ? * MON * in Europe/London"
+        },
+        {
+          "text": "Defaults: lookback_days 7, statuses OPEN,INVESTIGATING, severities CRITICAL,HIGH,MEDIUM,LOW"
+        }
+      ]
+    },
+    {
+      "id": "daily-oncall-critical-high",
+      "prompt": "can you get me a daily digest of critical + high incidents from the last 24h into #oncall at 8am new york time? only the open ones pls. Context (Orchestra MCP is unavailable in this run): your agent ID is 00000000-0000-4000-8000-000000000001; the workspace's only Slack connection is connectionId default_00000 (isDefault true, authStatus SUCCEEDED). Do not deploy - write the pipeline document you would pass to create_pipeline to pipeline.yml.",
+      "expected_output": "Daily 08:00 America/New_York (0 8 * * ? *), lookback 1, severities CRITICAL,HIGH, statuses OPEN,INVESTIGATING (open includes investigating), channel #oncall.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Uses a single ORCHESTRA RUN_AGENT task with agent_id 00000000-0000-4000-8000-000000000001 and set_outputs true"
+        },
+        {
+          "text": "The Slack SEND_SLACK_MESSAGE task uses connection default_00000 and passes the agent's 'blocks' output as blocks and its 'results' output as text"
+        },
+        {
+          "text": "Pipeline is named 'Slack Incidents Digest' and is a new pipeline (no update to an existing one is planned)"
+        },
+        {
+          "text": "Schedule cron has 6 fields with exactly one of day-of-month/day-of-week set to '?'"
+        },
+        {
+          "text": "No input has an empty-string default; name_contains is optional"
+        },
+        {
+          "text": "All ${{ inputs.* }} and ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...] }} expressions from the template are left intact"
+        },
+        {
+          "text": "slack_channel default is #oncall"
+        },
+        {
+          "text": "Schedule is 0 8 * * ? * in America/New_York"
+        },
+        {
+          "text": "Defaults: lookback_days 1, severities CRITICAL,HIGH, statuses OPEN,INVESTIGATING"
+        }
+      ]
+    },
+    {
+      "id": "weekly-dbt-roundup",
+      "prompt": "I want a weekly roundup in #analytics-eng every Friday at 4pm London time of every incident from the last 14 days with 'dbt' in the name - include resolved ones too, not just open Context (Orchestra MCP is unavailable in this run): your agent ID is 00000000-0000-4000-8000-000000000001; the workspace's only Slack connection is connectionId default_00000 (isDefault true, authStatus SUCCEEDED). Do not deploy - write the pipeline document you would pass to create_pipeline to pipeline.yml.",
+      "expected_output": "Fridays 16:00 Europe/London (0 16 ? * FRI *), lookback 14, statuses include RESOLVED, name_contains default dbt, channel #analytics-eng.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Uses a single ORCHESTRA RUN_AGENT task with agent_id 00000000-0000-4000-8000-000000000001 and set_outputs true"
+        },
+        {
+          "text": "The Slack SEND_SLACK_MESSAGE task uses connection default_00000 and passes the agent's 'blocks' output as blocks and its 'results' output as text"
+        },
+        {
+          "text": "Pipeline is named 'Slack Incidents Digest' and is a new pipeline (no update to an existing one is planned)"
+        },
+        {
+          "text": "Schedule cron has 6 fields with exactly one of day-of-month/day-of-week set to '?'"
+        },
+        {
+          "text": "No input has an empty-string default; name_contains is optional"
+        },
+        {
+          "text": "All ${{ inputs.* }} and ${{ ORCHESTRA.PIPELINE_RUN_TASKS[...] }} expressions from the template are left intact"
+        },
+        {
+          "text": "slack_channel default is #analytics-eng"
+        },
+        {
+          "text": "Schedule is 0 16 ? * FRI * in Europe/London"
+        },
+        {
+          "text": "Defaults: lookback_days 14, statuses include OPEN, INVESTIGATING and RESOLVED, name_contains default is dbt"
+        }
+      ]
+    }
+  ]
+}

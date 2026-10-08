@@ -1,0 +1,77 @@
+version: v1
+name: Slack Incidents Digest
+pipeline:
+  query-incidents:
+    tasks:
+      summarise-incidents:
+        integration: ORCHESTRA
+        integration_job: RUN_AGENT
+        parameters:
+          agent_id: __AGENT_ID__
+          set_outputs: true
+          prompt: |-
+            Read-only task: do not change anything in the account.
+
+            Summarise Orchestra incidents for a Slack channel.
+
+            1. Call list_incidents with status=${{ inputs.statuses }}, severity=${{ inputs.severities }}, name=${{ inputs.name_contains }} (omit any filter that is empty), sort_column=created_at, sort_direction=desc, page_size=100. Page until incidents are older than the window.
+            2. Keep only incidents created in the last ${{ inputs.lookback_days }} days, counting back from now (UTC). Sort by severity (CRITICAL, HIGH, MEDIUM, LOW), then newest first.
+            3. Build a Slack Block Kit blocks array:
+               - A section block (mrkdwn) with a bold title giving the window, an italic line with the filters used, and one line of counts by severity.
+               - One table block. Header row of raw_text cells: "Severity", "Incident", "Status", "Created (UTC)", "Last updated (UTC)". One row per incident:
+                 - Severity cell: rich_text with a single emoji element, rotating_light for CRITICAL, red_circle for HIGH, large_orange_circle for MEDIUM, large_green_circle for LOW.
+                 - Incident cell: rich_text with a link element, text = the incident name, url = https://app.getorchestra.io/incidents/<incidentId>. Append " (+N merged)" as a text element if it has merged children.
+                 - Status, Created and Last updated cells: raw_text, Created from createdAt and Last updated from updatedAt, both as YYYY-MM-DD HH:MM. Never leave a cell text empty - Slack rejects it.
+                 Use column_settings [{"align": "center"}, {"is_wrapped": true}]. Max 25 incident rows; if there are more, add a context block saying how many were left out.
+               - If no incidents match, skip the table and use a single section block saying so with :white_check_mark:.
+            4. Set two string outputs for this task:
+               - "results": a one-line plain-text summary (window and counts), used as the notification fallback.
+               - "blocks": the blocks array serialised as a JSON string (starting with [). It must be valid JSON.
+        depends_on: []
+        name: Query and summarise incidents
+    depends_on: []
+    name: Query incidents
+  notify:
+    tasks:
+      send-slack-summary:
+        integration: SLACK
+        integration_job: SEND_SLACK_MESSAGE
+        parameters:
+          channel_name: ${{ inputs.slack_channel }}
+          text: ${{ ORCHESTRA.PIPELINE_RUN_TASKS['summarise-incidents'].OUTPUTS['results'] }}
+          blocks: ${{ ORCHESTRA.PIPELINE_RUN_TASKS['summarise-incidents'].OUTPUTS['blocks'] }}
+        depends_on: []
+        name: Send summary to Slack
+        connection: __SLACK_CONNECTION_ID__
+    depends_on:
+    - query-incidents
+    name: Notify
+schedule:
+- name: __SCHEDULE_NAME__
+  cron: '__CRON__'
+  timezone: __TIMEZONE__
+webhook:
+  enabled: false
+inputs:
+  slack_channel:
+    type: string
+    default: '__SLACK_CHANNEL__'
+  lookback_days:
+    type: string
+    default: '__LOOKBACK_DAYS__'
+  statuses:
+    type: string
+    default: __STATUSES__
+  severities:
+    type: string
+    default: __SEVERITIES__
+  name_contains:
+    type: string
+    optional: true
+alerts:
+- name: Failures
+  statuses:
+  - FAILED
+  destinations:
+  - integration: SLACK
+    destination: '__SLACK_CHANNEL__'
