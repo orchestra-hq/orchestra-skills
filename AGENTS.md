@@ -72,6 +72,7 @@ skills/
       create-orchestra-pipeline/        # author & maintain
       merge-duplicate-pipelines/
       build-data-reconciliation-pipeline/
+      setup-incident-slack-summary/
       account-health-check/             # account health & governance
       orchestra-dbt-slim-ci-setup/      # dbt state-aware orchestration
       configure-dbt-source-freshness/
