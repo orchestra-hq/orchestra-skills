@@ -1,0 +1,137 @@
+{
+  "skill_name": "orchestra-dbt-slim-ci-setup",
+  "description": "Two halves of the skill. prior-attempts-audit: an account export with a broken CI-only pipeline, a manual manifest export and a PreProd environment; the output is a conversational audit report (free-text assertions, graded from transcript.txt, with expected/example_audit_report.md as the reference). clean-retrofit: a single production pipeline to patch; coded checks run against the generated pipeline.yml, and free-text ones cover the workflow file.",
+  "evals": [
+    {
+      "id": "prior-attempts-audit",
+      "prompt": "We tried to set up dbt Slim CI in Orchestra a while ago and I don't think it ever worked. files/account_export.md is an export of our Orchestra pipelines, environments and recent runs (use it in place of the Orchestra MCP), files/dbt_ci.yml is the GitHub workflow in our dbt repo, and files/profiles.yml is the profiles.yml on our dbt Core connection. Tell me what we have, what's broken or missing, and the steps to get Slim CI working cleanly. Don't change anything yet.",
+      "expected_output": "A short audit: flags dbt_slim_ci as a conflicting CI-only pipeline whose separate dbt task never gets latest_production (matching its failure logs), flags the manual manifest export + PreProd + run_type pattern as superseded, notes CI runs on the prod target and there is no ci target, no per-PR schema, fixed max_active, old run-pipeline without cancel_on_exit, no deploy or clean-up. Proposes a numbered plan that keeps dbt_production, parametrises it, repoints the workflow, then offers to pause dbt_slim_ci, each step marked as agent-with-approval or manual, and stops for approval. Ignores fivetran_hourly.",
+      "files": [
+        "account_export.md",
+        "dbt_ci.yml",
+        "profiles.yml"
+      ],
+      "assertions": [
+        {
+          "text": "Identifies dbt_slim_ci as a separate CI-only pipeline that conflicts with dbt_production"
+        },
+        {
+          "text": "Explains its failures (empty latest_production / 0 nodes selected) by the separate dbt task having its own artifact history that never ran successfully on main"
+        },
+        {
+          "text": "Flags that the Slim CI command uses --target prod, so PR code would write to production schemas"
+        },
+        {
+          "text": "Notes profiles.yml has no ci target"
+        },
+        {
+          "text": "Flags the save_manifest Python task / run_type condition / PreProd environment as a manual manifest pattern superseded by latest_production, without insisting it is removed"
+        },
+        {
+          "text": "Flags the fixed max_active: 1 on the shared pipeline and recommends ${{ ENV.DBT_PIPELINE_CONCURRENCY }} per environment"
+        },
+        {
+          "text": "Flags missing per-PR schema, missing cancel_on_exit / run-pipeline older than v1.7.0, and missing CI schema clean-up"
+        },
+        {
+          "text": "Does not flag fivetran_hourly as part of the CI setup"
+        },
+        {
+          "text": "Recommends keeping dbt_production as the single pipeline and parametrising its run_dbt task (dbt_command / dbt_branch inputs) rather than fixing dbt_slim_ci"
+        },
+        {
+          "text": "Presents a gap summary with a status per component and a 'fix first' or equivalent lead item, in roughly a page rather than an exhaustive dump"
+        },
+        {
+          "text": "Gives a numbered plan where each step is marked as something the agent does after approval or something the user does manually"
+        },
+        {
+          "text": "Asks before pausing dbt_slim_ci or removing any workflow job, and stops for approval rather than proceeding"
+        },
+        {
+          "text": "Makes no claim to have changed, paused, or deployed anything"
+        }
+      ]
+    },
+    {
+      "id": "clean-retrofit",
+      "prompt": "Add dbt Slim CI to our production pipeline in files/dbt_production.yml. It's Git-backed in our dbt repo (acme/analytics-dbt, default branch main) and the project has incremental models. Use CI and Production as the Orchestra environment names. Write the updated pipeline YAML to pipeline.yml and the GitHub Actions workflow to dbt_slim_ci.yml in the current directory. Don't call Orchestra, push, or deploy.",
+      "expected_output": "pipeline.yml keeps the existing tasks and schedule, adds dbt_branch / dbt_command / dbt_ci_schema_suffix inputs, parametrises run_dbt's commands, branch and DBT_CI_SCHEMA_SUFFIX, and sets max_active from ${{ ENV.DBT_PIPELINE_CONCURRENCY }}. dbt_slim_ci.yml has PR, deploy and clean-up jobs on run-pipeline v1.7.0+ with task_ids run_dbt, cancel_on_exit on the PR job, and the clone + modified_incremental commands. See expected/golden_pipeline.yml.",
+      "files": [
+        "dbt_production.yml"
+      ],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Adds a dbt_branch input",
+          "check": "yaml_present",
+          "path": "inputs.dbt_branch"
+        },
+        {
+          "text": "Adds a dbt_command input",
+          "check": "yaml_present",
+          "path": "inputs.dbt_command"
+        },
+        {
+          "text": "Adds a dbt_ci_schema_suffix input",
+          "check": "yaml_present",
+          "path": "inputs.dbt_ci_schema_suffix"
+        },
+        {
+          "text": "run_dbt checks out ${{ inputs.dbt_branch }}",
+          "check": "regex",
+          "pattern": "branch:\\s*\\$\\{\\{\\s*inputs\\.dbt_branch\\s*\\}\\}"
+        },
+        {
+          "text": "run_dbt runs dbt ${{ inputs.dbt_command }}",
+          "check": "regex",
+          "pattern": "commands:\\s*dbt \\$\\{\\{\\s*inputs\\.dbt_command\\s*\\}\\}"
+        },
+        {
+          "text": "DBT_CI_SCHEMA_SUFFIX is passed to the task from the input",
+          "check": "regex",
+          "pattern": "DBT_CI_SCHEMA_SUFFIX[^\\n]*inputs\\.dbt_ci_schema_suffix"
+        },
+        {
+          "text": "environment_variables is a JSON string, not a YAML mapping (DBT_CORE_EXECUTE rejects a mapping)",
+          "check": "regex",
+          "pattern": "environment_variables:\\s*['\"]\\{"
+        },
+        {
+          "text": "Concurrency comes from an environment variable",
+          "check": "regex",
+          "pattern": "max_active:\\s*\\$\\{\\{\\s*ENV\\.DBT_PIPELINE_CONCURRENCY"
+        },
+        {
+          "text": "Keeps the daily schedule",
+          "check": "yaml_present",
+          "path": "schedule"
+        },
+        {
+          "text": "Keeps the Tableau refresh task",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "TABLEAU_CLOUD"
+        },
+        {
+          "text": "dbt_slim_ci.yml has a PR job, a deploy-on-merge job and a CI schema clean-up job on PR close"
+        },
+        {
+          "text": "Every run-pipeline step is pinned to v1.7.0 or later, with task_ids set to run_dbt so the Tableau refresh does not run on PRs"
+        },
+        {
+          "text": "The PR job sets cancel_on_exit: true, environment CI, --target ci, and passes the PR number as dbt_ci_schema_suffix"
+        },
+        {
+          "text": "Uses the dbt clone + modified_incremental selector commands for incremental models, and provides or asks for selectors.yml"
+        },
+        {
+          "text": "Provides or tells the user to add the generate_schema_name and drop_ci_schema macros, the ci target, and the CI / Production environment variables"
+        }
+      ]
+    }
+  ]
+}

@@ -5,8 +5,8 @@ For each eval case and each configuration the runner creates an isolated run dir
 copies the case fixtures into ./files/, and invokes `claude -p` there with MCP servers
 disabled and only file tools allowed (so a run can never touch a live warehouse, repo,
 or Orchestra). For `with_skill`, the skill's SKILL.md — plus the content of any
-`../../references/...` files it links to, since those live outside the sandboxed run
-directory the agent can't otherwise reach — is injected via --append-system-prompt;
+`../../references/...` and skill-local `references/` / `templates/` files it links to, since those live outside
+the sandboxed run directory the agent can't otherwise reach — is injected via --append-system-prompt;
 `without_skill` is the bare prompt — that pair is the baseline comparison. Token/duration/
 cost are captured to timing.json; the final assistant message to transcript.txt. The
 iteration is graded on completion (see grade.py).
@@ -45,6 +45,8 @@ PLUGIN_ROOTS = {
 CONFIGS = ("with_skill", "without_skill")
 
 REFERENCE_LINK_RE = re.compile(r"`(\.\./\.\./references/[^`]+\.md)`")
+# Skill-local files linked as markdown, e.g. [x](references/x.md) or [y](templates/y.yml)
+LOCAL_LINK_RE = re.compile(r"\]\(((?:references|templates)/[^)#\s]+)\)")
 
 WITH_SKILL_PREAMBLE = (
     "You have been given a Skill below. Follow its instructions to complete the user's "
@@ -89,7 +91,7 @@ def skill_body(suite: str, plugin: str | None = None, skills_root: str | None = 
     text = skill_md.read_text()
 
     seen = set()
-    for rel in REFERENCE_LINK_RE.findall(text):
+    for rel in REFERENCE_LINK_RE.findall(text) + LOCAL_LINK_RE.findall(text):
         ref_path = (skill_dir / rel).resolve()
         if ref_path in seen:
             continue

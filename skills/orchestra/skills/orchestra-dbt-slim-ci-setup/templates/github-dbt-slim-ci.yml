@@ -1,13 +1,17 @@
-# Minimal GitHub Actions workflow: Orchestra Slim CI via run-pipeline
+# GitHub Actions: Orchestra dbt Slim CI, deploy on merge, and CI schema clean-up via run-pipeline
 # Place in dbt repo as .github/workflows/dbt_slim_ci.yml (rename as needed).
-# Replace placeholders: PIPELINE_ID, TASK_ID, PR_ENV, MERGE_ENV, path filters.
+# Replace placeholders: PIPELINE_ID (or vars.ORCHESTRA_DBT_PIPELINE_ID), TASK_ID, CI_ENV, PROD_ENV, path filters.
+# Splitting into three files (dbt_ci.yml, dbt_deploy.yml, ci_cleanup.yml) works equally well.
+# Incremental-model variant of the dbt_command values: github-dbt-slim-ci-incremental.yml.
 
 name: dbt Slim CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches:
       - main
+    # Also filters `closed`, so clean-up only fires for PRs that could have built a CI schema
     paths:
       - 'models/**'
       - 'macros/**'
@@ -26,27 +30,67 @@ on:
   workflow_dispatch:
 
 jobs:
-  dbt-core-slimci:
+  dbt-slim-ci:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Orchestra pipeline (Slim CI)
-        uses: orchestra-hq/run-pipeline@v1
+      - name: Trigger Orchestra pipeline (Slim CI)
+        uses: orchestra-hq/run-pipeline@v1.7.0
         with:
           api_key: ${{ secrets.ORCHESTRA_API_KEY }}
           pipeline_id: PIPELINE_ID
-          poll_interval: 20
-          environment: ${{ github.event_name == 'pull_request' && 'PR_ENV' || 'MERGE_ENV' }}
+          environment: CI_ENV
           task_ids: TASK_ID
+          poll_interval: 20
+          # Cancels the Orchestra run when a newer push supersedes this workflow run (needs v1.7.0+)
+          cancel_on_exit: true
           run_inputs: |
             {
-              "dbt_command": "build -s state:modified+ --defer --state latest_production --target ${{ github.event_name == 'pull_request' && 'ci' || 'prod' }}",
-              "dbt_branch": "${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+              "dbt_command": "build -s state:modified+ --defer --state latest_production --target ci",
+              "dbt_branch": "${{ github.head_ref }}",
+              "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
             }
 
-# Pipeline YAML in a SEPARATE repo from dbt: add on the run-pipeline step:
+  dbt-deploy:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Orchestra pipeline (deploy)
+        uses: orchestra-hq/run-pipeline@v1.7.0
+        with:
+          api_key: ${{ secrets.ORCHESTRA_API_KEY }}
+          pipeline_id: PIPELINE_ID
+          environment: PROD_ENV
+          task_ids: TASK_ID
+          poll_interval: 20
+          run_inputs: |
+            {
+              "dbt_command": "build -s state:modified+ --defer --state latest_production --target prod",
+              "dbt_branch": "main"
+            }
+
+  drop-ci-schema:
+    # Forks cannot read repository secrets
+    if: >-
+      github.event_name == 'pull_request' && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Drop CI schema for this pull request
+        uses: orchestra-hq/run-pipeline@v1.7.0
+        with:
+          api_key: ${{ secrets.ORCHESTRA_API_KEY }}
+          pipeline_id: PIPELINE_ID
+          environment: CI_ENV
+          task_ids: TASK_ID
+          poll_interval: 20
+          run_inputs: |
+            {
+              "dbt_command": "run-operation drop_ci_schema --target ci",
+              "dbt_branch": "main",
+              "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
+            }
+
+# Pipeline YAML in a SEPARATE repo from dbt: add on each run-pipeline step:
 #   branch: main
 # (branch of the pipeline YAML repository, not the dbt PR branch)

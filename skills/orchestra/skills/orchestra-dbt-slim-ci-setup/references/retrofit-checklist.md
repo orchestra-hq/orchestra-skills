@@ -13,9 +13,12 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 | Check | Expected |
 |-------|----------|
 | `inputs.dbt_branch` | `type: string`, default = default branch (e.g. `main`) |
-| `inputs.dbt_command` | `type: string`, default = current prod command (without leading `dbt`) |
+| `inputs.dbt_command` | `type: string`, default = current prod command (without leading `dbt`), incl. `--target ${{ ENV.DBT_TARGET }}` |
+| `inputs.dbt_ci_schema_suffix` | `type: string`, `optional: true` — CI passes the PR number |
 | Task `parameters.branch` | `${{ inputs.dbt_branch }}` on prod dbt task (and snapshot tasks if they must follow same branch) |
-| Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` plus existing suffixes (e.g. `--target ${{ ENV.DBT_TARGET }}`) |
+| Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` — keep `--target` inside the input, not appended here, or only the last of several `;`-chained commands gets it |
+| Task `parameters.environment_variables` | `'{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'` — a JSON string; a YAML mapping fails validation |
+| `configuration.concurrency.max_active` | `${{ ENV.DBT_PIPELINE_CONCURRENCY }}` (see Concurrency below) |
 | `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; not tags) |
 | Dedicated CI-only pipeline | **Avoid** unless user accepts separate `latest_production` history |
 
@@ -30,15 +33,19 @@ inputs:
     default: main
   dbt_command:
     type: string
-    default: build --select <prod_selector>
+    default: build --select <prod_selector> --target ${{ ENV.DBT_TARGET }}
+  dbt_ci_schema_suffix:
+    type: string
+    optional: true
 ```
 
 **Production dbt task** (task key varies):
 
 ```yaml
 parameters:
-  commands: dbt ${{ inputs.dbt_command }} --target ${{ ENV.DBT_TARGET }}
+  commands: dbt ${{ inputs.dbt_command }}
   branch: ${{ inputs.dbt_branch }}
+  environment_variables: '{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'
   # production_run_identifier: main
 ```
 
@@ -64,4 +71,4 @@ Orchestra injects artifacts before each dbt task run from the last **successful*
 ## Concurrency (shared prod + CI pipeline)
 
 - A fixed `configuration.concurrency.max_active` applies in every environment, so a prod limit of `1` also serialises PR runs. A run blocked by the limit is `SKIPPED`, and `run-pipeline` only logs a warning rather than failing the check. Check its `status` output if a skipped run should block the PR.
-- To give CI and prod separate limits, set `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` and define the variable per Orchestra environment (e.g. `Staging` = 5, `Production` = 1). See [dbt CI/CD](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd) and [run-pipeline outputs](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions).
+- To give CI and prod separate limits, set `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` and define the variable per Orchestra environment (e.g. `CI` = 5, `Production` = 1). See [dbt CI/CD](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd) and [run-pipeline outputs](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions).
