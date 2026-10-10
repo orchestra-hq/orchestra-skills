@@ -1,0 +1,49 @@
+version: v1
+name: dbt_production
+inputs:
+  dbt_branch:
+    type: string
+    default: main
+  dbt_command:
+    type: string
+    default: build --target ${{ ENV.DBT_TARGET }}
+  dbt_ci_schema_suffix:
+    type: string
+    optional: true
+pipeline:
+  dbt:
+    tasks:
+      run_dbt:
+        integration: DBT_CORE
+        integration_job: DBT_CORE_EXECUTE
+        parameters:
+          commands: dbt ${{ inputs.dbt_command }}
+          branch: ${{ inputs.dbt_branch }}
+          package_manager: PIP
+          python_version: "3.12"
+          environment_variables: '{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'
+        depends_on: []
+        name: dbt build
+        connection: dbt_core_prod_10001
+    depends_on: []
+    name: dbt
+  refresh_bi:
+    tasks:
+      refresh_tableau:
+        integration: TABLEAU_CLOUD
+        integration_job: TABLEAU_REFRESH_EXTRACT
+        parameters:
+          project_name: Exec
+          datasource_name: Exec Dashboard
+        depends_on: []
+        name: refresh exec dashboard
+        connection: tableau_prod_10002
+    depends_on: [dbt]
+    name: refresh BI
+schedule:
+  - name: Daily 5am
+    cron: 0 5 ? * * *
+    timezone: UTC
+configuration:
+  concurrency:
+    max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}
