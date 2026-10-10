@@ -21,6 +21,8 @@
 - `dbt_command` passed to Orchestra: <exact string>
 - Excludes / targets: <ci target, tag excludes, etc.>
 - GHA environments: PR → <Orchestra env> | merge → <Orchestra env>
+- CI schema: `<prefix>_<PR number>`, dropped on PR close: <yes / no>
+- Deploy on merge: <rebuild modified | full refresh | none>
 
 ### Bootstrap: latest_production
 - Status: <ready | needs first successful prod run on default branch>
@@ -32,6 +34,8 @@
 | ORCHESTRA_API_KEY in GitHub | <done / pending> |
 | Other secrets | <list> |
 | dbt connection / CI target in Orchestra | <done / pending> |
+| `DBT_TARGET` / `DBT_PIPELINE_CONCURRENCY` per Orchestra environment | <done / pending> |
+| Stale `ci_<PR number>` assets in Orchestra catalogue (optional delete) | <noted> |
 
 ### Validation
 - `validate_pipeline`: <pass / skip / fail>
@@ -88,4 +92,28 @@
 
 **Symptoms:** Incremental models need full refresh when modified.
 
-**Fix:** Use semicolon-separated commands in one `dbt_command` input (incremental full-refresh tranche, then `state:modified+` with excludes). See `templates/github-dbt-slim-ci-incremental.yml`.
+**Fix:** Use semicolon-separated commands in one `dbt_command` input: `dbt clone`, full-refresh `--selector modified_incremental`, then `state:modified+`. Each chained command after the first starts with `dbt`, and each carries its own `--target`. See `templates/github-dbt-slim-ci-incremental.yml`.
+
+### Superseded PR runs overwrite each other
+
+**Symptoms:** Two Orchestra runs build into the same `ci_<PR number>` schema after a new push.
+
+**Fix:** `cancel_on_exit: true` on the PR job, with `orchestra-hq/run-pipeline@v1.7.0` or later.
+
+### PR runs SKIPPED
+
+**Symptoms:** GHA check passes but Orchestra run is `SKIPPED`.
+
+**Fix:** Concurrency limit hit. Use `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` with a higher value in the CI environment.
+
+### `env_var('DBT_CI_SCHEMA_SUFFIX')` not set
+
+**Symptoms:** dbt compile error on the `ci` target.
+
+**Fix:** Task `environment_variables` must map `DBT_CI_SCHEMA_SUFFIX` from `inputs.dbt_ci_schema_suffix`, and the PR / clean-up jobs must pass `dbt_ci_schema_suffix`.
+
+### CI schema clean-up fails
+
+**Symptoms:** `drop_ci_schema` not found, or fork PRs fail.
+
+**Fix:** The macro must be on the default branch (clean-up runs with `dbt_branch: main`). Fork PRs cannot read secrets; the template skips them.

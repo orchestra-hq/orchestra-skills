@@ -1,6 +1,7 @@
 # Snippet: pipeline inputs + dbt Core task (retrofit)
 # Merge into existing pipeline YAML. Preserve prod default in dbt_command.
 # Replace <prod_selector>, connection ids, and task key as needed.
+# Drop dbt_ci_schema_suffix + environment_variables if CI does not write to a per-PR schema.
 
 inputs:
   dbt_branch:
@@ -8,15 +9,26 @@ inputs:
     default: main
   dbt_command:
     type: string
-    default: build --select <prod_selector>
+    default: build --select <prod_selector> --target ${{ ENV.DBT_TARGET }}
+  dbt_ci_schema_suffix:
+    type: string
+    optional: true
 
 # Under pipeline → task group → tasks → <dbt_task_key>:
 #   integration: DBT_CORE
 #   integration_job: DBT_CORE_EXECUTE
 #   parameters:
-#     commands: dbt ${{ inputs.dbt_command }} --target ${{ ENV.DBT_TARGET }}
+#     commands: dbt ${{ inputs.dbt_command }}
 #     package_manager: PIP
 #     python_version: '3.12'
 #     branch: ${{ inputs.dbt_branch }}
+#     environment_variables:
+#       DBT_CI_SCHEMA_SUFFIX: ${{ inputs.dbt_ci_schema_suffix }}
 #     # production_run_identifier: main
 #   connection: <dbt_core_connection_id>
+
+# Per-environment concurrency (set DBT_PIPELINE_CONCURRENCY in each Orchestra environment,
+# e.g. CI = 5, Production = 1):
+configuration:
+  concurrency:
+    max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}

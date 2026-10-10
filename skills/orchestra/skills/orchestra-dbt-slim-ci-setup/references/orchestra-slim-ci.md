@@ -19,7 +19,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 |------|---------|
 | [inputs-matrix.md](inputs-matrix.md) | Must-have / discoverable / manual inputs |
 | [retrofit-checklist.md](retrofit-checklist.md) | Pipeline inventory and YAML patches |
-| [mcp-playbook.md](mcp-playbook.md) | Documentation + Orchestra MCP sequence |
+| [mcp-playbook.md](../../../references/orchestra/mcp-playbook.md) | Documentation + Orchestra MCP sequence |
 | [completion-report.md](completion-report.md) | Report template and troubleshooting |
 
 ## Templates
@@ -27,8 +27,11 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | File | Purpose |
 |------|---------|
 | [../templates/pipeline-inputs-snippet.yml](../templates/pipeline-inputs-snippet.yml) | Pipeline inputs + dbt task parameters |
-| [../templates/github-dbt-slim-ci.yml](../templates/github-dbt-slim-ci.yml) | Minimal GHA workflow |
-| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Two-command incremental pattern |
+| [../templates/github-dbt-slim-ci.yml](../templates/github-dbt-slim-ci.yml) | GHA workflow: PR Slim CI, deploy on merge, CI schema clean-up |
+| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Incremental variant: `dbt clone` + `modified_incremental` selector |
+| [../templates/dbt/generate_schema_name.sql](../templates/dbt/generate_schema_name.sql) | Per-PR `ci_<PR number>` schema routing |
+| [../templates/dbt/drop_ci_schema.sql](../templates/dbt/drop_ci_schema.sql) | Drop the PR's CI schema on close |
+| [../templates/dbt/selectors.yml](../templates/dbt/selectors.yml) | `modified_incremental` selector |
 
 ## Architecture (one pipeline)
 
