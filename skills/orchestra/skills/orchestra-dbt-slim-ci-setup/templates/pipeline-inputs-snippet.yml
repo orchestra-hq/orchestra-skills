@@ -22,8 +22,7 @@ inputs:
 #     package_manager: PIP
 #     python_version: '3.12'
 #     branch: ${{ inputs.dbt_branch }}
-#     environment_variables:
-#       DBT_CI_SCHEMA_SUFFIX: ${{ inputs.dbt_ci_schema_suffix }}
+#     environment_variables: '{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'  # a JSON string, not a mapping
 #     # production_run_identifier: main
 #   connection: <dbt_core_connection_id>
 

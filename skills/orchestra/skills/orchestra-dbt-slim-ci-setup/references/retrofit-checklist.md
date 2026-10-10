@@ -17,7 +17,7 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 | `inputs.dbt_ci_schema_suffix` | `type: string`, `optional: true` — CI passes the PR number |
 | Task `parameters.branch` | `${{ inputs.dbt_branch }}` on prod dbt task (and snapshot tasks if they must follow same branch) |
 | Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` — keep `--target` inside the input, not appended here, or only the last of several `;`-chained commands gets it |
-| Task `parameters.environment_variables` | `DBT_CI_SCHEMA_SUFFIX: ${{ inputs.dbt_ci_schema_suffix }}` |
+| Task `parameters.environment_variables` | `'{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'` — a JSON string; a YAML mapping fails validation |
 | `configuration.concurrency.max_active` | `${{ ENV.DBT_PIPELINE_CONCURRENCY }}` (see Concurrency below) |
 | `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; not tags) |
 | Dedicated CI-only pipeline | **Avoid** unless user accepts separate `latest_production` history |
@@ -45,8 +45,7 @@ inputs:
 parameters:
   commands: dbt ${{ inputs.dbt_command }}
   branch: ${{ inputs.dbt_branch }}
-  environment_variables:
-    DBT_CI_SCHEMA_SUFFIX: ${{ inputs.dbt_ci_schema_suffix }}
+  environment_variables: '{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'
   # production_run_identifier: main
 ```
 
