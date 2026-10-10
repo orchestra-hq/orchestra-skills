@@ -3,52 +3,25 @@
 ## Completion report template
 
 ```markdown
-## Slim CI setup summary
+## Slim CI — <enabled | partially enabled>
 
-### Context
-- dbt repo: <org/repo> (default branch: <branch>)
-- Pipeline: <id> / <alias> | dbt task: <task_id>
-- Pipeline YAML: <path> (<same repo | separate repo>)
-- Storage: <Git-backed | Orchestra-backed>
+**Enabled:** <comma-separated: PR checks on <paths>, per-PR schema ci_<n>, deploy on merge, clean-up, per-env concurrency, incremental variant>
+**Still missing:** <one line each, with the consequence, or "nothing">
+**Retired / consolidated:** <pipelines paused, workflows removed, or "none">
 
-### Already configured
-- <bullets or "none">
+### You need to
+1. <manual step, e.g. add ORCHESTRA_API_KEY to GitHub secrets>
+2. <...>
 
-### Changes made
-- `<path>`: <reason>
+### Changed
+- `<path or pipeline>`: <one-line reason>
 
-### Slim CI command
-- `dbt_command` passed to Orchestra: <exact string>
-- Excludes / targets: <ci target, tag excludes, etc.>
-- GHA environments: PR → <Orchestra env> | merge → <Orchestra env>
-- CI schema: `<prefix>_<PR number>`, dropped on PR close: <yes / no>
-- Deploy on merge: <rebuild modified | full refresh | none>
-
-### Bootstrap: latest_production
-- Status: <ready | needs first successful prod run on default branch>
-- Notes: <production_run_identifier if set>
-
-### Manual follow-up
-| Item | Status |
-|------|--------|
-| ORCHESTRA_API_KEY in GitHub | <done / pending> |
-| Other secrets | <list> |
-| dbt connection / CI target in Orchestra | <done / pending> |
-| `DBT_TARGET` / `DBT_PIPELINE_CONCURRENCY` per Orchestra environment | <done / pending> |
-| Stale `ci_<PR number>` assets in Orchestra catalogue (optional delete) | <noted> |
-
-### Validation
-- `validate_pipeline`: <pass / skip / fail>
-- `dbt parse`: <pass / skip / fail>
-- Smoke `start_pipeline`: <not run / pass / fail>
-
-### How to test
-- Open PR touching `<paths>` or run `workflow_dispatch` on `<workflow file>`.
-- Expect check: `<job name>`; Orchestra run link appears in Action logs.
-
-### Failures after merge
-- Use **pr-slim-ci-orchestra-debug** for triage.
+### Check it works
+Open a PR touching `<paths>`; expect the `<job name>` check with an Orchestra run link in its log.
+Validation: `validate_pipeline` <pass/skip>, `dbt parse` <pass/skip>, smoke run <not run/pass>.
 ```
+
+Omit empty lines. `latest_production` not yet populated goes under **Still missing** with "run prod once on the default branch".
 
 ## Troubleshooting
 

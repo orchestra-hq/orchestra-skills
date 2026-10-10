@@ -42,7 +42,7 @@ Each skill auto-triggers when your prompt matches it — just describe the probl
 
 | Skill | What it does | Try saying |
 |-------|--------------|------------|
-| [`orchestra-dbt-slim-ci-setup`](skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline. | _"Set up dbt Slim CI in Orchestra"_ |
+| [`orchestra-dbt-slim-ci-setup`](skills/orchestra/skills/orchestra-dbt-slim-ci-setup/SKILL.md) | Retrofit dbt Slim CI (`run-pipeline`, `latest_production`, `state:modified+`, `--defer`) onto an existing production dbt pipeline, auditing and consolidating earlier attempts first. | _"Set up dbt Slim CI in Orchestra"_, _"What's missing from our dbt CI?"_ |
 | [`configure-dbt-source-freshness`](skills/orchestra/skills/configure-dbt-source-freshness/SKILL.md) | Author dbt source freshness (warehouse-correct `loaded_at_field`/thresholds) and enable `use_state_orchestration` so Orchestra skips downstream models when sources are unchanged. | _"Set up source freshness for state-aware orchestration"_ |
 | [`configure-dbt-build-after`](skills/orchestra/skills/configure-dbt-build-after/SKILL.md) | Author per-model `build_after` (SLA + upstream-freshness gating) so Orchestra rebuilds a model only when it's due and its data is fresh. | _"Make my marts state-aware — only rebuild when due and fresh"_ |
 

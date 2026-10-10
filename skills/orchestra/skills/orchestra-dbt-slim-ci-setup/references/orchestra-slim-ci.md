@@ -18,6 +18,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | File | Purpose |
 |------|---------|
 | [inputs-matrix.md](inputs-matrix.md) | Must-have / discoverable / manual inputs |
+| [audit-existing-setup.md](audit-existing-setup.md) | Find earlier attempts, gap table, consolidation plan |
 | [retrofit-checklist.md](retrofit-checklist.md) | Pipeline inventory and YAML patches |
 | [mcp-playbook.md](../../../references/orchestra/mcp-playbook.md) | Documentation + Orchestra MCP sequence |
 | [completion-report.md](completion-report.md) | Report template and troubleshooting |
