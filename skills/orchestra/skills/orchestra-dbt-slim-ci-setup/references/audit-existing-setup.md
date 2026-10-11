@@ -1,10 +1,27 @@
 # Audit existing Slim CI setup
 
-Run before patching anything. Accounts often hold earlier, partial attempts: a CI-only pipeline, a
-manual manifest export, a second dbt task. Patching the named pipeline without finding these leaves
-two setups fighting over the same PRs. Output is a gap table and a fix plan the user approves.
+Accounts often hold earlier, partial attempts: a CI-only pipeline, a manual manifest export, a
+second dbt task. Patching the named pipeline without finding these leaves two setups fighting over
+the same PRs.
 
-## 1. Sweep the account
+## Quick conflict check (implement mode)
+
+When the user named a pipeline and asked to set it up, check only for things that would fight the
+retrofit, then proceed:
+
+- `list_pipelines`: another pipeline with a `DBT_CORE` task on the same dbt repo, or a CI-sounding name.
+- The dbt repo's `.github/workflows/*`: an existing job calling `run-pipeline` or running `dbt` with warehouse secrets.
+- The named pipeline itself: Python tasks exporting `manifest.json`, `run_type` conditions.
+
+Report hits in the completion report under **Retired / consolidated** or **Still missing**, and ask
+before pausing or removing any of them. Skip the gap table.
+
+## Full audit (audit mode)
+
+Run when the user asks what's missing, to clean up or consolidate, or names no pipeline. Output is a
+gap table and a fix plan the user approves.
+
+### 1. Sweep the account
 
 | Source | Read |
 |--------|------|
@@ -16,7 +33,7 @@ two setups fighting over the same PRs. Output is a gap table and a fix plan the 
 
 Git-backed pipelines: read the repo YAML, not only the stored definition.
 
-## 2. Signals of earlier attempts
+### 2. Signals of earlier attempts
 
 | Signal | Why it matters |
 |--------|----------------|
@@ -30,7 +47,7 @@ Git-backed pipelines: read the repo YAML, not only the stored definition.
 | No per-PR schema / no clean-up | PRs collide in one CI schema; schemas pile up |
 | CI pipeline with no successful run in 30+ days | Abandoned attempt still triggered by GHA, or dead weight |
 
-## 3. Gap table
+### 3. Gap table
 
 One row per component of the docs pattern. Real state only; fold evidence into the row.
 
@@ -46,7 +63,7 @@ Components: one prod pipeline + one dbt task for CI · parametrised `dbt_command
 PR workflow (CI env, `cancel_on_exit`) · deploy on merge · schema clean-up · incremental variant
 (only if the project has incremental models).
 
-## 4. Fix plan
+### 4. Fix plan
 
 Numbered, in dependency order. Tag each step:
 
@@ -59,7 +76,7 @@ anything beyond a single CI-only duplicate, hand off to **merge-duplicate-pipeli
 delete, or remove a workflow without a per-item yes. Retiring a manual manifest export is optional:
 say what it does now and let the user decide.
 
-## Report shape
+### Report shape
 
 ```markdown
 ## Slim CI audit — <n> gaps, <n> conflicts

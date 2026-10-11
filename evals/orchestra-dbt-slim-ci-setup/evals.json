@@ -130,6 +130,9 @@
         },
         {
           "text": "Provides or tells the user to add the generate_schema_name and drop_ci_schema macros, the ci target, and the CI / Production environment variables"
+        },
+        {
+          "text": "Implements directly: writes both files without first producing an account audit gap table or stopping for approval"
         }
       ]
     }
