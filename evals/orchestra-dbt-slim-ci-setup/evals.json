@@ -135,6 +135,67 @@
           "text": "Implements directly: writes both files without first producing an account audit gap table or stopping for approval"
         }
       ]
+    },
+    {
+      "id": "second-ci-task-rejected",
+      "prompt": "Add dbt Slim CI to files/dbt_production.yml (Git-backed in acme/analytics-dbt, default branch main). I don't want PR runs going anywhere near the nightly task, so add a second dbt Core task called run_dbt_ci to the same pipeline just for CI, deferring with --defer --state latest_production, and leave run_dbt untouched. Write the resulting pipeline YAML to pipeline.yml. Don't call Orchestra, push, or deploy.",
+      "expected_output": "Pushes back on the second dbt Core task: latest_production is seeded per dbt Core task from that same task's last successful run on the dbt repository's default branch, so run_dbt_ci would start with empty or missing state and state:modified+ would select everything or nothing until run_dbt_ci itself succeeds on main. Parametrises the existing run_dbt task (dbt_branch / dbt_command / dbt_ci_schema_suffix) and writes that to pipeline.yml instead.",
+      "files": [
+        "dbt_production.yml"
+      ],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Parametrises the existing dbt task with a dbt_branch input instead of hardcoding the PR branch on a new one",
+          "check": "yaml_present",
+          "path": "inputs.dbt_branch"
+        },
+        {
+          "text": "The dbt task checks out ${{ inputs.dbt_branch }}",
+          "check": "regex",
+          "pattern": "branch:\\s*\\$\\{\\{\\s*inputs\\.dbt_branch\\s*\\}\\}"
+        },
+        {
+          "text": "States that latest_production artifact history is scoped to each dbt Core task, not to the pipeline"
+        },
+        {
+          "text": "Explains that run_dbt_ci would have empty or missing latest_production until that task itself has a successful run on the dbt repository default branch, so it does not inherit run_dbt's artifacts"
+        },
+        {
+          "text": "Recommends running Slim CI through the existing production run_dbt task (task_ids run_dbt) rather than adding a second dbt Core task"
+        },
+        {
+          "text": "Does not quietly add a second DBT_CORE task deferring to --state latest_production as though it would share run_dbt's state"
+        }
+      ]
+    },
+    {
+      "id": "production-run-identifier-tag",
+      "prompt": "Our Slim CI should compare against our latest release tag rather than main. Can I just set production_run_identifier: v2024.11.0 on the run_dbt task in files/dbt_production.yml? Tell me what I would get. Don't write any files or call Orchestra.",
+      "expected_output": "Says production_run_identifier takes a branch name or a commit SHA and does not support git tags, so v2024.11.0 would not resolve and latest_production could be empty for that run, leaving state:modified+ to select everything or nothing. Notes it defaults to the dbt repository default branch when unset, and offers the supported alternatives: the commit SHA the tag points at, or a long-lived release branch. Changes nothing.",
+      "files": [
+        "dbt_production.yml"
+      ],
+      "assertions": [
+        {
+          "text": "States that production_run_identifier does not support git tags"
+        },
+        {
+          "text": "Says it accepts a branch name or a commit SHA, and defaults to the dbt repository default branch when unset"
+        },
+        {
+          "text": "Warns that an identifier that does not resolve leaves latest_production empty for that run"
+        },
+        {
+          "text": "Offers the commit SHA the tag points at, or a long-lived release branch, as the supported way to pin the baseline"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
     }
   ]
 }

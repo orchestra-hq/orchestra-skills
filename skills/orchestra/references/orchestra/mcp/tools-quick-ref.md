@@ -152,6 +152,22 @@ Required arguments:
 Required arguments:
 - `pipeline_run_id`
 
+### `pause_pipeline`
+Arguments:
+- `pipeline_id_or_alias` (required)
+- `paused` (required) — `true` to pause, `false` to unpause
+
+Pausing stops schedules, sensors, trigger events and `start_pipeline` calls from starting new
+runs, without touching the pipeline's tasks or definition. Reach for it when a pipeline is
+failing repeatedly and the fix will take a while — it stops the noise without editing or
+deleting anything, and unpausing restores the previous behaviour exactly. It does **not** stop
+a run already in flight; cancel that with `cancel_pipeline_run`. Needs a standard (not
+read-only) credential, and is recorded in the audit trail as **Pipeline paused**.
+
+Prefer this over pausing every task individually: a paused *task* is removed from the DAG while
+the rest of the pipeline keeps running, which is a different outcome. See
+[pausing a pipeline](https://docs.getorchestra.io/docs/core-concepts/pipelines/running-and-retrying-pipelines#pausing-a-pipeline).
+
 ### `validate_pipeline`
 Required arguments:
 - `pipeline_definition`
@@ -170,6 +186,12 @@ Use for updating Orchestra-backed pipelines only.
 
 ## Useful supporting tools
 
+### `list_accounts`
+Lists the workspaces the current credential can act on. An API key is issued to one workspace
+and lists only that one; an OAuth connection can span several. Call it first whenever the user
+mentions more than one workspace, then pass the chosen id as `account_id` on the tools that
+take it — otherwise a call silently targets whichever workspace the credential defaults to.
+
 ### `list_assets`
 Filterable by asset type/integration. Useful when diagnosing missing tables or lineage gaps.
 
@@ -186,3 +208,10 @@ Returns the Orchestra lineage URL for a pipeline run.
   failure list. The composite tools already do.
 - A 403 means the Metadata API is not enabled for the workspace, not a bad key. Say so and
   ask the user to have a workspace admin enable it, rather than retrying.
+- The server accepts either an OAuth sign-in or an API key. An OAuth connection acts as the
+  user who signed in and can never exceed that user's own permissions, so a tool may fail on
+  permissions alone even though the connection is healthy — don't read that as a bad
+  credential. A connection granted only the `orchestra:read` scope (or using a read-only API
+  key) rejects anything that changes state: `start_pipeline`, `pause_pipeline`,
+  `cancel_pipeline_run`, `create_pipeline`, `update_pipeline`. Prepare the change and hand it
+  to the user rather than retrying. See [Orchestra MCP](https://docs.getorchestra.io/docs/mcp).

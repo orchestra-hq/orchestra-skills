@@ -59,6 +59,29 @@ Use `source: GIT` + `command:` (see `python-dagster-to-orchestra`/`python-prefec
 
 If instead the Airflow task genuinely checks out and runs a script from a separate Git repo (not the DAG repo itself), use `source: GIT`, commit/reference the script there, and create/verify an Orchestra Python connection pointing at that repo (URL, branch, credentials) as described for `source: GIT` tasks.
 
+## Credentials the Code Needs: Link, Don't Copy
+
+A callable that read a credential through `BaseHook.get_connection(...)` or a hook's `conn_id` still needs those credentials once it's inline in `parameters.code`. If that credential already exists as its own Orchestra connection, **link** it on the Python connection (**Linked connections** on the connection's form) rather than copying its user/password into that connection's **Secrets** — see `airflow-connections-to-orchestra`.
+
+Linked credentials are exported as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` (every part upper-cased, non-alphanumeric runs collapsed to a single `_`, parts joined by a **double** underscore, `<FIELD>` being the field's ID from the integration's **Authentication parameters** table) — e.g. `SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD`. The pre-installed `orchestra-sdk` builds those names for you:
+
+```python
+import os
+import snowflake.connector
+from orchestra_sdk.orchestra import OrchestraSDK
+
+orchestra = OrchestraSDK(api_key=os.environ["ORCHESTRA_API_KEY"])
+creds = orchestra.get_linked_connection("snowflake", connection_id="prod_12345")
+
+conn = snowflake.connector.connect(
+    account=creds.get("snowflake_account"),
+    user=creds.get("snowflake_user"),
+    password=creds.get("snowflake_password"),
+)
+```
+
+Drop `connection_id=` only when a single connection of that integration is linked. A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent, so don't write code that assumes `os.environ["..."]` is set. Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections).
+
 ## Before / After Example
 
 ### Airflow DAG (before)
@@ -124,13 +147,14 @@ pipeline:
 - **`PythonVirtualenvOperator` requirements**: list them in `build_command` as a `pip install ...` command.
 - **`environment_variables` is a JSON string, not a nested map** — it's a single string field on the parameters model (e.g. `'{"KEY": "value"}'`), not a YAML mapping.
 - **No specific connection mapped**: `connection: null` is the norm for `INLINE` tasks with no external credentials. Only set a specific connection if the code needs secrets injected from one (e.g. a boto3/Snowflake client reading connection-provided env vars) — never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field.
-- **Secrets**: do not hardcode credentials in `code`. If secrets are needed, use an Orchestra connection's injected env vars.
+- **Secrets**: do not hardcode credentials in `code`. If secrets are needed, use an Orchestra connection's injected env vars — and when the credential is already its own Orchestra connection, link it rather than copying its secrets (see above).
 - **`source: GIT` still exists for real Git-backed scripts** — if the Airflow task checks out and runs a script from a separate repo, use `GIT` + `parameters.command`, and create/verify a Python connection pointing at that repo (URL, branch, credentials). Orchestra supports sparse checkout for large monorepos, configurable on the connection.
 
 ## References
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/python
 - Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/python/python_execute_script
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 
 ## Before converting: check it isn't actually a Slack task
 

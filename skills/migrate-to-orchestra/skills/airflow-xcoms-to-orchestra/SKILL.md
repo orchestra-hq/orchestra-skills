@@ -61,6 +61,8 @@ client.set_output("pending_count", count)   # string key, any JSON-serialisable 
 client.set_output("has_pending", count > 0)
 ```
 
+The warehouse credentials behind `snowflake.connector.connect(...)` don't belong in this connection's **Secrets** if they already exist as their own Orchestra connection — link that connection and read it with `client.get_linked_connection("snowflake", connection_id="prod_12345")`. See [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections).
+
 ---
 
 ## Referencing Outputs Downstream

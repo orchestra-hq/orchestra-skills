@@ -1,6 +1,6 @@
 # Pipeline retrofit checklist
 
-Inventory the **existing production** dbt pipeline before editing. Prefer **one pipeline** for scheduled prod and Slim CI so `latest_production` shares lineage.
+Inventory the **existing production** dbt pipeline before editing. Prefer **one pipeline and one dbt Core task** for scheduled prod and Slim CI: artifact history is scoped to each dbt Core task, so only that task's own successful default-branch runs seed its `latest_production`.
 
 ## Orchestra MCP inventory
 
@@ -19,8 +19,8 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 | Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` — keep `--target` inside the input, not appended here, or only the last of several `;`-chained commands gets it |
 | Task `parameters.environment_variables` | `'{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'` — a JSON string; a YAML mapping fails validation |
 | `configuration.concurrency.max_active` | `${{ ENV.DBT_PIPELINE_CONCURRENCY }}` (see Concurrency below) |
-| `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; not tags) |
-| Dedicated CI-only pipeline | **Avoid** unless user accepts separate `latest_production` history |
+| `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; **git tags are not supported**). An identifier that does not resolve leaves `latest_production` empty for that run |
+| Dedicated CI-only pipeline **or a second dbt Core task for CI** | **Avoid** — artifact history is per task, so a new task's `latest_production` is empty (or missing) until that task itself succeeds on the default branch |
 
 ## Minimal YAML patch
 
@@ -60,13 +60,13 @@ Apply only missing pieces. Do not rename unrelated tasks or restructure groups.
 
 ## `latest_production`
 
-Orchestra injects artifacts before each dbt task run from the last **successful** run on the dbt repo **default branch** (unless `production_run_identifier` overrides). Empty state: run a successful non-defer prod build on default branch once before Slim CI. See [completion-report.md](completion-report.md).
+Orchestra injects artifacts before each dbt task run from **that same task's** last **successful** run on the dbt repo **default branch** (unless `production_run_identifier` overrides). History is per dbt Core task, not per pipeline — CI deferring to production state only works when CI runs the production task itself. Empty state: run a successful non-defer prod build of that task on the default branch once before Slim CI. See [dbt artifacts - `latest_production`](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production) and [completion-report.md](completion-report.md).
 
 ## Separate pipeline repo
 
 - GHA `branch` on `orchestra-hq/run-pipeline` = branch of **pipeline YAML** repo (usually `main`).
 - `run_inputs.dbt_branch` = PR branch for **dbt** checkout on the task.
-- `latest_production` resolves from dbt task branch settings, not pipeline YAML branch.
+- `latest_production` resolves from the dbt task's own history and branch settings, not the pipeline YAML branch.
 
 ## Concurrency (shared prod + CI pipeline)
 

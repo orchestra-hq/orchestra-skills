@@ -74,6 +74,29 @@ pipeline:
 - [ ] If the return value is consumed downstream, add `set_outputs: true` and call `client.set_output()` in `code` (instantiate `OrchestraSDK(api_key=os.environ.get("ORCHESTRA_API_KEY"))` first — that env var is auto-injected)
 - [ ] Only reach for `source: GIT` + `parameters.command` if the task genuinely checks out and runs a script from an already-separate repo — then commit the script there and create/verify a Python connection pointing at it
 
+## Credentials the Code Needs: Link, Don't Copy
+
+A `@task` that loaded a `SnowflakeConnector`/`AwsCredentials` block still needs those credentials once the body is inline in `parameters.code`. If that credential already exists as its own Orchestra connection, **link** it on the Python connection (**Linked connections** on the connection's form) rather than copying its user/password into that connection's **Secrets** — see `prefect-connections-to-orchestra`.
+
+Linked credentials are exported as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` (every part upper-cased, non-alphanumeric runs collapsed to a single `_`, parts joined by a **double** underscore, `<FIELD>` being the field's ID from the integration's **Authentication parameters** table) — e.g. `SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD`. The pre-installed `orchestra-sdk` builds those names for you:
+
+```python
+import os
+import snowflake.connector
+from orchestra_sdk.orchestra import OrchestraSDK
+
+orchestra = OrchestraSDK(api_key=os.environ["ORCHESTRA_API_KEY"])
+creds = orchestra.get_linked_connection("snowflake", connection_id="prod_12345")
+
+conn = snowflake.connector.connect(
+    account=creds.get("snowflake_account"),
+    user=creds.get("snowflake_user"),
+    password=creds.get("snowflake_password"),
+)
+```
+
+Drop `connection_id=` only when a single connection of that integration is linked. A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent, so don't write code that assumes `os.environ["..."]` is set. Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections).
+
 ## Before / After Example
 
 ### Prefect (before)
@@ -149,11 +172,13 @@ pipeline:
 - `retry_delay_seconds` in Prefect becomes `retry_delay` in Orchestra `configuration:` — **the unit changes, not just the key name**: Orchestra's `retry_delay` is integer MINUTES, so divide by 60 (round up). Capped at 120 (minutes); the API rejects anything higher with "Delay between retries cannot be greater than 120 minutes."
 - `timeout_seconds` becomes `timeout` (seconds) in `configuration:`
 - **`environment_variables` is a single JSON string, not a nested map** — e.g. `'{"KEY": "value"}'`, not a YAML mapping under that key
-- Secrets and API keys go on an Orchestra connection's environment, never hardcoded in YAML or `code`
+- Secrets and API keys go on an Orchestra connection's environment, never hardcoded in YAML or `code`; when the credential is already its own Orchestra connection, link it rather than copying its secrets (see above)
 - **No specific connection mapped** — `connection: null` is the norm for `INLINE` tasks with no external credentials. Never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field
 - **`source: GIT` still exists for real Git-backed scripts** — if the task checks out and runs a script from a separate repo, commit it there and reference by relative path via `command:`, with a Python connection pointing at that repo
 
 ## References
+
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 
 - https://docs.getorchestra.io/docs/integrations/python
 - https://docs.prefect.io/v3/develop/write-tasks

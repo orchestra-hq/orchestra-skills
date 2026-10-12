@@ -8,7 +8,7 @@ Collect before retrofit. Group: **must-have** (ask if missing), **discoverable**
 |-------|-----|
 | Orchestra workspace + API key | MCP validation and optional smoke trigger |
 | Production pipeline id and/or alias | Retrofit target |
-| dbt task id | When using `task_ids` on `run-pipeline` in a multi-task pipeline |
+| **Production** dbt task id | `task_ids` on `run-pipeline` in a multi-task pipeline; CI must reuse the production task, since `latest_production` artifact history is per dbt Core task |
 | dbt Git repo `org/repo` + default branch | `latest_production` baseline |
 | CI provider (default GitHub Actions) + PR base branch | Workflow triggers |
 | Orchestra environment names for PR vs merge (case-sensitive) | Maps GHA `environment` to Orchestra |

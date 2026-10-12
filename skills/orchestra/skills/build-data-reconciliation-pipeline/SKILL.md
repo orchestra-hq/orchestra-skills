@@ -119,7 +119,7 @@ webhook/manual trigger — this pipeline exists to run repeatedly on its own.
 ### Step 5 — Validate
 
 ```bash
-orchestra-cli validate <path/to/pipeline.yml>
+orchestra-cli pipeline validate <path/to/pipeline.yml>
 ```
 
 Or MCP `validate_pipeline` if the CLI isn't available. Fix and re-validate until clean —
