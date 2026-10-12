@@ -90,3 +90,7 @@ Omit empty lines. `latest_production` not yet populated goes under **Still missi
 **Symptoms:** `drop_ci_schema` not found, or fork PRs fail.
 
 **Fix:** The macro must be on the default branch (clean-up runs with `dbt_branch: main`). Fork PRs cannot read secrets; the template skips them.
+
+### Anything else
+
+Failures not covered above are pipeline-run debugging, not setup: use **identify-pipeline-error** ([SKILL.md](../../identify-pipeline-error/SKILL.md)), which routes dbt code/config issues to **fix-pipeline-dbt-task** ([SKILL.md](../../fix-pipeline-dbt-task/SKILL.md)). Do not add debug steps to this skill.

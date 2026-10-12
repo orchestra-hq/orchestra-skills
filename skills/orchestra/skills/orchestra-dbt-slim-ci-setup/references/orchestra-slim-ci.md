@@ -62,4 +62,4 @@ flowchart LR
 
 ## Companion
 
-Post-setup CI failures: **pr-slim-ci-orchestra-debug** (do not merge into this skill).
+Post-setup CI failures: **identify-pipeline-error** ([SKILL.md](../../identify-pipeline-error/SKILL.md)) first, then **fix-pipeline-dbt-task** ([SKILL.md](../../fix-pipeline-dbt-task/SKILL.md)) for dbt code/config fixes (do not merge into this skill).

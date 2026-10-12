@@ -16,7 +16,7 @@ Retrofit **Slim CI** onto an **existing production dbt Orchestra pipeline** (one
 
 ## Companion skill
 
-After setup, failed PR checks: use **pr-slim-ci-orchestra-debug** (project or org copy). Do not merge debug steps into this skill.
+After setup, failed PR checks or pipeline runs: start with **identify-pipeline-error** ([SKILL.md](../identify-pipeline-error/SKILL.md)) to find the failing task and cause; it routes dbt code/config issues to **fix-pipeline-dbt-task** ([SKILL.md](../fix-pipeline-dbt-task/SKILL.md)). Do not merge debug steps into this skill.
 
 ## Workflow
 
