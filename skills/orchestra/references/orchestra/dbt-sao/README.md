@@ -4,6 +4,11 @@ Shared knowledge for the dbt **state-aware orchestration (SAO)** skills. SAO let
 rebuild only the dbt models whose code changed or whose upstream data is actually fresh,
 instead of rebuilding the whole DAG on every run.
 
+> **dbt v2+ is not supported.** State management / state-aware orchestration works with
+> **dbt Core v1.x** only. On a project pinned to dbt v2 or above, stop and say so rather than
+> authoring freshness or `build_after` config — it will not be consumed. See the
+> [state management guide](https://docs.getorchestra.io/docs/guides/dbt-core-state-management/guide).
+
 Two things drive that decision, and each has its own skill:
 
 | Component | Where it is configured | Skill |

@@ -105,7 +105,7 @@ Per the classification:
 - Carry forward every task that exists in any member of the set. Don't silently drop a step
   that only some variants have — gate it, and call out the gating explicitly in the report
   so the user can confirm the condition matches real intent rather than a guess.
-- Validate the draft: `orchestra-cli validate <path>` if available, else MCP
+- Validate the draft: `orchestra-cli pipeline validate <path>` if available, else MCP
   `validate_pipeline`.
 
 ### Step 5 — Present and ask before doing anything

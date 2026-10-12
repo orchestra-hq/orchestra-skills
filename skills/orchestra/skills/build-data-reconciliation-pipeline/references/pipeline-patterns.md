@@ -26,7 +26,7 @@ groups regardless of how many tables are being reconciled, and matches the repor
 (chat summary "N row-count checks, M column checks" reads better than one line per table).
 
 `error_threshold_expression`/`warn_threshold_expression` must be a **literal string at
-authoring time** — `orchestra-cli validate` rejects a matrix-templated value
+authoring time** — `orchestra-cli pipeline validate` rejects a matrix-templated value
 (`${{ MATRIX.x['error_threshold'] }}`) with "Invalid threshold expression format," even
 though the schema's type is just `string` and nothing else about the field hints at that
 restriction. So group further by **threshold policy**, not only by check kind: everything in

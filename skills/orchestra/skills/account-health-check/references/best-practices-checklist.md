@@ -127,12 +127,12 @@ Signal: `list_pipelines` shows `storageProvider: ORCHESTRA` (UI-only) on product
 `/docs/git-control-and-ci-cd/git-control`.
 
 **3.2 Stable alias for register/update** — *Medium*
-Good: pipelines updated via `PUT /pipelines/{alias}` / `update-pipeline` with a stable alias.
+Good: pipelines updated via `PUT /pipelines/{alias}` / `orchestra pipeline update` with a stable alias.
 Signal: duplicate pipelines that look like repeated `import`/`POST` of the same definition (same
 name, multiple entries). → Use one alias. Docs: `/docs/git-control-and-ci-cd/orchestra-cli`.
 
 **3.3 Validate before deploy** — *Medium* `[MANUAL]`
-Good: CI runs `orchestra-cli validate` / `POST /pipelines/schema` and the JSON Schema is wired into
+Good: CI runs `orchestra-cli pipeline validate` / `POST /pipelines/schema` and the JSON Schema is wired into
 the IDE. CI config isn't visible to MCP — flag for manual check; recommend if pipelines are Git-backed
 but you can't confirm validation. Docs: `/docs/git-control-and-ci-cd/ci-cd/validation`.
 

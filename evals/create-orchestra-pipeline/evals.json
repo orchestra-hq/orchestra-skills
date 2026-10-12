@@ -8,37 +8,198 @@
       "prompt": "Create an Orchestra pipeline called 'Core dbt Build' that runs our dbt Cloud job (job_id 555111) on a cron trigger, daily at 3am UTC. I want to know if the whole run ever takes noticeably longer than usual -- say 25% longer than normal -- and have that posted to our #data-eng-alerts Slack channel. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
       "expected_output": "An Orchestra v1 pipeline YAML with a DBT (dbt Cloud) task running the given job on a 3am daily cron, plus a pipeline-level `anomalies` block (type `pipeline_duration_above_baseline`, `percentage_above_baseline: 25`) with a SLACK destination targeting #data-eng-alerts. No task-level or operation-level anomaly block, since only overall pipeline duration was asked about.",
       "files": [],
-      "assertions_ref": ["anomalies"],
+      "assertions_ref": [
+        "anomalies"
+      ],
       "assertions": [
-        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
-        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
-        { "text": "An above-baseline pipeline anomaly type is used", "check": "regex", "pattern": "type:\\s*pipeline_duration_above_baseline" },
-        { "text": "Threshold is set to 25%", "check": "regex", "pattern": "percentage_above_baseline:\\s*25\\b" },
-        { "text": "Anomaly notifies the requested Slack channel", "check": "regex", "pattern": "#data-eng-alerts" },
-        { "text": "Uses the DBT integration for the dbt Cloud job", "check": "regex", "pattern": "integration:\\s*DBT\\b" },
-        { "text": "Scheduled daily at 3am UTC", "check": "regex", "pattern": "cron:\\s*0\\s+3\\s" },
-        { "text": "The `anomalies:` block sits at the pipeline's top level (a sibling of `pipeline:`, `schedule:`, `alerts:`), not nested inside a task" },
-        { "text": "Does not add an operation-level (operation_duration_*) anomaly block -- the user only asked about overall pipeline duration, not individual dbt models" },
-        { "text": "Does not add a task-level (task_duration_*) anomaly block in addition to the pipeline-level one -- only the pipeline-level monitor was requested" }
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "An above-baseline pipeline anomaly type is used",
+          "check": "regex",
+          "pattern": "type:\\s*pipeline_duration_above_baseline"
+        },
+        {
+          "text": "Threshold is set to 25%",
+          "check": "regex",
+          "pattern": "percentage_above_baseline:\\s*25\\b"
+        },
+        {
+          "text": "Anomaly notifies the requested Slack channel",
+          "check": "regex",
+          "pattern": "#data-eng-alerts"
+        },
+        {
+          "text": "Uses the DBT integration for the dbt Cloud job",
+          "check": "regex",
+          "pattern": "integration:\\s*DBT\\b"
+        },
+        {
+          "text": "Scheduled daily at 3am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+3\\s"
+        },
+        {
+          "text": "The `anomalies:` block sits at the pipeline's top level (a sibling of `pipeline:`, `schedule:`, `alerts:`), not nested inside a task"
+        },
+        {
+          "text": "Does not add an operation-level (operation_duration_*) anomaly block -- the user only asked about overall pipeline duration, not individual dbt models"
+        },
+        {
+          "text": "Does not add a task-level (task_duration_*) anomaly block in addition to the pipeline-level one -- only the pipeline-level monitor was requested"
+        }
       ]
     },
     {
       "id": "task-level-below-baseline-existing-pipeline",
       "prompt": "Here's our existing pipeline in files/orders_sync_pipeline.yml. The nightly Fivetran sync task 'sync_orders' sometimes finishes way faster than usual, which we've learned means it silently picked up zero new rows. Add anomaly detection to that task so we get flagged when it finishes more than 80% faster than its normal baseline -- no Slack needed for this one, just flag it in the UI is fine. Leave the rest of the pipeline as-is. Write the updated pipeline to pipeline.yml.",
       "expected_output": "The same pipeline as the fixture, unchanged, except the `sync_orders` task now has a task-level `anomalies` block: type `task_duration_below_baseline` (explicit, since type is required for below-baseline), `percentage_below_baseline: 80`, no destinations. The `dbt_build` task, schedule, and failure alert are preserved exactly as in the fixture.",
-      "files": ["orders_sync_pipeline.yml"],
-      "assertions_ref": ["anomalies"],
+      "files": [
+        "orders_sync_pipeline.yml"
+      ],
+      "assertions_ref": [
+        "anomalies"
+      ],
       "assertions": [
-        { "text": "Output is a valid YAML document", "check": "valid_yaml" },
-        { "text": "Pipeline declares version v1", "check": "yaml_eq", "path": "version", "value": "v1" },
-        { "text": "A below-baseline task anomaly type is used", "check": "regex", "pattern": "type:\\s*task_duration_below_baseline" },
-        { "text": "Threshold is set to 80%", "check": "regex", "pattern": "percentage_below_baseline:\\s*80\\b" },
-        { "text": "The sync_orders task is still present", "check": "regex", "pattern": "sync_orders" },
-        { "text": "The unrelated dbt_build task from the fixture is preserved", "check": "regex", "pattern": "dbt_build" },
-        { "text": "The existing failure alert from the fixture is preserved", "check": "alerts_status", "status": "FAILED" },
-        { "text": "The `anomalies:` block is nested under the sync_orders task specifically, not under dbt_build and not left at the pipeline level" },
-        { "text": "No destinations are added to the anomaly block, matching the user's 'just flag it in the UI' request" },
-        { "text": "The 2am UTC schedule and the FIVETRAN/DBT_CORE task configuration from the fixture are otherwise left unmodified" }
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "A below-baseline task anomaly type is used",
+          "check": "regex",
+          "pattern": "type:\\s*task_duration_below_baseline"
+        },
+        {
+          "text": "Threshold is set to 80%",
+          "check": "regex",
+          "pattern": "percentage_below_baseline:\\s*80\\b"
+        },
+        {
+          "text": "The sync_orders task is still present",
+          "check": "regex",
+          "pattern": "sync_orders"
+        },
+        {
+          "text": "The unrelated dbt_build task from the fixture is preserved",
+          "check": "regex",
+          "pattern": "dbt_build"
+        },
+        {
+          "text": "The existing failure alert from the fixture is preserved",
+          "check": "alerts_status",
+          "status": "FAILED"
+        },
+        {
+          "text": "The `anomalies:` block is nested under the sync_orders task specifically, not under dbt_build and not left at the pipeline level"
+        },
+        {
+          "text": "No destinations are added to the anomaly block, matching the user's 'just flag it in the UI' request"
+        },
+        {
+          "text": "The 2am UTC schedule and the FIVETRAN/DBT_CORE task configuration from the fixture are otherwise left unmodified"
+        }
+      ]
+    },
+    {
+      "id": "json-object-params-and-task-timeout",
+      "prompt": "Create an Orchestra pipeline called 'Partner Feed' with a single HTTP task that POSTs to /v2/ingest on our partner API. It needs a JSON body of {\"mode\": \"full\"} and a custom header X-Partner-Id set to acme. Kill the task if it hasn't finished 45 minutes after it was queued. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an HTTP / HTTP_REQUEST task whose `body` and `custom_headers` parameters are quoted JSON *strings* rather than bare YAML mappings, plus a `configuration.timeout` of 2700 (45 minutes expressed in seconds) on the task.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the HTTP integration",
+          "check": "regex",
+          "pattern": "integration:\\s*HTTP\\b"
+        },
+        {
+          "text": "Uses the HTTP_REQUEST job",
+          "check": "regex",
+          "pattern": "integration_job:\\s*HTTP_REQUEST\\b"
+        },
+        {
+          "text": "Timeout is expressed in seconds, not minutes",
+          "check": "regex",
+          "pattern": "timeout:\\s*2700\\b"
+        },
+        {
+          "text": "`body` is a quoted JSON string, not a nested YAML mapping \u2014 the parameter's schema type is string, so a bare mapping is rejected"
+        },
+        {
+          "text": "`custom_headers` is likewise a quoted JSON string carrying X-Partner-Id, not a nested YAML mapping"
+        },
+        {
+          "text": "`timeout` sits under a `configuration:` block (on the task, or at pipeline level), not as a bare task key"
+        },
+        {
+          "text": "Does not set a timeout above 259200 seconds, the schema maximum"
+        }
+      ]
+    },
+    {
+      "id": "webhook-payload-mapped-to-inputs",
+      "prompt": "We want an Orchestra pipeline called 'Partner Sync Reaction' that a partner's system triggers by POSTing their own event JSON \u2014 it looks like {\"connection_id\": \"abc-123\", \"event\": \"sync_completed\"} and we can't change its shape. The pipeline should run a Python task, but only when connection_id is abc-123. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with the webhook trigger enabled and pipeline `inputs` that the partner's payload is mapped into via `${{ outputs.payload[...] }}`, with the task gated by a `condition` reading the mapped input as `${{ inputs.<name> }}`.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "The webhook trigger is enabled",
+          "check": "regex",
+          "pattern": "webhook:[\\s\\S]{0,60}enabled:\\s*true"
+        },
+        {
+          "text": "Declares pipeline inputs the payload is mapped into",
+          "check": "yaml_present",
+          "path": "inputs"
+        },
+        {
+          "text": "The task is gated by a condition referencing a mapped input",
+          "check": "regex",
+          "pattern": "condition:[^\\n]*\\$\\{\\{\\s*inputs\\."
+        },
+        {
+          "text": "The payload reaches the pipeline through `${{ outputs.payload }}` (whole body or a subscript such as `${{ outputs.payload['connection_id'] }}`) in the webhook trigger's run input mapping"
+        },
+        {
+          "text": "Does not reference `${{ outputs.payload }}` from a task parameter or condition directly \u2014 it is only readable in the trigger's run input mapping, and must be mapped to an input first"
+        },
+        {
+          "text": "Does not try to reshape the partner's payload into Orchestra's start-pipeline format, or treat a non-matching body as an error \u2014 any JSON body starts the run"
+        }
       ]
     }
   ]

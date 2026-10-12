@@ -62,6 +62,8 @@ client.set_output("has_pending", count > 0)
 
 `ORCHESTRA_API_KEY` is auto-injected into every `PYTHON_EXECUTE_SCRIPT` task's environment — no connection or secret setup needed for this.
 
+The warehouse credentials behind `snowflake.connector.connect(...)` do need a connection: if they already exist as their own Orchestra connection, link that connection rather than copying its secrets, and read it with `client.get_linked_connection("snowflake", connection_id="prod_12345")`. See [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections).
+
 ---
 
 ## Referencing Outputs Downstream

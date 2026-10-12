@@ -57,11 +57,19 @@ pipeline:
 | TABLEAU_CLOUD | TABLEAU_REFRESH_EXTRACT | `project_name`, `datasource_name` |
 | POWER_BI | POWER_BI_REFRESH_DATASET | `dataset_id` |
 | HTTP | HTTP_REQUEST | `path`, `method`, `body`, `custom_headers` |
+| MARIADB | MARIADB_RUN_QUERY | `statement` |
+| GCP_CLOUD_STORAGE | GCP_CLOUD_STORAGE_GET_FILE / GCP_CLOUD_STORAGE_PUT_FILE | `bucket`, file paths |
 | ORCHESTRA | APPROVAL | `message_integration`, `message_connection_id`, `message_destination` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
+
+Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
+Glue, `environment_variables` on Python and dbt Core — are **strings**, not YAML mappings.
+Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
+YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
+porting a dict straight out of Airflow or Dagster, where it really is a mapping.
 
 ## Connection format
 
@@ -85,10 +93,18 @@ rather than shipping a fabricated literal or GUID.
 configuration:          # pipeline-level default; a task's own configuration: overrides it
   retries: 2             # integer
   retry_delay: 5         # integer MINUTES — not seconds, not a timedelta string. Max 120
-  timeout: 3600           # integer seconds
+  timeout: 3600           # integer seconds, 0..259200 (3 days)
   concurrency:
     max_active: 1          # integer >= 0, or ${{ ENV.VAR }}; null/omit = no limit
 ```
+
+`timeout` is counted from when the task run is **queued**, not from when it starts executing,
+so queue time eats into it. Omitting it falls back to the organisation's own task timeout
+limit — 6 hours by default. A task's own `timeout` can only bring that forward: the schema
+accepts up to 259200 seconds, but a value above the organisation's limit won't extend it, and
+raising the limit itself (up to 3 days) is an account-manager request. Convert a source
+orchestrator's execution timeout and set it explicitly rather than relying on the default.
+See [task timeouts](https://docs.getorchestra.io/docs/core-concepts/tasks#task-timeouts).
 
 `max_active` can reference an environment variable (`${{ ENV.PIPELINE_CONCURRENCY }}`) so one
 pipeline gets a different limit per environment — e.g. several parallel Slim CI runs in staging,
@@ -145,6 +161,23 @@ literal `default` must be one of them (an expression default like `${{ ENV.X }}`
 webhook:
   enabled: false
 ```
+
+The webhook endpoint accepts **any** JSON body, so a third-party event you can't reshape is a
+valid trigger. A body that doesn't match Orchestra's start-pipeline format doesn't fail — the
+run starts with default options (default environment, branch, commit, all tasks, default
+inputs) and the mismatch is reported in the response's `requestBodyMessage` /
+`requestBodyErrors`. That silent fallback is the trap worth warning a user about: a mistyped
+option such as `env` instead of `environment` starts a run that quietly ignores it, so check
+`requestBodyErrors` when a run didn't use the options that were sent. Invalid JSON is the one
+hard failure (`422`, no run). A body over 64 KiB still runs but isn't stored.
+
+Either way the whole body is available as `${{ outputs.payload }}` in the webhook trigger's run
+inputs, so map it to pipeline `inputs` to use it — `${{ outputs.payload }}` for the whole body,
+`${{ outputs.payload['event'] }}` for one field, `${{ outputs.payload['meta']['rows'] }}` for a
+nested one. Mapped inputs are then read as `${{ inputs.event_name }}` anywhere an input works,
+including task conditions. `${{ outputs.payload }}` is **only** valid in that trigger's run
+input mapping — there is no way to read the payload from a task parameter directly. See
+[webhook triggers](https://docs.getorchestra.io/docs/core-concepts/triggers/webhook#mapping-the-payload-to-run-inputs).
 
 **Alerts:**
 
@@ -267,7 +300,7 @@ After writing or editing a file, validate it with the tool that matches its exte
 For `.yml` / `.yaml`:
 
 ```bash
-orchestra-cli validate <path/to/pipeline.yml>
+orchestra-cli pipeline validate <path/to/pipeline.yml>
 ```
 
 For `.oml`, use the `orchestra-lang` package (imported as `oml_lang`). It runs the same checks as
@@ -278,9 +311,18 @@ pip install orchestra-lang
 ```
 
 Report each entry of `oml_lang.analyze(source).errors()` with its line and column. Don't run
-`orchestra-cli validate` on an `.oml` file: it reads its input as YAML, so it can't parse OML
-block terminators or embed blocks. See
+`orchestra-cli pipeline validate` on an `.oml` file: the CLI accepts the `.oml` extension but
+reads it as YAML, so OML block terminators (`.`) and embeds (`%sql ... %%`) fail with an
+`Invalid YAML` error. See
 [Pipeline Validation](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/validation).
+
+CLI commands are `noun verb` (`orchestra pipeline validate`, `orchestra pipeline import`,
+`orchestra pipeline run`). The old flat names (`orchestra validate`, `orchestra import`,
+`orchestra run`, `orchestra create-pipeline`, `orchestra update-pipeline`,
+`orchestra delete-pipeline`, `orchestra fetch-pipelines`) still work as hidden aliases, so
+existing scripts keep running — but write the noun/verb form in anything new, and don't
+"fix" a legacy name you find in a working CI config. See the
+[Orchestra CLI](https://docs.getorchestra.io/docs/git-control-and-ci-cd/orchestra-cli).
 
 Prefer MCP `validate_pipeline` when the Orchestra MCP server is connected and you need to
 validate without a local CLI install. It takes the definition as JSON, so convert an `.oml` file

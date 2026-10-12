@@ -109,6 +109,23 @@ If the Airflow deployment configures a Secrets Backend (AWS Secrets Manager, Has
 
 ---
 
+## Linked Connections — Reuse a Connection, Don't Copy Its Secrets
+
+Not every `conn_id` is consumed by a dedicated operator: a `PythonOperator` that calls `BaseHook.get_connection("snowflake_prod").password` and builds its own client becomes an Orchestra Python (or dbt Core) task that still needs those warehouse credentials at runtime.
+
+**Decision rule:** if the credential already exists as its own Orchestra connection — the Snowflake/Postgres/AWS connection you created from the tables above — **link** it on the Python/dbt Core connection (**Linked connections** on that connection's form) instead of re-typing the same user/password into that connection's **Secrets**. One credential, one place to rotate it.
+
+Each linked connection's fields arrive as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>`: every part upper-cased, each run of non-alphanumeric characters collapsed to a single `_`, and the parts joined by a **double** underscore. `<CONNECTION_ID>` is the id the YAML's `connection:` field uses (it survives renames), and `<FIELD>` is the field's ID from that integration's **Authentication parameters** table — so a Snowflake connection `prod_12345` exports `SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD`.
+
+- Python reads them via the pre-installed SDK: `orchestra.get_linked_connection("snowflake", connection_id="prod_12345")`, keyed by field ID.
+- dbt Core reads them in `profiles.yml`: `{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD') }}`.
+- A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent. Check a variable exists rather than assuming it.
+- Linking is also what opens an approved private connection for a task on Orchestra-hosted compute (MariaDB today); private connections are not opened for connections that aren't linked.
+
+Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections) (same section on [dbt Core](https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections)).
+
+---
+
 ## `Variable` / `AIRFLOW_VAR_*` vs `Connection` / `AIRFLOW_CONN_*`
 
 These look similar (`AIRFLOW_VAR_` vs `AIRFLOW_CONN_` env var prefixes) but map to opposite places in Orchestra:
@@ -156,6 +173,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - [ ] Grep the deployment/env files for `AIRFLOW_CONN_*` (connections) separately from `AIRFLOW_VAR_*` (config)
 - [ ] For each distinct `conn_id`, identify the operator/hook it's passed to and look up the Orchestra connection type (table above)
 - [ ] Check whether a Secrets Backend is configured (`airflow.cfg` `[secrets] backend`) — if so, note that no further credential detail can be extracted from source
+- [ ] For a `conn_id` consumed inside Python/dbt code rather than by a dedicated operator, link that credential's own Orchestra connection on the Python/dbt Core connection instead of copying its secrets across
 - [ ] Create the Orchestra connection (Settings → Connections) and record its `name_XXXXX` suffix
 - [ ] Replace every Airflow `conn_id="..."` reference with the matching Orchestra `connection: name_XXXXX` in the YAML
 - [ ] Route `Variable.get()` / `AIRFLOW_VAR_*` values to `inputs:`, never to a connection
@@ -168,6 +186,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - **One `conn_id` can be reused across many tasks/DAGs** — map it to a single Orchestra connection, don't create a duplicate per task.
 - **`conn_id=` is generic; the operator class disambiguates the type** — the same generic kwarg name is used by Power BI, HTTP, and many community-provider operators, so identify the type from the operator/hook class, not the kwarg name alone.
 - **`AIRFLOW_CONN_*` URIs are real credentials in plain sight** — if a deployment manifest or `.env` file has one, treat the value as sensitive; don't echo it back into any generated file, only use it to identify what fields the new Orchestra connection needs.
+- **Don't copy a warehouse credential into a Python/dbt connection's Secrets** — if it already exists as its own Orchestra connection, link it and read the injected `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` variables; a copied secret is a second copy to rotate, and a linked one that's deleted just goes missing rather than failing loudly.
 - **Secrets Backend means nothing to extract** — this is normal, not a blocker; still create the Orchestra connection, just leave the value fields for the user.
 - **`Variable` is not a secret store** — even though it's fetched with a `.get()` call that superficially resembles `Secret.load()` in other orchestrators, Airflow Variables map to `inputs:`, not to a connection.
 - **dbt-over-SSH still isn't `LINUX_SSH`** — if a `conn_id`/`ssh_conn_id` is feeding a dbt CLI invocation, defer to `dbt-core-airflow-to-orchestra`, not this skill's SSH mapping.
@@ -177,4 +196,5 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - Airflow connections concepts: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/connections.html
 - Airflow secrets backends: https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments

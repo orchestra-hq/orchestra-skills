@@ -79,7 +79,7 @@ pipeline:
 ## Conversion Steps
 
 1. **Identify the Airflow tasks** — find all `BashOperator` or `SSHOperator` tasks running `dbt` commands. If using Cosmos, find the `DbtTaskGroup`.
-2. **Create/verify the Orchestra dbt Core connection** — in Orchestra Settings → Connections, create a *dbt Core* connection pointing to your Git repository (URL, branch, folder path) and your data warehouse credentials (via `profiles.yml` equivalent). This is also where `package_manager` gets confirmed — see step 3.
+2. **Create/verify the Orchestra dbt Core connection** — in Orchestra Settings → Connections, create a *dbt Core* connection pointing to your Git repository (URL, branch, folder path) and your data warehouse credentials (via `profiles.yml` equivalent, or by linking an existing warehouse connection — see below). This is also where `package_manager` gets confirmed — see step 3.
 3. **Determine `package_manager`** — infer it from visible signals (lockfile/manifest in the repo, or an explicit `poetry run`/`uv run` invocation). If the source gives no such signal, don't silently default to `PIP`: add a `# MANUAL:` comment on the `package_manager` line so it surfaces in the migration checklist for the user to confirm/select when they set up the dbt Core connection.
 4. **Carry over `--project-dir`** — if the source passes `--project-dir <path>` or `cd`s into a subdirectory before running dbt, set `parameters.project_dir` to that path. Leave it `null` if the dbt project is at the repo root.
 5. **Consolidate commands** — collect the ordered dbt commands into a single semicolon-separated string for `parameters.commands`.
@@ -129,10 +129,33 @@ pipeline:
         tags: []
 ```
 
+## Warehouse Credentials: Link, Don't Copy
+
+A dbt Core connection needs warehouse credentials, but they don't have to be re-typed into it. If the warehouse already exists as its own Orchestra connection — the Snowflake/Postgres/BigQuery connection the rest of the pipeline already uses — **link** it under **Linked connections** on the dbt Core connection's form rather than pasting the same password into that connection's **Secrets**. One credential, one place to rotate it.
+
+Linked fields arrive as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>`: every part upper-cased, each run of non-alphanumeric characters collapsed to a single `_`, and the parts joined by a **double** underscore. `<CONNECTION_ID>` is the id the YAML's `connection:` field uses (it survives renames), and `<FIELD>` is the field's ID from that integration's **Authentication parameters** table. Read them in `profiles.yml` with dbt's `env_var()`:
+
+```yaml
+my_project:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD') }}"
+```
+
+- A Snowflake connection using key-pair auth exports `SNOWFLAKE__PROD_12345__SNOWFLAKE_PRIVATE_KEY` instead of a password — check the integration's field IDs rather than assuming `password`.
+- A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent, so don't write a profile that assumes one is set.
+- Linking is also what opens an approved [private connection](https://docs.getorchestra.io/docs/deployment-options/private-connections) for a task on Orchestra-hosted compute; private connections are not opened for connections that aren't linked.
+
+Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections).
+
 ## Gotchas
 
 - **SSHOperator running dbt is still a dbt task, not an SSH task**: convert to `DBT_CORE_EXECUTE`, not `LINUX_SSH`. The remote server in `ssh_conn_id` was Airflow's way of reaching the dbt project; Orchestra reaches it via a Git-backed dbt Core connection instead, so the SSH connection itself is dropped from the conversion. If the dbt project on that remote server isn't tracked in Git, flag that as a prerequisite rather than silently emitting a `LINUX_SSH` task.
-- **profiles.yml**: Orchestra manages warehouse credentials via its dbt Core connection — do not hardcode credentials in the command string.
+- **profiles.yml**: Orchestra manages warehouse credentials via its dbt Core connection — do not hardcode credentials in the command string. If the warehouse is already its own Orchestra connection, link it rather than copying its secrets across (see above).
 - **Cosmos `DbtTaskGroup` granularity**: Cosmos creates one Airflow task per dbt model/test. Orchestra collapses these back to one task with a select filter. This is intentional — Observatory still provides per-model metadata.
 - **`--project-dir` is a real task parameter, not connection config**: set `parameters.project_dir` to the subdirectory holding `dbt_project.yml` (e.g. `dbt_project` in a monorepo); leave it `null` if the project is at the repo root. Don't just drop `--project-dir`/`cd <dir> &&` — carry the path over instead of silently discarding it.
 - **Slim CI / state**: if the Airflow DAG uses `dbt build --state` for deferred runs, configure this in Orchestra's dbt Core connection settings (artifact storage).
@@ -147,6 +170,7 @@ pipeline:
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/dbt_core
 - Orchestra dbt Core setup guide: https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections
 - Live example YAML: https://docs.getorchestra.io/docs/git-control-and-ci-cd/git-control
 
 ## Adding Alerts

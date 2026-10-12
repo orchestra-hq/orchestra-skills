@@ -121,6 +121,19 @@ pipelines require a code change.
    - Provide Orchestra's IP ranges for firewall whitelisting
    - Suggest Orchestra's Private Connections feature for VPC peering
    - Reference: https://docs.getorchestra.io/docs/deployment-options/private-connections
+   - Private Connections are enterprise-plan only, and cover a fixed set of targets: Azure
+     Data Lake Storage and Databricks on Azure, Snowflake on AWS, and MariaDB on Amazon RDS.
+     Anything else needs IP allowlisting instead — don't send a user down the private-link
+     path for a target it doesn't support.
+   - A new connection starts **Pending** and does not appear in the integration's credential
+     form until Orchestra has approved it, typically 1-2 business days (Azure also needs the
+     customer to approve the endpoint). So "the Private Connection isn't in the dropdown" is
+     usually a pending approval, not a misconfiguration — check its status before debugging.
+   - A task on Orchestra-hosted compute reaches a private database through a **linked**
+     connection with "Connect using private link" enabled. Private connections are not opened
+     for connections that aren't linked, so a Python or dbt Core task hitting a private host
+     needs that database's connection added under **Linked connections** on the connection the
+     task uses.
 3. For DNS issues, verify the hostname in the connection settings is correct
 4. For intermittent connectivity, suggest adding retries to the task configuration:
    ```json

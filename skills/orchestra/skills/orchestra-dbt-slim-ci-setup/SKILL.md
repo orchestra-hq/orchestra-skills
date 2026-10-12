@@ -12,7 +12,7 @@ Retrofit **Slim CI** onto an **existing production dbt Orchestra pipeline** (one
 - User asks to set up Slim CI, dbt CI/CD in Orchestra, or `run-pipeline` for dbt PR checks.
 - User asks what is missing from, or how to clean up, an existing dbt CI setup.
 - Workspace is a dbt repo **or** user supplies dbt repo paths and pipeline YAML location.
-- Default scope: **retrofit** an existing production pipeline; do not create a separate CI-only pipeline unless the user opts out of shared `latest_production`.
+- Default scope: **retrofit** an existing production pipeline and reuse its **production dbt Core task**; do not create a CI-only pipeline *or a second dbt Core task for CI* — artifact history is per task (see Guardrails).
 
 ## Companion skill
 
@@ -29,7 +29,7 @@ After setup, failed PR checks or pipeline runs: start with **identify-pipeline-e
 5. **Inventory pipeline** — Read the keeper pipeline's YAML. Checklist: [references/retrofit-checklist.md](references/retrofit-checklist.md).
 6. **Patch pipeline YAML** — Minimal changes from [templates/pipeline-inputs-snippet.yml](templates/pipeline-inputs-snippet.yml): `dbt_branch`, `dbt_command` (default = current prod command incl. `--target ${{ ENV.DBT_TARGET }}`), optional `dbt_ci_schema_suffix` passed to the task as `DBT_CI_SCHEMA_SUFFIX`, and `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` so CI can run PRs in parallel while prod stays at 1. Git-backed: commit YAML; do not use `update_pipeline`. Orchestra-backed only: `validate_pipeline` then `create_pipeline` / `update_pipeline`.
 7. **Orchestra environments** — CI and prod environments (names case-sensitive) with `DBT_TARGET` (`ci` / `prod`) and `DBT_PIPELINE_CONCURRENCY` (e.g. `5` / `1`). Manual unless the environment MCP tools are available and the user approves.
-8. **dbt project** — `ci` target alongside `prod` in the Orchestra dbt connection's `profiles.yml` (its `schema` is the per-PR prefix, e.g. `ci` → `ci_123`). Add or merge [templates/dbt/generate_schema_name.sql](templates/dbt/generate_schema_name.sql) and [templates/dbt/drop_ci_schema.sql](templates/dbt/drop_ci_schema.sql) into `macros/`; if the project already overrides `generate_schema_name`, add only the `ci` branch. Projects with incremental models: add [templates/dbt/selectors.yml](templates/dbt/selectors.yml). Bootstrap `latest_production` (successful prod run on default branch).
+8. **dbt project** — `ci` target alongside `prod` in the Orchestra dbt connection's `profiles.yml` (its `schema` is the per-PR prefix, e.g. `ci` → `ci_123`). Add or merge [templates/dbt/generate_schema_name.sql](templates/dbt/generate_schema_name.sql) and [templates/dbt/drop_ci_schema.sql](templates/dbt/drop_ci_schema.sql) into `macros/`; if the project already overrides `generate_schema_name`, add only the `ci` branch. Projects with incremental models: add [templates/dbt/selectors.yml](templates/dbt/selectors.yml). Bootstrap `latest_production` for **that same dbt task** (one successful run of it on the dbt repo default branch).
 9. **GitHub Actions** — Add or patch [templates/github-dbt-slim-ci.yml](templates/github-dbt-slim-ci.yml): PR job (CI env, `cancel_on_exit: true`, PR number as `dbt_ci_schema_suffix`), deploy job on merge (prod env, `dbt_branch: main`), and clean-up job dropping `ci_<PR number>` on close. Pin `orchestra-hq/run-pipeline@v1.7.0`+ (`cancel_on_exit` needs it). Incremental models: swap in the `dbt_command` values from [templates/github-dbt-slim-ci-incremental.yml](templates/github-dbt-slim-ci-incremental.yml). Ask how merges should deploy (rebuild modified, full refresh, or leave to the schedule) before keeping the deploy job. Separate pipeline repo: Action `branch` = pipeline YAML branch; `dbt_branch` only in `run_inputs`.
 10. **Secrets checklist** — `ORCHESTRA_API_KEY` secret; pipeline id as a secret or `vars.ORCHESTRA_DBT_PIPELINE_ID`. Warehouse creds stay in the Orchestra dbt connection, so GitHub never needs them — including for schema clean-up.
 11. **Validate** — `validate_pipeline` when definition available; `dbt parse` when possible. `start_pipeline` with Slim `runInputs` only with user approval.
@@ -37,7 +37,7 @@ After setup, failed PR checks or pipeline runs: start with **identify-pipeline-e
 
 ## Guardrails
 
-- One production pipeline for prod + Slim CI unless user wants isolated artifact history.
+- Slim CI runs the **same dbt Core task** as production. Artifact history is scoped per dbt Core task, not per pipeline: a CI-only pipeline *or* a second CI task in the same pipeline starts with its own empty `latest_production` and never inherits production's. Split only if the user accepts separate artifact history and seeding it with a successful default-branch run of that task.
 - Never pause, delete, or repoint an existing pipeline or workflow without a per-item yes. Multi-pipeline consolidation goes to **merge-duplicate-pipelines**.
 - Do not implement manual S3 manifest export unless user rejects Orchestra `latest_production`.
 - Do not commit API keys or connection secrets.
@@ -55,6 +55,7 @@ Non-GitHub CI (document `start_pipeline` MCP tool / CLI as follow-up), new wareh
 | Topic | URL |
 |-------|-----|
 | CI/CD for dbt Core | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd |
+| `latest_production` artifacts (per dbt task) | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production |
 | GitHub Actions CI/CD | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions |
 | dbt Core execute | https://docs.getorchestra.io/docs/integrations/dbt_core/dbt_core_execute |
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |

@@ -59,6 +59,29 @@ Use `source: GIT` + `command:` only when the op/asset genuinely runs a script th
 
 If instead the op/asset genuinely checks out and runs a script from a separate Git repo, use `source: GIT`, and create/verify an Orchestra Python connection pointing at that repo (URL, branch, credentials).
 
+## Credentials the Code Needs: Link, Don't Copy
+
+An `@op`/`@asset` that received a `SnowflakeResource`/`S3Resource` via context still needs those credentials once the body is inline in `parameters.code`. If that credential already exists as its own Orchestra connection, **link** it on the Python connection (**Linked connections** on the connection's form) rather than copying its user/password into that connection's **Secrets** — see `dagster-connections-to-orchestra`.
+
+Linked credentials are exported as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` (every part upper-cased, non-alphanumeric runs collapsed to a single `_`, parts joined by a **double** underscore, `<FIELD>` being the field's ID from the integration's **Authentication parameters** table) — e.g. `SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD`. The pre-installed `orchestra-sdk` builds those names for you:
+
+```python
+import os
+import snowflake.connector
+from orchestra_sdk.orchestra import OrchestraSDK
+
+orchestra = OrchestraSDK(api_key=os.environ["ORCHESTRA_API_KEY"])
+creds = orchestra.get_linked_connection("snowflake", connection_id="prod_12345")
+
+conn = snowflake.connector.connect(
+    account=creds.get("snowflake_account"),
+    user=creds.get("snowflake_user"),
+    password=creds.get("snowflake_password"),
+)
+```
+
+Drop `connection_id=` only when a single connection of that integration is linked. A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent, so don't write code that assumes `os.environ["..."]` is set. Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections).
+
 ## Before / After Example
 
 ### Dagster (before)
@@ -137,11 +160,13 @@ pipeline:
 - **Consuming a JSON-shaped upstream output in `code`?** Wrap the `${{ ...OUTPUTS[...] }}` substitution in Python triple-quotes for `json.loads()`, not single/double — see `dagster-io-managers-to-orchestra`'s Gotchas for why (raw text substitution, no escaping).
 - **IO managers** — replicate any IO-manager persistence explicitly in `code`.
 - **`@multi_asset`** — one op producing several assets becomes one Orchestra PYTHON task.
-- **Secrets** — never hardcode; use Orchestra connection secrets if credentials are actually needed.
+- **Secrets** — never hardcode; use Orchestra connection secrets if credentials are actually needed, and link an existing Orchestra connection rather than copying its credentials into a second one (see above).
 - **No specific connection mapped** — `connection: null` is the norm for `INLINE` tasks with no external credentials. Never invent a placeholder like `${{ ENV.PYTHON_CONNECTION }}` just to fill the field.
 - **`source: GIT` still exists for real Git-backed scripts** — if the op/asset checks out and runs a script from a separate repo, commit it there and reference by relative path via `command:`, with a Python connection pointing at that repo.
 
 ## References
+
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/python
 - Orchestra Execute Script: https://docs.getorchestra.io/docs/integrations/python/python_execute_script

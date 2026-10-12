@@ -44,6 +44,19 @@
         { "text": "project_dir is carried over as just 'dbt' — the subfolder within the analytics-dbt repo — not the full local clone path", "check": "regex", "pattern": "project_dir:\\s*['\"]?dbt['\"]?" },
         { "text": "Neither the git@github.com:acme-co/analytics-dbt.git URL nor the local /tmp/analytics-dbt clone path appears anywhere in the YAML as a literal task parameter — the repo and branch are represented via the connection: field (or flagged as connection setup), since Orchestra pulls the project from its own connected Git repo rather than a local clone" }
       ]
+    },
+    {
+      "id": "linked-connection-credentials",
+      "prompt": "Convert this Dagster code location to an Orchestra pipeline task (see files/dbt_build_snowflake_resource_env.py), and say how the Snowflake credentials the dbt project needs should reach it. Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task, plus guidance that the existing Snowflake connection is *linked* on the dbt Core connection (Linked connections) rather than its account/user/password being copied into that connection's Secrets or left in the YAML. profiles.yml then reads the injected <INTEGRATION>__<CONNECTION_ID>__<FIELD> variables via dbt's env_var() — e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD — and must not assume a variable is present, since a deleted or undecryptable linked connection is skipped silently.",
+      "files": ["dbt_build_snowflake_resource_env.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "The warehouse credentials behind the Snowflake credentials supplied to the code location as EnvVar resources are reached by linking that existing Snowflake connection on the dbt Core connection, rather than being copied into the dbt Core connection's own Secrets" },
+        { "text": "Linked credentials are read in profiles.yml through dbt's env_var() using the <INTEGRATION>__<CONNECTION_ID>__<FIELD> naming (parts joined by a double underscore, <FIELD> being the field ID from the integration's Authentication parameters table), e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD", "check": "regex", "pattern": "env_var|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_", "min_count": 1 },
+        { "text": "No Snowflake account, user or password value is written into the YAML", "check": "no_hardcoded_secret" },
+        { "text": "The conversion does not assume a linked credential's environment variable is present — a linked connection that has been deleted, or whose credentials cannot be decrypted, is skipped silently, so its variables are simply absent" }
+      ]
     }
   ]
 }

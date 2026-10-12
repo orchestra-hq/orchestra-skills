@@ -6,7 +6,8 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 
 | Topic | URL |
 |-------|-----|
-| CI/CD for dbt Core (Slim CI, latest_production) | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd |
+| Set up dbt Slim CI and CD with Orchestra | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#set-up-dbt-slim-ci-and-cd-with-orchestra |
+| `latest_production` artifacts, scoped per dbt Core task | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production |
 | GitHub Actions + run-pipeline | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions |
 | dbt Core execute task parameters | https://docs.getorchestra.io/docs/integrations/dbt_core/dbt_core_execute |
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |
@@ -34,7 +35,9 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | [../templates/dbt/drop_ci_schema.sql](../templates/dbt/drop_ci_schema.sql) | Drop the PR's CI schema on close |
 | [../templates/dbt/selectors.yml](../templates/dbt/selectors.yml) | `modified_incremental` selector |
 
-## Architecture (one pipeline)
+## Architecture (one pipeline, one dbt task)
+
+`latest_production` is seeded per **dbt Core task** from that task's own last successful default-branch run, so the CI run below must go through the production `DBT_CORE_EXECUTE` task — a CI-only pipeline or a second CI task starts with empty state.
 
 ```mermaid
 flowchart LR

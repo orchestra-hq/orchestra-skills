@@ -42,6 +42,20 @@
         { "text": "connection is set to a Python/Git connection pointing at the acme-data/etl-scripts repo rather than left null, since GIT source needs a repo-pointing connection" },
         { "text": "The op's own `git clone` subprocess call is not reproduced inside parameters.code — the checkout is delegated to Orchestra's GIT source/connection instead of being duplicated as a shell step" }
       ]
+    },
+    {
+      "id": "linked-connection-credentials",
+      "prompt": "Convert this task to an Orchestra pipeline task, including how the Snowflake credentials behind the SnowflakeResource injected into the op should reach the running code (see files/snowflake_rowcount_op.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A PYTHON / PYTHON_EXECUTE_SCRIPT task whose code reads the Snowflake credentials from the Snowflake connection *linked* on the Python connection — via orchestra.get_linked_connection(\"snowflake\", ...) or the injected <INTEGRATION>__<CONNECTION_ID>__<FIELD> environment variables (e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD) — rather than the Snowflake account/user/password being copied into the Python connection's own Secrets or written into the YAML. A deleted or undecryptable linked connection is skipped silently, so the code must not assume the variables are present.",
+      "files": ["snowflake_rowcount_op.py"],
+      "assertions_ref": ["python"],
+      "assertions": [
+        { "text": "The converted code reads the warehouse credentials from a linked connection — get_linked_connection(...) or an injected SNOWFLAKE__<CONNECTION_ID>__SNOWFLAKE_* environment variable — rather than re-declaring them", "check": "regex", "pattern": "get_linked_connection|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_", "min_count": 1 },
+        { "text": "No Snowflake account/user/password value is written into the YAML", "check": "no_hardcoded_secret" },
+        { "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place" },
+        { "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label" },
+        { "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check" }
+      ]
     }
   ]
 }

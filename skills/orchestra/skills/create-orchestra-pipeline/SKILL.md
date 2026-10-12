@@ -74,7 +74,7 @@ Pick the tool that matches the file's extension. For `.yml` / `.yaml`, run local
 `orchestra-cli` is available:
 
 ```bash
-orchestra-cli validate <path/to/pipeline.yml>
+orchestra-cli pipeline validate <path/to/pipeline.yml>
 ```
 
 For `.oml`, validate with the `orchestra-lang` package (`pip install orchestra-lang`, then report
@@ -114,7 +114,7 @@ Keep the summary concise.
 
 - Pipelines can represent both data workflows and AI agent workflows; use `PYTHON` /
   `PYTHON_EXECUTE_SCRIPT` with `build_command` and `project_dir` for in-repo agent entrypoints.
-- After saving YAML in repos that use Cursor hooks, `orchestra-cli validate` may run
+- After saving YAML in repos that use Cursor hooks, `orchestra-cli pipeline validate` may run
   automatically on `*.yml` / `*.yaml` — still run validation explicitly when unsure. Those hooks
   don't match `.oml`, so always validate OML yourself.
 - For Git-backed pipelines, committing YAML does not deploy until the repo is connected in

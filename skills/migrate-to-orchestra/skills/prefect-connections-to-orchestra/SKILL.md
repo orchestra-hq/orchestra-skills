@@ -104,6 +104,23 @@ For secrets stored in a Prefect `Secret` block or `SecretStr` field with no dedi
 
 ---
 
+## Linked Connections — Link, Don't Copy
+
+A `SnowflakeConnector.load("snowflake-prod")` inside a `@task` that also runs arbitrary Python becomes a `PYTHON_EXECUTE_SCRIPT` task (see `python-prefect-to-orchestra`), which needs those warehouse credentials at runtime.
+
+**Decision rule:** if the credential already exists as its own Orchestra connection — the Snowflake/Postgres/AWS connection from the table above — **link** it on the Python/dbt Core connection (**Linked connections** on that connection's form) instead of copying its user/password into that connection's **Secrets**. One credential, one place to rotate it.
+
+Each linked connection's fields arrive as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>`: every part upper-cased, each run of non-alphanumeric characters collapsed to a single `_`, and the parts joined by a **double** underscore. `<CONNECTION_ID>` is the id the YAML's `connection:` field uses (it survives renames), and `<FIELD>` is the field's ID from that integration's **Authentication parameters** table — so a Snowflake connection `prod_12345` exports `SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD`.
+
+- Python reads them via the pre-installed SDK: `orchestra.get_linked_connection("snowflake", connection_id="prod_12345")`, keyed by field ID.
+- dbt Core reads them in `profiles.yml`: `{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD') }}`.
+- A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent. Check a variable exists rather than assuming it.
+- Linking is also what opens an approved private connection for a task on Orchestra-hosted compute (MariaDB today); private connections are not opened for connections that aren't linked.
+
+Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/python#linked-connections) (same section on [dbt Core](https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections)).
+
+---
+
 ## Multi-Environment Pattern
 
 ```yaml
@@ -172,11 +189,13 @@ pipeline:
 - **GCP service account** — paste the full JSON into the GCP connection key field.
 - **Airbyte Cloud vs Server** — an `AirbyteConnection` block pointed at `api.airbyte.com` -> Cloud connection; pointed at any other host -> Server connection.
 - **No official block for Tableau or Power BI** — both are always a hand-rolled `@task` wrapping a third-party client (`tableau-server-client`, `msal`+`requests`); the token-acquisition code disappears entirely once the credentials move to the Orchestra connection.
+- **Don't copy a warehouse credential into a Python/dbt connection's Secrets** — if it already exists as its own Orchestra connection, link it and read the injected `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` variables instead.
 - **`Variable.get()`** — non-secret, unencrypted config -> `inputs:`; only `Secret`/`SecretStr`-backed values -> a connection.
 
 ## References
 
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
 - Prefect blocks: https://docs.prefect.io/v3/develop/blocks
 
