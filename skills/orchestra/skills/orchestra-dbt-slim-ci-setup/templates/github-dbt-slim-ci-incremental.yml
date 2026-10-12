@@ -1,44 +1,26 @@
-# GitHub Actions: Slim CI with incremental full-refresh tranche (BigQuery-style pattern)
-# Use when modified incremental models need --full-refresh before downstream state:modified+.
-# Add --exclude tag:metadata or other project excludes to both commands as needed.
+# Incremental-model variant: swap these run_inputs into the dbt-slim-ci and dbt-deploy jobs of
+# github-dbt-slim-ci.yml. Requires the modified_incremental selector (templates/dbt/selectors.yml).
+#
+# A plain `build -s state:modified+` only tests one code path of a changed incremental model.
+# On a PR this:
+#   1. clones prod relations into ci_<PR number> so incremental models have data to build onto
+#      (zero-copy on Snowflake/BigQuery/Databricks; views elsewhere),
+#   2. full-refreshes modified incremental models (and their modified ancestors),
+#   3. builds everything modified + downstream without --full-refresh, testing is_incremental().
+# Skip step 1 to rely on --defer alone; modified incrementals then have no existing CI table.
+# The task's commands are `dbt ${{ inputs.dbt_command }}`, so each chained command after `;` starts with `dbt`.
 
-name: dbt Slim CI (incremental)
+# dbt-slim-ci job:
+env:
+  COMMON: "--defer --state latest_production --target ci"
+with:
+  run_inputs: |
+    {
+      "dbt_command": "clone --state latest_production --target ci; dbt build --full-refresh --selector modified_incremental ${{ env.COMMON }}; dbt build -s state:modified+ ${{ env.COMMON }}",
+      "dbt_branch": "${{ github.head_ref }}",
+      "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
+    }
 
-on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - 'models/**'
-      - 'seeds/**'
-      - 'dbt_project.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'models/**'
-      - 'seeds/**'
-      - 'dbt_project.yml'
-  workflow_dispatch:
-
-jobs:
-  dbt-core-slimci:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Orchestra pipeline (Slim CI)
-        uses: orchestra-hq/run-pipeline@v1
-        with:
-          api_key: ${{ secrets.ORCHESTRA_API_KEY }}
-          pipeline_id: PIPELINE_ID
-          poll_interval: 20
-          environment: ${{ github.event_name == 'pull_request' && 'PR_ENV' || 'MERGE_ENV' }}
-          task_ids: TASK_ID
-          run_inputs: |
-            {
-              "dbt_command": "build --full-refresh -s state:modified,config.materialized:incremental --defer --state latest_production --exclude tag:metadata --target ${{ github.event_name == 'pull_request' && 'ci' || 'prod' }}; dbt build -s state:modified+ --defer --state latest_production --exclude tag:metadata --exclude state:modified,config.materialized:incremental --target ${{ github.event_name == 'pull_request' && 'ci' || 'prod' }}",
-              "dbt_branch": "${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
-            }
+# dbt-deploy job (same commands, no clone; set COMMON's --target to prod):
+#   "dbt_command": "build --full-refresh --selector modified_incremental ${{ env.COMMON }}; dbt build -s state:modified+ ${{ env.COMMON }}",
+#   "dbt_branch": "main"

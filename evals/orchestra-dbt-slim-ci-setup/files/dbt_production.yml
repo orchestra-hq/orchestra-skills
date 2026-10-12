@@ -1,0 +1,40 @@
+# Git-backed pipeline YAML at orchestra/dbt_production.yml in acme/analytics-dbt.
+# The dbt project has incremental models (fct_orders, fct_events).
+version: v1
+name: dbt_production
+pipeline:
+  dbt:
+    tasks:
+      run_dbt:
+        integration: DBT_CORE
+        integration_job: DBT_CORE_EXECUTE
+        parameters:
+          commands: dbt build --target prod
+          branch: main
+          package_manager: PIP
+          python_version: "3.12"
+        depends_on: []
+        name: dbt build
+        connection: dbt_core_prod_10001
+    depends_on: []
+    name: dbt
+  refresh_bi:
+    tasks:
+      refresh_tableau:
+        integration: TABLEAU_CLOUD
+        integration_job: TABLEAU_REFRESH_EXTRACT
+        parameters:
+          project_name: Exec
+          datasource_name: Exec Dashboard
+        depends_on: []
+        name: refresh exec dashboard
+        connection: tableau_prod_10002
+    depends_on: [dbt]
+    name: refresh BI
+schedule:
+  - name: Daily 5am
+    cron: 0 5 ? * * *
+    timezone: UTC
+configuration:
+  concurrency:
+    max_active: 1

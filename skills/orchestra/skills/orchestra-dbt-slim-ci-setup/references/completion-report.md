@@ -3,48 +3,25 @@
 ## Completion report template
 
 ```markdown
-## Slim CI setup summary
+## Slim CI — <enabled | partially enabled>
 
-### Context
-- dbt repo: <org/repo> (default branch: <branch>)
-- Pipeline: <id> / <alias> | dbt task: <task_id>
-- Pipeline YAML: <path> (<same repo | separate repo>)
-- Storage: <Git-backed | Orchestra-backed>
+**Enabled:** <comma-separated: PR checks on <paths>, per-PR schema ci_<n>, deploy on merge, clean-up, per-env concurrency, incremental variant>
+**Still missing:** <one line each, with the consequence, or "nothing">
+**Retired / consolidated:** <pipelines paused, workflows removed, or "none">
 
-### Already configured
-- <bullets or "none">
+### You need to
+1. <manual step, e.g. add ORCHESTRA_API_KEY to GitHub secrets>
+2. <...>
 
-### Changes made
-- `<path>`: <reason>
+### Changed
+- `<path or pipeline>`: <one-line reason>
 
-### Slim CI command
-- `dbt_command` passed to Orchestra: <exact string>
-- Excludes / targets: <ci target, tag excludes, etc.>
-- GHA environments: PR → <Orchestra env> | merge → <Orchestra env>
-
-### Bootstrap: latest_production
-- Status: <ready | needs first successful prod run on default branch>
-- Notes: <production_run_identifier if set>
-
-### Manual follow-up
-| Item | Status |
-|------|--------|
-| ORCHESTRA_API_KEY in GitHub | <done / pending> |
-| Other secrets | <list> |
-| dbt connection / CI target in Orchestra | <done / pending> |
-
-### Validation
-- `validate_pipeline`: <pass / skip / fail>
-- `dbt parse`: <pass / skip / fail>
-- Smoke `start_pipeline`: <not run / pass / fail>
-
-### How to test
-- Open PR touching `<paths>` or run `workflow_dispatch` on `<workflow file>`.
-- Expect check: `<job name>`; Orchestra run link appears in Action logs.
-
-### Failures after merge
-- Use **pr-slim-ci-orchestra-debug** for triage.
+### Check it works
+Open a PR touching `<paths>`; expect the `<job name>` check with an Orchestra run link in its log.
+Validation: `validate_pipeline` <pass/skip>, `dbt parse` <pass/skip>, smoke run <not run/pass>.
 ```
+
+Omit empty lines. `latest_production` not yet populated goes under **Still missing** with "run prod once on the default branch".
 
 ## Troubleshooting
 
@@ -88,4 +65,28 @@
 
 **Symptoms:** Incremental models need full refresh when modified.
 
-**Fix:** Use semicolon-separated commands in one `dbt_command` input (incremental full-refresh tranche, then `state:modified+` with excludes). See `templates/github-dbt-slim-ci-incremental.yml`.
+**Fix:** Use semicolon-separated commands in one `dbt_command` input: `dbt clone`, full-refresh `--selector modified_incremental`, then `state:modified+`. Each chained command after the first starts with `dbt`, and each carries its own `--target`. See `templates/github-dbt-slim-ci-incremental.yml`.
+
+### Superseded PR runs overwrite each other
+
+**Symptoms:** Two Orchestra runs build into the same `ci_<PR number>` schema after a new push.
+
+**Fix:** `cancel_on_exit: true` on the PR job, with `orchestra-hq/run-pipeline@v1.7.0` or later.
+
+### PR runs SKIPPED
+
+**Symptoms:** GHA check passes but Orchestra run is `SKIPPED`.
+
+**Fix:** Concurrency limit hit. Use `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` with a higher value in the CI environment.
+
+### `env_var('DBT_CI_SCHEMA_SUFFIX')` not set
+
+**Symptoms:** dbt compile error on the `ci` target.
+
+**Fix:** Task `environment_variables` must map `DBT_CI_SCHEMA_SUFFIX` from `inputs.dbt_ci_schema_suffix`, and the PR / clean-up jobs must pass `dbt_ci_schema_suffix`.
+
+### CI schema clean-up fails
+
+**Symptoms:** `drop_ci_schema` not found, or fork PRs fail.
+
+**Fix:** The macro must be on the default branch (clean-up runs with `dbt_branch: main`). Fork PRs cannot read secrets; the template skips them.

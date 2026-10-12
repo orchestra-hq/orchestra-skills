@@ -1,0 +1,12 @@
+# selectors.yml — only needed for the incremental variant (github-dbt-slim-ci-incremental.yml).
+# A named selector keeps dbt_command short and avoids quoting issues through pipeline inputs.
+selectors:
+  - name: modified_incremental
+    description: Modified incremental models, plus modified ancestors of any incremental model.
+    definition:
+      intersection:
+        - method: state
+          value: modified
+        - method: config.materialized
+          value: incremental
+          parents: true

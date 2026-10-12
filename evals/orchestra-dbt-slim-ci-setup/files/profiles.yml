@@ -1,0 +1,12 @@
+# profiles.yml uploaded to the Orchestra dbt Core connection dbt_core_prod_10001
+analytics:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE_PASSWORD') }}"
+      database: ANALYTICS
+      warehouse: TRANSFORMING
+      schema: analytics

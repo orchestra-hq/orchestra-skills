@@ -1,0 +1,33 @@
+# acme/analytics-dbt: .github/workflows/dbt_ci.yml
+name: dbt CI
+on:
+  pull_request:
+    branches: [main]
+    paths: ['models/**']
+  push:
+    branches: [main]
+    paths: ['models/**']
+jobs:
+  slim-ci:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: orchestra-hq/run-pipeline@v1
+        with:
+          api_key: ${{ secrets.ORCHESTRA_API_KEY }}
+          pipeline_id: 0b7e4d21-55aa-4c1f-8e2b-91d0c6a7f3e2
+          poll_interval: 20
+          run_inputs: |
+            { "dbt_branch": "${{ github.head_ref }}" }
+  save-manifest:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: orchestra-hq/run-pipeline@v1
+        with:
+          api_key: ${{ secrets.ORCHESTRA_API_KEY }}
+          pipeline_id: 6f1c2a90-0d1e-4b7a-9a51-2f3c8e1d4b10
+          environment: PreProd
+          poll_interval: 20
+          run_inputs: |
+            { "run_type": "CI" }
