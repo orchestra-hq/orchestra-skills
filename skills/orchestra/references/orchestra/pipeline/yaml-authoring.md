@@ -304,6 +304,7 @@ validate those yourself with `orchestra-lang`.
 | YAML syntax error | Fix indentation, quoting, or structure |
 | Invalid cron expression | Six fields, minute-first: `0 8 ? * * *` (not seconds-first Quartz) |
 | `tags` on a task group (`extra_forbidden`) | `TaskGroupModel` has no `tags` field — confirmed live against `/pipelines/schema`. Put `tags:` on each task, never on the stage wrapping it |
+| `environment_variables` as a YAML mapping (`Input should be a valid string`) | On `DBT_CORE_EXECUTE`, `PYTHON_EXECUTE_SCRIPT` and other tasks that take it, `parameters.environment_variables` must be a JSON string, not a mapping — confirmed live against `validate_pipeline`. Write `environment_variables: '{"KEY": "${{ inputs.x }}"}'` |
 | Invalid threshold expression (e.g. on `SNOWFLAKE_RUN_TEST`) | `error_threshold_expression` / `warn_threshold_expression` need a single-character comparator (`=`, `>`, `<`, `>=`, `<=`, `!=`) + a non-negative integer — confirmed live: `'== 0'` is rejected, `'= 0'` is accepted. Python-style `==` doesn't work here |
 
 Re-run validation after each fix. Cap remediation at around 5 attempts — patch only what the
