@@ -100,11 +100,34 @@ pipeline:
         tags: []
 ```
 
+## Warehouse Credentials: Link, Don't Copy
+
+A dbt Core connection needs warehouse credentials, but they don't have to be re-typed into it. If the warehouse already exists as its own Orchestra connection — the Snowflake/Postgres/BigQuery connection the rest of the pipeline already uses — **link** it under **Linked connections** on the dbt Core connection's form rather than pasting the same password into that connection's **Secrets**. One credential, one place to rotate it.
+
+Linked fields arrive as environment variables named `<INTEGRATION>__<CONNECTION_ID>__<FIELD>`: every part upper-cased, each run of non-alphanumeric characters collapsed to a single `_`, and the parts joined by a **double** underscore. `<CONNECTION_ID>` is the id the YAML's `connection:` field uses (it survives renames), and `<FIELD>` is the field's ID from that integration's **Authentication parameters** table. Read them in `profiles.yml` with dbt's `env_var()`:
+
+```yaml
+my_project:
+  target: prod
+  outputs:
+    prod:
+      type: snowflake
+      account: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_ACCOUNT') }}"
+      user: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_USER') }}"
+      password: "{{ env_var('SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD') }}"
+```
+
+- A Snowflake connection using key-pair auth exports `SNOWFLAKE__PROD_12345__SNOWFLAKE_PRIVATE_KEY` instead of a password — check the integration's field IDs rather than assuming `password`.
+- A linked connection that has been deleted, or whose credentials can't be decrypted, is **skipped silently** — its variables are simply absent, so don't write a profile that assumes one is set.
+- Linking is also what opens an approved [private connection](https://docs.getorchestra.io/docs/deployment-options/private-connections) for a task on Orchestra-hosted compute; private connections are not opened for connections that aren't linked.
+
+Full reference: [Linked connections](https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections).
+
 ## Gotchas
 
 - **`@dbt_assets` granularity** — Dagster expands the manifest into one asset per model/test; Orchestra collapses these into one `DBT_CORE_EXECUTE` task with the same `--select` filter. Observatory still surfaces per-model metadata.
 - **`dbt.cli([...])` -> `commands` string** — `["build","--select","tag:daily"]` becomes `dbt build --select tag:daily;`. Join multiple calls with semicolons.
-- **profiles.yml** — Orchestra manages warehouse credentials on its dbt Core connection; do not pass `--profiles-dir` or hardcode credentials.
+- **profiles.yml** — Orchestra manages warehouse credentials on its dbt Core connection; do not pass `--profiles-dir` or hardcode credentials. If the warehouse is already its own Orchestra connection, link it rather than copying its secrets across (see above).
 - **`project_dir` is a real task parameter, not connection config** — carry `DbtProject(project_dir=...)`'s value over to `parameters.project_dir` instead of dropping it. Only `null` it if the dbt project genuinely sits at the repo root.
 - **Partitioned dbt assets / `--vars`** — Orchestra has no backfill; convert vars to `inputs:` or hardcode and flag partition logic.
 - **Manifest** — Dagster needs a compiled `manifest.json`; Orchestra compiles on its runners, so you do not ship the manifest.
@@ -118,6 +141,7 @@ pipeline:
 
 - Orchestra docs: https://docs.getorchestra.io/docs/integrations/dbt_core
 - Orchestra dbt Core setup: https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup
+- Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/dbt_core#linked-connections
 - Dagster dbt: https://docs.dagster.io/integrations/libraries/dbt
 - dagster-dbt API: https://docs.dagster.io/api/python-api/libraries/dagster-dbt
 
