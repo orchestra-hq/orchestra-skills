@@ -196,6 +196,31 @@
           "text": "Writes no files and makes no Orchestra calls"
         }
       ]
+    },
+    {
+      "id": "defer-after-clone",
+      "prompt": "Our Slim CI dbt_command is `clone --state latest_production --target ci; dbt build --full-refresh --selector modified_incremental --defer --state latest_production --target ci; dbt build -s state:modified+ --defer --state latest_production --target ci`. The clone has no selector, so it clones the whole target into ci_<PR number>. Do the two build commands still need --defer? Our deploy-on-merge job runs the same two builds with no clone. Don't write any files or call Orchestra.",
+      "expected_output": "Says --defer is not needed on the builds in the PR job: the unselected clone copies the whole target into ci_<PR number>, so unmodified upstream models resolve from the clones rather than from production. Adds that --defer becomes necessary again if the clone is narrowed to a subset of the target, for example by passing a selector to dbt clone, and that --state latest_production stays either way because state:modified+ and the modified_incremental selector compare against it. Keeps --defer on the deploy-on-merge job, which never clones. Changes nothing.",
+      "files": [
+        "dbt_production.yml"
+      ],
+      "assertions": [
+        {
+          "text": "States that --defer is not needed on the build commands after a dbt clone that covers the whole target, because unmodified upstream models can be read from the clones in ci_<PR number>"
+        },
+        {
+          "text": "Says --defer is still required after a clone that covers only a subset of the target, for example when a selector is passed to dbt clone"
+        },
+        {
+          "text": "Keeps --state latest_production on the build commands either way, because state:modified+ and the modified_incremental selector compare against that state"
+        },
+        {
+          "text": "Keeps --defer on the deploy-on-merge job, which runs no clone"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
     }
   ]
 }

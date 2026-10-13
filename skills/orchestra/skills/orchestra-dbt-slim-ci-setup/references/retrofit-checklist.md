@@ -62,6 +62,10 @@ Apply only missing pieces. Do not rename unrelated tasks or restructure groups.
 
 Orchestra injects artifacts before each dbt task run from **that same task's** last **successful** run on the dbt repo **default branch** (unless `production_run_identifier` overrides). History is per dbt Core task, not per pipeline — CI deferring to production state only works when CI runs the production task itself. Empty state: run a successful non-defer prod build of that task on the default branch once before Slim CI. See [dbt artifacts - `latest_production`](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production) and [completion-report.md](completion-report.md).
 
+## `dbt clone` and `--defer`
+
+Cloning the **whole** dbt target into `ci_<PR number>` leaves the later `dbt build` commands able to read unmodified upstream models from the clones, so `--defer` is not needed on them. `--defer` is only required after a clone when the clone covered a **subset** of the target (e.g. a selector was passed to `dbt clone`) — then the uncloned upstreams still have to resolve to production. Keep `--state latest_production` regardless: `state:modified+` and the `modified_incremental` selector compare against it whether or not anything defers. A deploy job that doesn't clone at all still needs `--defer`. See [Set up dbt Slim CI and CD with Orchestra](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#set-up-dbt-slim-ci-and-cd-with-orchestra).
+
 ## Separate pipeline repo
 
 - GHA `branch` on `orchestra-hq/run-pipeline` = branch of **pipeline YAML** repo (usually `main`).

@@ -30,7 +30,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 |------|---------|
 | [../templates/pipeline-inputs-snippet.yml](../templates/pipeline-inputs-snippet.yml) | Pipeline inputs + dbt task parameters |
 | [../templates/github-dbt-slim-ci.yml](../templates/github-dbt-slim-ci.yml) | GHA workflow: PR Slim CI, deploy on merge, CI schema clean-up |
-| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Incremental variant: `dbt clone` + `modified_incremental` selector |
+| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Incremental variant: `dbt clone` + `modified_incremental` selector; when `--defer` is still needed after the clone |
 | [../templates/dbt/generate_schema_name.sql](../templates/dbt/generate_schema_name.sql) | Per-PR `ci_<PR number>` schema routing |
 | [../templates/dbt/drop_ci_schema.sql](../templates/dbt/drop_ci_schema.sql) | Drop the PR's CI schema on close |
 | [../templates/dbt/selectors.yml](../templates/dbt/selectors.yml) | `modified_incremental` selector |
