@@ -147,7 +147,7 @@
           "pattern": "timeout:\\s*2700\\b"
         },
         {
-          "text": "`body` is a quoted JSON string, not a nested YAML mapping \u2014 the parameter's schema type is string, so a bare mapping is rejected"
+          "text": "`body` is a quoted JSON string, not a nested YAML mapping — the parameter's schema type is string, so a bare mapping is rejected"
         },
         {
           "text": "`custom_headers` is likewise a quoted JSON string carrying X-Partner-Id, not a nested YAML mapping"
@@ -162,7 +162,7 @@
     },
     {
       "id": "webhook-payload-mapped-to-inputs",
-      "prompt": "We want an Orchestra pipeline called 'Partner Sync Reaction' that a partner's system triggers by POSTing their own event JSON \u2014 it looks like {\"connection_id\": \"abc-123\", \"event\": \"sync_completed\"} and we can't change its shape. The pipeline should run a Python task, but only when connection_id is abc-123. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "prompt": "We want an Orchestra pipeline called 'Partner Sync Reaction' that a partner's system triggers by POSTing their own event JSON — it looks like {\"connection_id\": \"abc-123\", \"event\": \"sync_completed\"} and we can't change its shape. The pipeline should run a Python task, but only when connection_id is abc-123. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
       "expected_output": "An Orchestra v1 pipeline YAML with the webhook trigger enabled and pipeline `inputs` that the partner's payload is mapped into via `${{ outputs.payload[...] }}`, with the task gated by a `condition` reading the mapped input as `${{ inputs.<name> }}`.",
       "files": [],
       "assertions": [
@@ -195,10 +195,62 @@
           "text": "The payload reaches the pipeline through `${{ outputs.payload }}` (whole body or a subscript such as `${{ outputs.payload['connection_id'] }}`) in the webhook trigger's run input mapping"
         },
         {
-          "text": "Does not reference `${{ outputs.payload }}` from a task parameter or condition directly \u2014 it is only readable in the trigger's run input mapping, and must be mapped to an input first"
+          "text": "Does not reference `${{ outputs.payload }}` from a task parameter or condition directly — it is only readable in the trigger's run input mapping, and must be mapped to an input first"
         },
         {
-          "text": "Does not try to reshape the partner's payload into Orchestra's start-pipeline format, or treat a non-matching body as an error \u2014 any JSON body starts the run"
+          "text": "Does not try to reshape the partner's payload into Orchestra's start-pipeline format, or treat a non-matching body as an error — any JSON body starts the run"
+        }
+      ]
+    },
+    {
+      "id": "aws-batch-submit-job-mapping-params",
+      "prompt": "Create an Orchestra pipeline called 'Nightly Transform' with a single AWS Batch task that submits to the analytics-prod job queue using the nightly-transform job definition, pinned to revision 3. Override the container command to `python transform.py` and set STAGE=prod in the container's environment. AWS Batch should kill an attempt that has been running for more than 30 minutes. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit — rather than a `configuration.timeout`, which would only fail the task and leave the job running.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_BATCH integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_BATCH"
+        },
+        {
+          "text": "Uses the AWS_BATCH_SUBMIT_JOB job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_BATCH_SUBMIT_JOB"
+        },
+        {
+          "text": "The job definition is pinned to revision 3",
+          "check": "regex",
+          "pattern": "job_definition:\\s*[\"']?nightly-transform:3"
+        },
+        {
+          "text": "The 30-minute attempt limit is expressed as timeout_seconds: 1800, in seconds",
+          "check": "regex",
+          "pattern": "timeout_seconds:\\s*1800\\b"
+        },
+        {
+          "text": "`container_overrides` is a nested YAML mapping, not a quoted JSON string — unlike HTTP `body` or Python `environment_variables`, this parameter's schema type really is an object"
+        },
+        {
+          "text": "The container environment is a list of {name, value} objects (STAGE / prod), not a bare key-value mapping"
+        },
+        {
+          "text": "The attempt limit is set with the task's own `timeout_seconds` rather than only a `configuration.timeout` — a task timeout fails the task without terminating the Batch job"
+        },
+        {
+          "text": "Does not set timeout_seconds below 60, the schema minimum"
         }
       ]
     }

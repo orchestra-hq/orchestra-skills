@@ -62,6 +62,7 @@ pipeline:
 | ORCHESTRA | APPROVAL | `message_integration`, `message_connection_id`, `message_destination` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
+| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 
@@ -70,6 +71,23 @@ Glue, `environment_variables` on Python and dbt Core — are **strings**, not YA
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
+
+AWS Batch is the exception: `parameters` and `container_overrides` on `AWS_BATCH_SUBMIT_JOB`
+really are YAML mappings, not quoted strings. Check the schema for the specific parameter
+rather than applying either habit across the board.
+
+`AWS_BATCH_SUBMIT_JOB` submits one job to a queue and waits for it. Single-container jobs on
+EC2 or Fargate only — array jobs and multi-node parallel jobs aren't supported. A
+`job_definition` without `:<revision>` resolves to the latest active revision. `timeout_seconds`
+is a per-attempt limit with a minimum of 60, enforced by Batch. A task that hits its own
+`configuration.timeout` fails **without terminating the job** — a running job keeps running and
+a queued one can still start later — so bound queue waits with a job state time limit action on
+the queue rather than relying on the task timeout; cancelling the task does terminate the job.
+Orchestra injects `ORCHESTRA_ACCOUNT_ID`, `ORCHESTRA_PIPELINE_RUN_ID`, `ORCHESTRA_TASK_RUN_ID`
+and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_overrides.environment`
+adds to that rather than replacing it. The integration is in beta and may not be enabled on an
+account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
+[Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
 
 ## Connection format
 
