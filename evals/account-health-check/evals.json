@@ -1,0 +1,35 @@
+{
+  "skill_name": "account-health-check",
+  "description": "The asset-governance half of the health check (rubric checks 5.6 and 5.7). The skill's output is a conversational review, not a pipeline artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file.",
+  "evals": [
+    {
+      "id": "asset-runs-deprecated-not-recommended",
+      "prompt": "I'm reviewing our Orchestra workspace. `list_assets` shows 60-odd Snowflake tables and views; about 20 of them have had no Orchestra operation against them in the last 30 days, but their metadata still refreshes every morning, so something is collecting them. Nobody here knows what. What should we do about the stale ones, and is there anything we should be fixing about how they're collected? Don't call any live Orchestra tools — just tell me what you'd recommend.",
+      "expected_output": "Flags the stale assets as a governance signal and recommends bringing the work under an Orchestra pipeline. Does not recommend scheduling asset collection (Asset runs) as the fix. Says scheduled asset collection is deprecated and stops working on 23 October 2026, so a workspace relying on it loses asset coverage on that date, and recommends migrating to the Python asset-collection template — a scheduled PYTHON task that reads the warehouse's tables, views and lineage and writes them through the asset API. Notes that it matches on the same externalId, so it updates existing assets rather than duplicating them. Treats the refreshing-with-no-operation pattern as a reason to ask the user whether an asset configuration exists, not as a confirmed finding, because asset configurations are not exposed by the MCP. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Does not recommend setting up or scheduling Asset runs / scheduled asset collection to cover the stale assets"
+        },
+        {
+          "text": "States that scheduled asset collection (Asset runs) is deprecated, and gives 23 October 2026 as the date it stops working"
+        },
+        {
+          "text": "Recommends the Python asset-collection template — a scheduled PYTHON task writing warehouse metadata and lineage through the asset API — as the replacement"
+        },
+        {
+          "text": "Says the replacement matches assets on the same externalId, so it updates assets an existing Asset run created rather than creating duplicates"
+        },
+        {
+          "text": "Still recommends bringing the stale assets under a pipeline as the first option, rather than treating a scheduled collector as a substitute for orchestrating the work"
+        },
+        {
+          "text": "Treats the existence of an asset configuration as something to confirm with the user rather than asserting it, noting the MCP does not expose asset configurations"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
+        }
+      ]
+    }
+  ]
+}

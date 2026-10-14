@@ -215,9 +215,24 @@ sensitive data; 5 MB/run limit). Signal: `set_outputs: true` on tasks whose outp
 references. → Disable where unused. Docs: `/docs/core-concepts/tasks/setting-outputs`.
 
 **5.6 Stale assets are a governance signal** — *Low*
-Good: assets have Orchestra operations within ~7 days; uncovered assets get scheduled Asset Runs.
-Signal: `list_assets` entries with no operation in 7+ days (confirm via `list_operations`). → Bring
-under a pipeline / schedule Asset Runs. Docs: `/docs/core-concepts/assets`.
+Good: assets have Orchestra operations within ~7 days. Signal: `list_assets` entries with no
+operation in 7+ days (confirm via `list_operations`). → Bring under a pipeline. Where the work
+genuinely runs outside Orchestra and only the metadata is wanted, recommend a scheduled Python
+collector (see 5.7) — not scheduled asset collection, which is being removed. Docs:
+`/docs/core-concepts/assets`.
+
+**5.7 Not relying on scheduled asset collection** — *Medium* `[MANUAL]`
+Scheduled asset collection (Asset runs) is deprecated and stops working on **23 October 2026**, so
+a workspace that leans on it for asset coverage loses that coverage on a fixed date. Asset
+configurations aren't exposed by the MCP: `list_assets` shows the assets, not what collected them,
+so treat a warehouse whose assets keep refreshing with no Orchestra operation behind them as a
+prompt to ask, not as a finding. → Replace with the Python asset-collection template: a scheduled
+`PYTHON` task reads tables, views and lineage from Snowflake, BigQuery or Databricks and writes
+them through the asset API. It matches on the same `externalId`, so it updates the assets an Asset
+run already created instead of duplicating them — point the Python connection's linked warehouse
+connection at the same connection the old configuration used. Docs:
+https://docs.getorchestra.io/docs/core-concepts/assets,
+https://docs.getorchestra.io/docs/templates/asset-collection.
 
 ## 6. Security and access control
 
