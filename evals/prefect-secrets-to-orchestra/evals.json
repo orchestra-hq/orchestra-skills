@@ -86,7 +86,7 @@
     {
       "id": "azure-key-vault-external-credential-store",
       "prompt": "See files/azure_key_vault_secret.py — this Prefect flow pulls the Snowflake password out of Azure Key Vault before building a connector. Give me a checklist of what needs to move to Orchestra. Don't ask me for the actual secret values — I just want the checklist.",
-      "expected_output": "Identifies the Snowflake password held in Azure Key Vault as the secret to migrate, and routes it to an Orchestra Snowflake connection whose Credential Store is Azure Key Vault rather than to a re-typed password field: an Orchestra Azure Key Vault connection is created first, the target connection then identifies the secret by its name in the vault (not an ARN, which is the AWS Secrets Manager form), and the secret's value must be a JSON object holding exactly the keys the Snowflake integration expects. Never asks for or writes the real password.",
+      "expected_output": "Identifies the Snowflake password held in Azure Key Vault as the secret to migrate, and routes it to an Orchestra Snowflake connection whose Credential Store is Azure Key Vault rather than to a re-typed password field: an Orchestra Azure Key Vault connection is created first, the target connection then identifies the secret by its name in the vault (not an ARN, which is the AWS Secrets Manager form), and the secret's value must be a JSON object holding the Snowflake connection's parameters under their Orchestra parameter IDs — every required one, not only the password. The vault secret name is constrained to letters, numbers and hyphens, so a Prefect block name with underscores cannot be reused verbatim. Never asks for or writes the real password.",
       "files": [
         "azure_key_vault_secret.py"
       ],
@@ -107,7 +107,10 @@
           "text": "Identifies the Azure Key Vault secret by its name in the vault, and does not ask for a Secret ARN — an ARN is the AWS Secrets Manager form, not the Azure Key Vault one"
         },
         {
-          "text": "States that the vault secret's value must be a JSON object containing exactly the keys the Snowflake integration expects, rather than a bare password string or one vault secret per field"
+          "text": "States that the vault secret's value must be a JSON object holding the Snowflake connection's parameters under their Orchestra parameter IDs (snowflake_account, snowflake_user, snowflake_password and the rest of the required ones), not a bare password string, not one vault secret per field, and not only the sensitive values"
+        },
+        {
+          "text": "Does not assume the Prefect secret's name carries over unchanged — an Azure Key Vault secret name takes only letters, numbers and hyphens, so a block name containing underscores has to be renamed"
         }
       ]
     }

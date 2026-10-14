@@ -102,7 +102,7 @@ task-001:
     statement: 'SELECT 1'
 ```
 
-For secrets fetched at runtime, use `AWS_SECRETS_MANAGER` or `AZURE_KEY_VAULT` as a preceding task that sets an output, then reference it downstream.
+`AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are credential stores a connection reads from, not task integrations — neither has an `integration_job`, so there is no task that fetches a secret mid-run for a later task to consume. A resource that resolves its credential from one of them is handled on the connection, below.
 
 ### Credentials already held in a secret store
 
@@ -110,9 +110,10 @@ A resource that resolves its secret at runtime from a secret store — `SecretsM
 
 - Create the Orchestra connection to the store first. A store only appears in the target connection's **Credential Store** dropdown once a connection to it exists.
 - On the target connection, set **Credential Store** to that store and identify the secret — the **Secret ARN** for AWS Secrets Manager, the **secret name** for Azure Key Vault.
-- The secret's value must be a JSON object holding exactly the keys that integration expects and nothing else. In Azure Key Vault, that whole object is the secret's value — don't split it into one vault secret per field.
+- The secret's value must be a JSON object holding exactly the keys that integration expects — the parameter IDs from its **Authentication parameters** table, and every required one, not only the sensitive fields. In Azure Key Vault, that whole object is the secret's value — don't split it into one vault secret per field.
+- Orchestra reads the secret when the connection is saved and rejects it if it can't be read or its keys don't match, so a wrong key set surfaces there rather than at run time. After that it reads the latest version on each use, so rotating the secret in the store needs no change in Orchestra.
 
-Only those two stores work this way; a resource backed by Hashicorp Vault or GCP Secret Manager still means a manual re-entry. Don't confuse this with the task integrations named above: those fetch a value mid-run for a downstream task to consume, whereas **Credential Store** is how a connection authenticates itself. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage).
+Only those two stores work this way; a resource backed by Hashicorp Vault or GCP Secret Manager still means a manual re-entry. Both store integrations are in beta, so confirm they're enabled on the account before planning the migration around them. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
 
 ---
 

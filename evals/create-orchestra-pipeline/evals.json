@@ -253,6 +253,92 @@
           "text": "Does not set timeout_seconds below 60, the schema minimum"
         }
       ]
+    },
+    {
+      "id": "secret-store-is-not-a-task",
+      "prompt": "Create an Orchestra pipeline called 'Daily Revenue' that first pulls the Snowflake credentials out of our Azure Key Vault and then uses them to run `SELECT * FROM revenue` on Snowflake. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML containing only the SNOWFLAKE / SNOWFLAKE_RUN_QUERY task, with its credentials referenced through `connection:`. No Key Vault task is authored: AZURE_KEY_VAULT is an integration with no integration_job — a credential store a connection reads its own credentials from — so the fetch is configured as Credential Store on the Snowflake connection and the credentials never move through the pipeline. The response says so rather than inventing a job name.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Authors the Snowflake query task",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "SNOWFLAKE_RUN_QUERY"
+        },
+        {
+          "text": "No secret-fetch task is invented — every task in the pipeline is the SNOWFLAKE one",
+          "check": "every_task",
+          "field": "integration",
+          "equals": "SNOWFLAKE"
+        },
+        {
+          "text": "No credential value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "Explains that AZURE_KEY_VAULT has no integration_job and cannot be a task — it is a credential store selected on the Snowflake connection, so the vault lookup happens when Orchestra uses that connection, not as a pipeline step"
+        },
+        {
+          "text": "Does not invent a job name such as AZURE_KEY_VAULT_GET_SECRET, and does not substitute a PYTHON or HTTP task that calls Key Vault itself to work around the missing job"
+        },
+        {
+          "text": "Does not pass the credential between tasks via set_outputs or a parameter reference — there is no secret value in the pipeline to pass"
+        }
+      ]
+    },
+    {
+      "id": "run-agent-optional-parameters",
+      "prompt": "Add a task to pipeline.yml called 'Summarise Incidents' that runs our Orchestra agent a1b2c3d4-0000-4000-8000-000000000001 with the prompt 'Summarise today's open incidents', and feed its answer into the Slack task that already posts to #data-alerts. Keep the agent on whatever model and effort it is already configured with. Just the YAML file, don't deploy it.",
+      "expected_output": "An ORCHESTRA / RUN_AGENT task carrying only agent_id, prompt and set_outputs: true, with model_id, effort, llm_integration and llm_connection_id left out so the task inherits the agent's own settings, and the Slack task referencing the agent task's output rather than being left unwired.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Uses the ORCHESTRA integration for the agent task",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "ORCHESTRA"
+        },
+        {
+          "text": "Uses the RUN_AGENT job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "RUN_AGENT"
+        },
+        {
+          "text": "The agent id given in the request is used verbatim",
+          "check": "regex",
+          "pattern": "a1b2c3d4-0000-4000-8000-000000000001"
+        },
+        {
+          "text": "set_outputs is true on the agent task, since a downstream task reads its answer",
+          "check": "regex",
+          "pattern": "set_outputs:\\s*true"
+        },
+        {
+          "text": "model_id and effort are omitted rather than guessed — the request says to keep the agent's own settings, and each optional parameter falls back to the agent when left out"
+        },
+        {
+          "text": "No llm_integration / llm_connection_id is invented, and no API key appears anywhere in the YAML"
+        },
+        {
+          "text": "The Slack task consumes the agent task's output through an OUTPUTS reference and depends on it, rather than set_outputs being set but never read"
+        }
+      ]
     }
   ]
 }

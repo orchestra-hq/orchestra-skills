@@ -60,6 +60,7 @@ pipeline:
 | MARIADB | MARIADB_RUN_QUERY | `statement` |
 | GCP_CLOUD_STORAGE | GCP_CLOUD_STORAGE_GET_FILE / GCP_CLOUD_STORAGE_PUT_FILE | `bucket`, file paths |
 | ORCHESTRA | APPROVAL | `message_integration`, `message_connection_id`, `message_destination` |
+| ORCHESTRA | RUN_AGENT | `agent_id`, `prompt`, `set_outputs`, `model_id`, `effort`, `llm_integration`, `llm_connection_id` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
 | AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
@@ -88,6 +89,21 @@ and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_over
 adds to that rather than replacing it. The integration is in beta and may not be enabled on an
 account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
 [Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
+
+`AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
+`integration_job`: they are credential stores a connection reads its own credentials from, not
+task types. There is no task that fetches a secret mid-run for a later task to consume, so a
+pipeline that needs one is really a connection that should name the store as its **Credential
+Store**. Both are in beta. See [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault)
+and [AWS Secrets Manager](https://docs.getorchestra.io/docs/integrations/aws_secrets_manager).
+
+`RUN_AGENT` creates an agent session from `prompt` and waits for it. Only `agent_id` and
+`prompt` are required: `model_id`, `effort`, `llm_integration` and `llm_connection_id` each fall
+back to the agent's own setting when omitted, so leave them out unless the run needs to differ
+from the agent. `llm_connection_id` names a connection the account already holds — naming one it
+doesn't fails the run — and never an API key written into the YAML. Nothing can prompt the
+session again once it is created, so everything the agent needs goes in that first `prompt`. See
+[Run Agent](https://docs.getorchestra.io/docs/integrations/orchestra/run_agent).
 
 ## Connection format
 

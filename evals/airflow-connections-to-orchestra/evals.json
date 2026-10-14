@@ -131,10 +131,13 @@
           "text": "Offers the external credential store route — create an Orchestra AWS Secrets Manager connection, then set Credential Store on the Snowflake connection and point it at the Secret ARN — rather than stating flatly that the credential must be re-entered by hand in Orchestra"
         },
         {
-          "text": "Notes that the AWS Secrets Manager connection has to exist before AWS Secrets Manager can be chosen as the credential store, and that the secret's value must be a JSON object with exactly the keys the Snowflake integration expects"
+          "text": "Notes that the AWS Secrets Manager connection has to exist before AWS Secrets Manager can be chosen as the credential store, and that the secret's value must be a JSON object holding the Snowflake connection's parameters — every required one, not only the password"
         },
         {
           "text": "Does not fabricate a Snowflake account, user, or password — the DAG and airflow.cfg contain none"
+        },
+        {
+          "text": "Does not assume the existing secret can be read as-is — an Airflow connection URI or extra blob is not the shape Orchestra reads, so the secret has to be rewritten as the Orchestra connection's parameters before Credential Store will accept it"
         }
       ]
     }

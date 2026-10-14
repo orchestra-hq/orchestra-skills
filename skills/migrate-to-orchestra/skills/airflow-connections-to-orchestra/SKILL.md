@@ -110,9 +110,10 @@ If the Airflow deployment configures a Secrets Backend (AWS Secrets Manager, Has
 **If the backend is AWS Secrets Manager or Azure Key Vault, the credential may not need re-entering at all.** An Orchestra connection can read its credentials straight from either of those stores instead of holding them itself: create an Orchestra connection to the store, then set **Credential Store** on the target connection and identify the secret — the **Secret ARN** for AWS Secrets Manager, the **secret name** for Azure Key Vault. Two constraints to flag when you propose this:
 
 - A store only appears in the **Credential Store** dropdown once a connection to that store exists, so create the store connection first.
-- The secret's value must be a JSON object holding exactly the keys the target integration expects and nothing else — the same key-matching requirement as any other Orchestra credential.
+- The secret's value must be a JSON object holding exactly the keys the target integration expects — the parameter IDs from its **Authentication parameters** table, and every required one, not only the sensitive fields. An Airflow URI or `extra` blob is not that shape, so a secret written for Airflow usually has to be rewritten as the Orchestra connection's parameters before it can be read this way. In Azure Key Vault the whole JSON object is the secret's value, and the secret's name may contain only letters, numbers and hyphens — an Airflow `conn_id` with underscores can't be reused verbatim.
+- Orchestra reads the secret when the connection is saved and rejects it if it can't be read or its keys don't match, so a mismatch surfaces at save time rather than mid-run. After that it reads the latest version on each use, so rotating the secret in the store needs no change in Orchestra.
 
-Hashicorp Vault and GCP Secret Manager are not supported as Orchestra credential stores, so a DAG backed by either still means a manual re-entry. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage).
+Hashicorp Vault and GCP Secret Manager are not supported as Orchestra credential stores, so a DAG backed by either still means a manual re-entry. Both supported stores are in beta, so confirm they're enabled on the account before proposing this route. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
 
 ---
 
