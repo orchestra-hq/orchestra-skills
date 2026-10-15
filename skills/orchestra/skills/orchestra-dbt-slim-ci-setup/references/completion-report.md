@@ -77,7 +77,7 @@ Omit empty lines. `latest_production` not yet populated goes under **Still missi
 
 **Symptoms:** GHA check passes but Orchestra run is `SKIPPED`.
 
-**Fix:** Concurrency limit hit. Use `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` with a higher value in the CI environment.
+**Fix:** Concurrency limit hit, with `on_limit` at its `SKIP` default. Use `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` with a higher value in the CI environment, and `on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }}` so blocked runs wait instead of being skipped (`QUEUE_LATEST` in CI, `QUEUE` in Production). A `QUEUE_LATEST` CI run can still be skipped by a newer PR's run.
 
 ### `env_var('DBT_CI_SCHEMA_SUFFIX')` not set
 

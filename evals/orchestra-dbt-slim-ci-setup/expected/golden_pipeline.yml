@@ -47,3 +47,4 @@ schedule:
 configuration:
   concurrency:
     max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}
+    on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }}

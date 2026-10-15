@@ -26,8 +26,12 @@ inputs:
 #     # production_run_identifier: main
 #   connection: <dbt_core_connection_id>
 
-# Per-environment concurrency (set DBT_PIPELINE_CONCURRENCY in each Orchestra environment,
-# e.g. CI = 5, Production = 1):
+# Per-environment concurrency (set both variables in each Orchestra environment;
+# documented starting point: CI = 5 / QUEUE_LATEST, Production = 1 / QUEUE).
+# on_limit decides what a run blocked by the limit does: SKIP (default), QUEUE, QUEUE_LATEST.
+# QUEUE_LATEST in CI skips an older PR's still-waiting run when a newer PR arrives -- see
+# references/retrofit-checklist.md "Concurrency" before choosing it.
 configuration:
   concurrency:
     max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}
+    on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }}
