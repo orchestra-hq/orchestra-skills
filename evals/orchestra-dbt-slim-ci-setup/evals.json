@@ -221,6 +221,32 @@
           "text": "Writes no files and makes no Orchestra calls"
         }
       ]
+    },
+    {
+      "id": "concurrency-on-limit-not-queue-latest-for-ci",
+      "prompt": "We share one pipeline between production and Slim CI with configuration.concurrency.max_active: 1, and PR runs keep coming back SKIPPED when prod is running. Someone suggested setting on_limit: QUEUE_LATEST so the PR run waits instead of being dropped. Is that the right fix? Advise only — don't change anything.",
+      "expected_output": "Rejects QUEUE_LATEST for a shared CI pipeline: it keeps only the newest waiting run, so a second PR's run would mark the first PR's still-waiting run SKIPPED and that PR gets a false result it never ran for. Recommends per-environment limits via max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} as the real fix, so CI isn't queued behind prod at all. May note QUEUE as a stopgap that turns the problem into a slow check, with the 24-hour queue expiry still ending in SKIPPED, and that run-pipeline only warns on a skipped run so its status output has to be checked.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Rejects QUEUE_LATEST for this pipeline and explains the specific failure: a newer PR run causes an older PR's waiting run to be marked SKIPPED, so that PR reports a result for a run that never happened"
+        },
+        {
+          "text": "Recommends per-environment concurrency via an environment variable rather than queueing CI behind prod",
+          "check": "regex",
+          "pattern": "DBT_PIPELINE_CONCURRENCY",
+          "min_count": 1
+        },
+        {
+          "text": "If QUEUE is offered at all, it is framed as a stopgap that makes the check wait rather than fail, not as the fix"
+        },
+        {
+          "text": "Notes that a queued run still expires as SKIPPED after 24 hours, so queueing does not guarantee the PR run ever executes"
+        },
+        {
+          "text": "Notes that run-pipeline only logs a warning for a SKIPPED run, so its status output must be checked for a skipped run to block the PR"
+        }
+      ]
     }
   ]
 }

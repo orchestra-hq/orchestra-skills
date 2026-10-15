@@ -339,6 +339,41 @@
           "text": "The Slack task consumes the agent task's output through an OUTPUTS reference and depends on it, rather than set_outputs being set but never read"
         }
       ]
+    },
+    {
+      "id": "concurrency-on-limit-queue-latest",
+      "prompt": "Our 'Exec Dashboard Refresh' pipeline runs on a 6-field cron every 15 minutes and rebuilds the same aggregate tables each time, but a run sometimes takes 25 minutes and we're getting overlapping runs hammering the warehouse. Cap it to one run at a time, and make sure a trigger that lands while a run is in progress isn't just thrown away — we always want one more refresh after the current one, and only the freshest one. Write the pipeline YAML to pipeline.yml. Don't deploy it.",
+      "expected_output": "A pipeline with configuration.concurrency.max_active: 1 and on_limit: QUEUE_LATEST — the refresh is idempotent and only the latest state matters, and on a 15-minute cron whose runs can take 25 minutes plain QUEUE would build an ever-growing backlog while the default SKIP would throw the trigger away, which the request rules out. Does not try to solve it by cancelling the in-progress run, which Orchestra never does.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "configuration.concurrency.max_active is 1",
+          "check": "yaml_eq",
+          "path": "configuration.concurrency.max_active",
+          "value": 1
+        },
+        {
+          "text": "configuration.concurrency.on_limit is QUEUE_LATEST — only the latest refresh matters, and on a cron whose runs outlast the interval QUEUE would build an unbounded backlog",
+          "check": "yaml_eq",
+          "path": "configuration.concurrency.on_limit",
+          "value": "QUEUE_LATEST"
+        },
+        {
+          "text": "on_limit is set explicitly rather than left to the default, since the default SKIP would discard the trigger the request says to keep",
+          "check": "regex",
+          "pattern": "on_limit:\\s*QUEUE_LATEST"
+        },
+        {
+          "text": "Does not claim or configure cancellation of the in-progress run to free the slot — Orchestra never cancels in-progress runs to honour a concurrency limit"
+        },
+        {
+          "text": "Does not invent a concurrency field outside configuration.concurrency (no top-level concurrency:, no max_active on a task)"
+        }
+      ]
     }
   ]
 }

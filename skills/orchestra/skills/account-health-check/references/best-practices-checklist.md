@@ -70,11 +70,18 @@ warehouse. → Push compute down. Docs:
 
 **1.8 Set pipeline concurrency where overlap is undesirable** — *High*
 Good: `configuration.concurrency.max_active` (a.k.a. `maxActive`) is set on pipelines where
-overlapping runs would corrupt data or double-spend compute. Signal: a frequently scheduled or
-sensor-triggered pipeline with no concurrency limit; or `list_pipeline_runs` showing overlapping
-RUNNING windows. Note: at the limit Orchestra **skips** the new run (no queue, no cancel), evaluated
-per pipeline + environment (+ Git branch). → Set `max_active`. Docs:
-`/docs/core-concepts/pipelines/pipeline-runs#how-pipeline-concurrency-works`.
+overlapping runs would corrupt data or double-spend compute, with an `on_limit` that matches what
+a delayed run is worth. Signal: a frequently scheduled or sensor-triggered pipeline with no
+concurrency limit; or `list_pipeline_runs` showing overlapping RUNNING windows. Second signal: a
+limit set but left on the default `on_limit: SKIP` where the dropped runs mattered — event-driven
+pipelines (sensor/webhook) silently losing a run per event, or a cron pipeline whose SKIPPED runs
+mean the refresh simply didn't happen. Orchestra never cancels in-progress runs to make room; the
+limit and its queue are scoped per pipeline + environment (+ Git branch). → Set `max_active`, then
+`on_limit: QUEUE` where each trigger does distinct work, `QUEUE_LATEST` where only the latest state
+matters (and on frequent crons, to avoid an unbounded backlog), leaving `SKIP` where a delayed run
+is genuinely redundant. Queued runs expire as SKIPPED after 24 hours, so a queue that is always
+full is under-provisioned rather than fixed. Docs:
+`/docs/core-concepts/pipelines/pipeline-runs#what-happens-when-the-concurrency-limit-is-reached`.
 
 **1.9 Prefer inputs/env vars/conditionals over duplication** — *Medium*
 Good: variation handled with `${{ inputs.* }}`, `${{ ENV.* }}`, and conditional expressions. Signal:

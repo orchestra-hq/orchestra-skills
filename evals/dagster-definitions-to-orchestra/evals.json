@@ -6,7 +6,7 @@
     {
       "id": "retry-schedule-concurrency",
       "prompt": "Convert this Dagster job to the Orchestra pipeline root (see files/nightly_elt_job.py) — schedule, retries, timeout, and concurrency only, don't worry about the task bodies yet. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
-      "expected_output": "An Orchestra pipeline root with version v1, a 6-field cron schedule converted from '0 2 * * *' in UTC, configuration.retries=2, configuration.retry_delay=5 (300s/60), configuration.timeout=3600 (from dagster/max_runtime), and configuration.concurrency.max_active=1 (from dagster/max_concurrent). Backoff.LINEAR and the 'team' tag have no direct equivalent and should be flagged, not silently dropped.",
+      "expected_output": "An Orchestra pipeline root with version v1, a 6-field cron schedule converted from '0 2 * * *' in UTC, configuration.retries=2, configuration.retry_delay=5 (300s/60), configuration.timeout=3600 (from dagster/max_runtime), configuration.concurrency.max_active=1 (from dagster/max_concurrent), and configuration.concurrency.on_limit=QUEUE, since Dagster queues runs that hit a concurrency limit and Orchestra's default SKIP would drop them. Backoff.LINEAR and the 'team' tag have no direct equivalent and should be flagged, not silently dropped.",
       "files": ["nightly_elt_job.py"],
       "assertions_ref": ["definitions"],
       "assertions": [
@@ -15,6 +15,7 @@
         { "text": "configuration.retry_delay is 5 minutes (Dagster's delay=300 seconds / 60), not 300", "check": "yaml_eq", "path": "configuration.retry_delay", "value": 5 },
         { "text": "configuration.timeout is 3600 (from dagster/max_runtime)", "check": "yaml_eq", "path": "configuration.timeout", "value": 3600 },
         { "text": "configuration.concurrency.max_active is 1 (from dagster/max_concurrent)", "check": "yaml_eq", "path": "configuration.concurrency.max_active", "value": 1 },
+        { "text": "configuration.concurrency.on_limit is QUEUE — Dagster queues runs blocked by a concurrency limit, so leaving Orchestra's default SKIP would silently drop runs the job would have executed", "check": "yaml_eq", "path": "configuration.concurrency.on_limit", "value": "QUEUE" },
         { "text": "Backoff.LINEAR has no Orchestra equivalent — the base delay is used and the simplification is flagged, not silently dropped" },
         { "text": "The 'team' tag is preserved as a task-level tag (or noted under meta) rather than lost or placed on the enclosing stage" }
       ]

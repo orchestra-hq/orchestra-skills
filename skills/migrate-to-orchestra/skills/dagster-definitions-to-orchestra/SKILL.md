@@ -61,8 +61,18 @@ def my_job(): ...
 # Orchestra
 configuration:
   concurrency:
-    max_active: 1     # 0 or null = no limit
+    max_active: 1       # 0 or null = no limit
+    on_limit: QUEUE     # SKIP (default) | QUEUE | QUEUE_LATEST
 ```
+
+Set `on_limit` as well as `max_active`. Dagster's run concurrency **queues** blocked runs,
+so Orchestra's default `on_limit: SKIP` would silently drop runs the Dagster job would have
+executed — `QUEUE` is the faithful mapping for a `dagster/max_concurrent` tag or an instance
+`concurrency` limit. Use `QUEUE_LATEST` only where the job is a refresh and the user confirms
+only the latest run matters. Queue scope matches the limit's (per pipeline + environment +
+Git branch), waiting runs expire as `SKIPPED` after 24 hours, and a queued run picks up the
+pipeline version current when it starts. See
+[yaml-authoring.md](../../../orchestra/references/orchestra/pipeline/yaml-authoring.md).
 
 ### Partitions / backfills -> _(drop)_
 
@@ -114,7 +124,7 @@ pipeline:
 ## Conversion Checklist
 
 - [ ] `ScheduleDefinition.cron_schedule` -> `schedule:` block with `cron:` and `timezone:`
-- [ ] concurrency limits -> `configuration.concurrency.max_active`
+- [ ] concurrency limits -> `configuration.concurrency.max_active` + `on_limit` (`QUEUE` unless only the latest run matters)
 - [ ] `RetryPolicy(max_retries, delay)` -> `configuration.retries` + `configuration.retry_delay` (minutes — convert Dagster's seconds `delay` by dividing by 60)
 - [ ] `dagster/max_runtime` tag -> `configuration.timeout` (seconds)
 - [ ] failure/success notifications (run status sensors, hooks) -> `alerts:` block (see dagster-alerts-to-orchestra)
@@ -194,7 +204,7 @@ pipeline:
 - **`Definitions` with multiple jobs** — each Dagster job typically becomes its own Orchestra pipeline (separate YAML), not multiple stages in one pipeline.
 - **`RunConfig` / `Config`** — op/asset run config becomes Orchestra `inputs:` referenced via `${{ inputs.x }}`.
 - **`EnvVar`** — non-secret values map to `inputs:`; secrets map to the Orchestra connection, never inline.
-- **Concurrency** — op/run concurrency limits map to `configuration.concurrency.max_active`.
+- **Concurrency** — op/run concurrency limits map to `configuration.concurrency.max_active`, with `on_limit: QUEUE` to preserve Dagster's queue-rather-than-drop behaviour.
 - **`tags` on a stage fails real validation** — confirmed by calling Orchestra's actual `/pipelines/schema` endpoint — `TaskGroupModel` rejects any `tags` key with `"extra_forbidden"`. Always put `tags:` on each `TaskModel`, never on the stage wrapping it.
 
 ## References

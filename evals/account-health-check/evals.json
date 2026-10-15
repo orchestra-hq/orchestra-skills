@@ -30,6 +30,38 @@
           "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
         }
       ]
+    },
+    {
+      "id": "concurrency-on-limit-skip-drops-events",
+      "prompt": "Health-check this pipeline config for us. 'file_ingest' is triggered by an S3 sensor, one run per file landed, and has configuration.concurrency.max_active: 1 with nothing else set under concurrency. Our data team says files go missing on busy mornings but every pipeline run they can see succeeded. What, if anything, should we change?",
+      "expected_output": "Identifies that with max_active: 1 and no on_limit, the pipeline is on the default SKIP, so a file landing while a run is in progress creates a SKIPPED run and that file is never ingested — which matches 'missing files' with no failed runs. Recommends on_limit: QUEUE, because each sensor trigger does distinct work (one file each), and explicitly rules out QUEUE_LATEST, which would discard all but the newest waiting file. Does not recommend removing the limit as the fix.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Names configuration.concurrency.on_limit and states the default is SKIP when it is not set",
+          "check": "regex",
+          "pattern": "on_limit",
+          "min_count": 1
+        },
+        {
+          "text": "Explains the symptom: a blocked run is created as SKIPPED rather than failing, so the dropped files leave no failed run behind — which is why every visible run succeeded"
+        },
+        {
+          "text": "Recommends on_limit: QUEUE because each sensor trigger carries distinct work (one file per run)",
+          "check": "regex",
+          "pattern": "QUEUE",
+          "min_count": 1
+        },
+        {
+          "text": "Explicitly rejects QUEUE_LATEST here, since keeping only the newest waiting run would drop the very files the fix is meant to save"
+        },
+        {
+          "text": "Does not recommend removing max_active (or raising it arbitrarily) as the primary fix — the limit is deliberate; it is the on_limit mode that is wrong"
+        },
+        {
+          "text": "Mentions that queued runs are not held indefinitely — a run waiting 24 hours expires as SKIPPED — so a permanently full queue means the limit is under-provisioned"
+        }
+      ]
     }
   ]
 }
