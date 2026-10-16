@@ -39,7 +39,7 @@ Collect before retrofit. Group: **must-have** (ask if missing), **discoverable**
 | dbt Core connection | Upload `profiles.yml`, Secret JSON for `env_var`, optional Validate |
 | Warehouse `operation_metadata` on dbt tasks | Per adapter docs |
 | GitHub secrets | `ORCHESTRA_API_KEY`; optional `ORCHESTRA_DBT_PIPELINE_ID` (secret or repo variable) |
-| Orchestra environment variables | `DBT_TARGET`, `DBT_PIPELINE_CONCURRENCY` per environment (CI vs Production) |
+| Orchestra environment variables | `DBT_TARGET`, `DBT_PIPELINE_CONCURRENCY`, `DBT_PIPELINE_ON_LIMIT` per environment (CI vs Production) |
 | Duplicate PreProd environment | Only if using manifest-save extensions on merge to main |
 
 ## Questionnaire (agent)

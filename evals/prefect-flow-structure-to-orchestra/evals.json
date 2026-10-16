@@ -6,7 +6,7 @@
     {
       "id": "retry-schedule-concurrency",
       "prompt": "Convert this Prefect flow to the Orchestra pipeline root (see files/nightly_elt_flow.py) — schedule, retries, timeout, and concurrency only, don't worry about the task bodies yet. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
-      "expected_output": "An Orchestra pipeline root with version v1, a 6-field cron schedule converted from '0 2 * * *' in UTC, configuration.retries=2, configuration.retry_delay=5 (300s/60), configuration.timeout=3600, and configuration.concurrency.max_active=1 (from the 'nightly-elt-limit' tag-based global concurrency limit and .serve(limit=1)). The 'nightly-elt-limit' concurrency tag has no direct equivalent Orchestra can read automatically and should be flagged, not silently dropped, and the 'data-team' tag should land on tasks, not the stage.",
+      "expected_output": "An Orchestra pipeline root with version v1, a 6-field cron schedule converted from '0 2 * * *' in UTC, configuration.retries=2, configuration.retry_delay=5 (300s/60), configuration.timeout=3600, configuration.concurrency.max_active=1 (from the 'nightly-elt-limit' tag-based global concurrency limit and .serve(limit=1)), and configuration.concurrency.on_limit=QUEUE, since Prefect holds runs that hit a tag limit rather than dropping them. The 'nightly-elt-limit' concurrency tag has no direct equivalent Orchestra can read automatically and should be flagged, not silently dropped, and the 'data-team' tag should land on tasks, not the stage.",
       "files": ["nightly_elt_flow.py"],
       "assertions_ref": ["definitions"],
       "assertions": [
@@ -15,8 +15,10 @@
         { "text": "configuration.retry_delay is 5 minutes (Prefect's retry_delay_seconds=300 / 60), not 300", "check": "yaml_eq", "path": "configuration.retry_delay", "value": 5 },
         { "text": "configuration.timeout is 3600 (from timeout_seconds)", "check": "yaml_eq", "path": "configuration.timeout", "value": 3600 },
         { "text": "configuration.concurrency.max_active is 1 (from the .serve(limit=1) / 'nightly-elt-limit' tag)", "check": "yaml_eq", "path": "configuration.concurrency.max_active", "value": 1 },
+        { "text": "configuration.concurrency.on_limit is QUEUE — a Prefect tag concurrency limit holds blocked runs, so Orchestra's default SKIP would change behaviour by dropping them", "check": "yaml_eq", "path": "configuration.concurrency.on_limit", "value": "QUEUE" },
         { "text": "The 'nightly-elt-limit' tag-based global concurrency limit is called out with a MANUAL/flagging note since Orchestra can't read the out-of-band `prefect gcl create` registration automatically" },
-        { "text": "The 'data-team' tag is preserved as a task-level tag (or noted under meta) rather than lost or placed on the enclosing stage" }
+        { "text": "The 'data-team' tag is preserved as a task-level tag (or noted under meta) rather than lost or placed on the enclosing stage" },
+        { "text": "The scope difference is flagged: Prefect's limit is per tag and shared across every flow carrying it, while Orchestra's is per pipeline + environment (+ Git branch), so a tag shared by several flows does not carry over" }
       ]
     },
     {

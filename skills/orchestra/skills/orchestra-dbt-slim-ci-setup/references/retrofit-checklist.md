@@ -19,6 +19,7 @@ Inventory the **existing production** dbt pipeline before editing. Prefer **one 
 | Task `parameters.commands` | `dbt ${{ inputs.dbt_command }}` — keep `--target` inside the input, not appended here, or only the last of several `;`-chained commands gets it |
 | Task `parameters.environment_variables` | `'{"DBT_CI_SCHEMA_SUFFIX": "${{ inputs.dbt_ci_schema_suffix }}"}'` — a JSON string; a YAML mapping fails validation |
 | `configuration.concurrency.max_active` | `${{ ENV.DBT_PIPELINE_CONCURRENCY }}` (see Concurrency below) |
+| `configuration.concurrency.on_limit` | `${{ ENV.DBT_PIPELINE_ON_LIMIT }}` (see Concurrency below) |
 | `production_run_identifier` | Set only if baseline ≠ dbt repo default branch (branch name or commit SHA; **git tags are not supported**). An identifier that does not resolve leaves `latest_production` empty for that run |
 | Dedicated CI-only pipeline **or a second dbt Core task for CI** | **Avoid** — artifact history is per task, so a new task's `latest_production` is empty (or missing) until that task itself succeeds on the default branch |
 
@@ -62,6 +63,10 @@ Apply only missing pieces. Do not rename unrelated tasks or restructure groups.
 
 Orchestra injects artifacts before each dbt task run from **that same task's** last **successful** run on the dbt repo **default branch** (unless `production_run_identifier` overrides). History is per dbt Core task, not per pipeline — CI deferring to production state only works when CI runs the production task itself. Empty state: run a successful non-defer prod build of that task on the default branch once before Slim CI. See [dbt artifacts - `latest_production`](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production) and [completion-report.md](completion-report.md).
 
+## `dbt clone` and `--defer`
+
+Cloning the **whole** dbt target into `ci_<PR number>` leaves the later `dbt build` commands able to read unmodified upstream models from the clones, so `--defer` is not needed on them. `--defer` is only required after a clone when the clone covered a **subset** of the target (e.g. a selector was passed to `dbt clone`) — then the uncloned upstreams still have to resolve to production. Keep `--state latest_production` regardless: `state:modified+` and the `modified_incremental` selector compare against it whether or not anything defers. A deploy job that doesn't clone at all still needs `--defer`. See [Set up dbt Slim CI and CD with Orchestra](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#set-up-dbt-slim-ci-and-cd-with-orchestra).
+
 ## Separate pipeline repo
 
 - GHA `branch` on `orchestra-hq/run-pipeline` = branch of **pipeline YAML** repo (usually `main`).
@@ -70,5 +75,6 @@ Orchestra injects artifacts before each dbt task run from **that same task's** l
 
 ## Concurrency (shared prod + CI pipeline)
 
-- A fixed `configuration.concurrency.max_active` applies in every environment, so a prod limit of `1` also serialises PR runs. A run blocked by the limit is `SKIPPED`, and `run-pipeline` only logs a warning rather than failing the check. Check its `status` output if a skipped run should block the PR.
-- To give CI and prod separate limits, set `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` and define the variable per Orchestra environment (e.g. `CI` = 5, `Production` = 1). See [dbt CI/CD](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd) and [run-pipeline outputs](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions).
+- A fixed `configuration.concurrency.max_active` applies in every environment, so a prod limit of `1` also serialises PR runs. What a blocked run does depends on `configuration.concurrency.on_limit`: the default `SKIP` creates it as `SKIPPED`, and `run-pipeline` only logs a warning rather than failing the check — check its `status` output if a skipped PR run should block the PR. `QUEUE` instead holds the run as `QUEUED` until a slot frees, so the GHA job waits rather than reporting early; that turns a concurrency problem into a slow check, and a run still waiting after 24 hours expires as `SKIPPED` anyway.
+- Scope **both** settings per environment rather than queueing CI behind prod: `max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }}` and `on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }}`, each defined per Orchestra environment. The documented starting point is `CI` = `5` / `QUEUE_LATEST` and `Production` = `1` / `QUEUE`: CI runs several PRs at once and, at the limit, keeps only the newest waiting run instead of queueing one per commit, while a merge-triggered prod deploy waits for an in-progress scheduled run rather than being skipped. See [dbt CI/CD](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd) and [run-pipeline outputs](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/github_actions).
+- Raise the `QUEUE_LATEST` trade-off with the user before setting it in CI. The queue is scoped per pipeline and environment (plus branch for Git-backed pipelines), and `run-pipeline`'s `branch` is the **pipeline YAML** repo's branch, so every PR shares one CI queue. Once CI is at `max_active`, a run from a newer PR skips an older PR's still-waiting run and `run-pipeline` only warns. Set `max_active` high enough that PRs rarely queue, and check `status` if a skipped PR run should block the PR. Use `QUEUE` in CI instead when every PR run must report a real result.

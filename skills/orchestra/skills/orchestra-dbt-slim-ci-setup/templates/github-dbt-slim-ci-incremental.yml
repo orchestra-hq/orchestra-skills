@@ -8,6 +8,13 @@
 #   2. full-refreshes modified incremental models (and their modified ancestors),
 #   3. builds everything modified + downstream without --full-refresh, testing is_incremental().
 # Skip step 1 to rely on --defer alone; modified incrementals then have no existing CI table.
+#
+# --defer after a clone: the clone below is unselected, so it copies the whole target into
+# ci_<PR number> and steps 2-3 can read unmodified upstreams from the clones -- --defer is not
+# required for them. It stays in COMMON because (a) the dbt-deploy job reuses COMMON and never
+# clones, and (b) narrowing the clone with a selector (a subset of the target) makes --defer
+# required again for whatever the clone left out. --state is needed either way: state:modified+
+# and the modified_incremental selector both compare against it.
 # The task's commands are `dbt ${{ inputs.dbt_command }}`, so each chained command after `;` starts with `dbt`.
 
 # dbt-slim-ci job:

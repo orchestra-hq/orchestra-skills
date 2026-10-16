@@ -102,6 +102,8 @@ task-001:
 
 For secrets stored in a Prefect `Secret` block or `SecretStr` field with no dedicated integration connection (e.g. a bare API token used inside a `PYTHON_EXECUTE_SCRIPT` task), see `prefect-secrets-to-orchestra` for the full checklist-based handoff — this skill covers the connection side, that one covers the "where does each secret land" side.
 
+One case lands back on this side: if the value already sits in **AWS Secrets Manager** or **Azure Key Vault** (an `AwsSecret` block from `prefect-aws`, an `AzureKeyVaultSecretReference` from `prefect-azure`), the Orchestra connection can read it in place rather than holding a copy — set **Credential Store** on the connection and identify the secret by Secret ARN (AWS) or secret name (Azure). The store's own Orchestra connection has to exist first, and the secret's value must be a JSON object with exactly the keys the integration expects. `prefect-secrets-to-orchestra` has the full sequencing; see also [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage).
+
 ---
 
 ## Linked Connections — Link, Don't Copy
@@ -174,6 +176,7 @@ pipeline:
 - [ ] Identify each Prefect block and the secret(s) it holds
 - [ ] Find the equivalent Orchestra connection type above
 - [ ] Create the connection in Orchestra (Settings -> Connections -> Add Connection)
+- [ ] If the block's value already lives in AWS Secrets Manager or Azure Key Vault, set **Credential Store** on the connection instead of re-entering the value
 - [ ] Note the full connection name including the 5-digit suffix
 - [ ] Replace placeholder `connection: <name>` with the real name
 - [ ] For environment-specific blocks, set env vars and use `${{ ENV.VAR }}`
@@ -195,6 +198,7 @@ pipeline:
 ## References
 
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
 - Prefect blocks: https://docs.prefect.io/v3/develop/blocks

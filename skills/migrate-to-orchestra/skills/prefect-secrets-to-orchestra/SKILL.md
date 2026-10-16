@@ -1,11 +1,11 @@
 ---
 name: prefect-secrets-to-orchestra
-description: "Use this skill when the user has Prefect Secret blocks, SecretStr fields, SecretDict, or prefect.blocks.system.Secret usage to move into Orchestra. Triggers: any Prefect code using Secret.load(), .get_secret_value(), SecretStr type annotations, or AWS Secrets Manager blocks storing credentials. Never asks for real secret values — produces a checklist of what to re-enter directly in Orchestra."
+description: "Use this skill when the user has Prefect Secret blocks, SecretStr fields, SecretDict, or prefect.blocks.system.Secret usage to move into Orchestra. Triggers: any Prefect code using Secret.load(), .get_secret_value(), SecretStr type annotations, or external secret-store blocks (AWS Secrets Manager, Azure Key Vault) storing credentials. Never asks for real secret values — produces a checklist of what to re-enter directly in Orchestra."
 ---
 
 ## Overview
 
-This skill produces a **secrets checklist** — a table of every secret name, where it came from in Prefect, and where it must be re-entered in Orchestra. It never asks for actual secret values and never writes them to any file. Prefect's encrypted Secret block store has no bulk export mechanism; every secret must be re-entered by hand in Orchestra.
+This skill produces a **secrets checklist** — a table of every secret name, where it came from in Prefect, and where it must be re-entered in Orchestra. It never asks for actual secret values and never writes them to any file. Prefect's encrypted Secret block store has no bulk export mechanism, so most secrets must be re-entered by hand in Orchestra — the exception is a value that already lives in AWS Secrets Manager or Azure Key Vault, which an Orchestra connection can read in place via its **Credential Store**.
 
 ## Parameter Mapping
 
@@ -15,7 +15,8 @@ This skill produces a **secrets checklist** — a table of every secret name, wh
 | `SecretStr` field on a credential block | Store on Orchestra connection credential field | Follow `prefect-connections-to-orchestra` for the block type |
 | `Secret` value used inside a `@task` as an env var | Python connection → env var → read via `os.getenv("KEY")` in script | |
 | `SecretDict` | Multiple key-value entries on the relevant connection | One Orchestra field per key |
-| `AwsSecret` / AWS Secrets Manager block | Orchestra AWS Secrets Manager credential store | Create an Orchestra AWS connection; secret JSON keys must match the target integration's expected fields |
+| `AwsSecret` / AWS Secrets Manager block | Orchestra connection with **Credential Store = AWS Secrets Manager** | Create an Orchestra AWS Secrets Manager connection first, then point the target connection at the **Secret ARN**; the secret's JSON keys must match the target integration's expected fields |
+| `AzureKeyVaultSecretReference` / Azure Key Vault block (`prefect-azure`) | Orchestra connection with **Credential Store = Azure Key Vault** | Create an Orchestra Azure Key Vault connection first (service principal + vault name), then point the target connection at the **secret name** — not an ARN. Vault secret names take only letters, numbers and hyphens, so a Prefect block name with underscores needs renaming |
 | Prefect Variables (non-sensitive, `Variable.get()`) | Pipeline `inputs:` or task `env_vars:` — **not** secrets | Variables are not encrypted; treat as config, not credentials |
 
 **Hard rule (enforced always):**
@@ -53,7 +54,7 @@ response = requests.get("https://api.example.com/data", headers={"Authorization"
 - [ ] Produce the secrets checklist (see template below)
 - [ ] For each row marked "Orchestra connection field": follow `prefect-connections-to-orchestra` to create the connection and enter the value in the credential field
 - [ ] For each row marked "Python connection env var": open the Orchestra Python connection → Advanced → Environment Variables → add the key
-- [ ] For AWS Secrets Manager entries: create an Orchestra AWS Secrets Manager connection; confirm the secret's JSON keys match the integration's expected field names
+- [ ] For a secret already held in an external store: if that store is AWS Secrets Manager or Azure Key Vault, the value can stay where it is — create the Orchestra connection to the store, then set **Credential Store** on the target connection and identify the secret (Secret ARN for AWS Secrets Manager, secret name for Azure Key Vault) instead of re-entering it. Confirm the secret's JSON keys match the integration's expected field names. Any other store (Hashicorp Vault, GCP Secret Manager) still needs a manual re-entry
 - [ ] After all secrets are entered, verify each pipeline runs successfully in a test environment before promoting to production
 
 ## Before / After Example
@@ -119,10 +120,12 @@ pipeline:
 
 ## Gotchas
 
-- Prefect's encrypted Secret block store has **no bulk export** to Orchestra — every secret must be re-entered by hand; plan for this in your migration timeline
+- Prefect's encrypted Secret block store has **no bulk export** to Orchestra — every secret Prefect itself holds must be re-entered by hand; plan for this in your migration timeline. Only secrets already sitting in AWS Secrets Manager or Azure Key Vault escape the re-key, by being read in place through the connection's **Credential Store**
 - Prefect `Variable.get()` values are **not encrypted** — route to `inputs:` or `env_vars:` in the Orchestra pipeline, not to secrets
 - `SecretStr` fields inside credential blocks follow `prefect-connections-to-orchestra`, not this skill — they are stored on the connection, not as standalone secrets
-- AWS Secrets Manager: the secret's JSON must contain exactly the keys the target integration expects (e.g. for a Snowflake connection: `account`, `user`, `password`, etc.); mismatched keys will silently fail
+- **An external credential store holds one JSON object per connection** — in AWS Secrets Manager or Azure Key Vault the secret's value must be a JSON object containing exactly the keys the target integration expects, and every required one rather than only the sensitive fields. The keys are the parameter IDs from that integration's **Authentication parameters** table, not friendly names — a Snowflake connection wants `snowflake_account`, `snowflake_user`, `snowflake_password` and the rest of its required parameters, not `account` / `user` / `password`. In Azure Key Vault, set that whole JSON object as the secret's value rather than splitting it into one secret per field. One Prefect secret rarely maps to one store secret: a flow that loads a password on its own still needs the non-secret parameters gathered into the same JSON object
+- **A mismatch is caught when the connection is saved** — Orchestra reads the secret at that point and rejects it if the store credential is invalid, the secret can't be read, or its JSON doesn't match the integration's parameters, so this is checked up front rather than failing mid-run. From then on it reads the latest version each time it uses the connection, so rotation in the store needs no change in Orchestra — worth saying in the checklist, since it's the part of the old Prefect workflow that disappears
+- **A credential store only appears once its own connection exists** — the **Credential Store** dropdown offers AWS Secrets Manager or Azure Key Vault only when a connection to that store has already been created, so sequence the store connection before the connections that read from it. Both store integrations are in beta and may not be enabled on the account, and a vault whose networking is restricted to selected networks has to allow Orchestra's IPs through before any secret can be read — confirm both before building a migration plan around this route. See [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault)
 - Never store secrets in task `env_vars:` in the YAML file itself — only reference connection-level env vars or use Orchestra's secrets integration
 - If a `Secret` block is used purely for observability (e.g. masking values in logs) with no downstream consumer, it can be dropped entirely
 
@@ -130,6 +133,7 @@ pipeline:
 
 - https://docs.prefect.io/v3/develop/blocks
 - https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 
 ## Adding Alerts
 

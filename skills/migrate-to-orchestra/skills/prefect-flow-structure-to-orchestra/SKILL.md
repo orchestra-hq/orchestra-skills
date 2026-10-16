@@ -18,7 +18,7 @@ This skill handles conversion of Prefect `@flow`-level constructs into Orchestra
 | `def my_flow(env: str = "prod")` | `inputs: {env: {type: string, default: prod}}` | int/float→number, str→string, bool→boolean |
 | `@flow(retries=2, retry_delay_seconds=300)` | `configuration: {retries: 2, retry_delay: 5}` | Orchestra's `retry_delay` is MINUTES — convert seconds/60 (round up); **cap at 120** — clamp and flag if larger |
 | `@flow(timeout_seconds=3600)` | `configuration: {timeout: 3600}` | |
-| tag-based concurrency limit | `configuration: {concurrency: {max_active: 1}}` | + MANUAL note |
+| tag-based concurrency limit | `configuration: {concurrency: {max_active: 1, on_limit: QUEUE}}` | Prefect queues runs that hit a tag limit, so set `on_limit: QUEUE` — Orchestra's default `SKIP` would drop them. `QUEUE_LATEST` only if just the latest run matters. + MANUAL note: Prefect's limit is per *tag* across flows; Orchestra's is per pipeline + environment (+ branch) |
 | `@flow(log_prints=True)` | drop | No equivalent; omit |
 | `@flow(tags=["elt"])` | `tags: [elt]` on each task individually (NOT on the group — `TaskGroupModel` has no `tags` field) | |
 | `SecretStr` params | → `prefect-secrets-to-orchestra` | never inline |

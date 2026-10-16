@@ -8,7 +8,8 @@ verification** instead of asserting pass/fail.
 
 Detection runs against data from Step 2: `list_pipelines` (inventory + `storageProvider` + schedule),
 `get_pipeline` (full definition), `list_pipeline_runs`/`list_task_runs`/`list_operations` (runtime),
-`list_assets` (governance). Match field names on concept, not one spelling (`max_active`/`maxActive`,
+`list_assets` (governance), `list_monitors`/`get_incident_settings` (incident routing).
+Match field names on concept, not one spelling (`max_active`/`maxActive`,
 `set_outputs`/`setOutputs`, `task_groups`/`taskGroups`).
 
 ## Contents
@@ -70,11 +71,18 @@ warehouse. → Push compute down. Docs:
 
 **1.8 Set pipeline concurrency where overlap is undesirable** — *High*
 Good: `configuration.concurrency.max_active` (a.k.a. `maxActive`) is set on pipelines where
-overlapping runs would corrupt data or double-spend compute. Signal: a frequently scheduled or
-sensor-triggered pipeline with no concurrency limit; or `list_pipeline_runs` showing overlapping
-RUNNING windows. Note: at the limit Orchestra **skips** the new run (no queue, no cancel), evaluated
-per pipeline + environment (+ Git branch). → Set `max_active`. Docs:
-`/docs/core-concepts/pipelines/pipeline-runs#how-pipeline-concurrency-works`.
+overlapping runs would corrupt data or double-spend compute, with an `on_limit` that matches what
+a delayed run is worth. Signal: a frequently scheduled or sensor-triggered pipeline with no
+concurrency limit; or `list_pipeline_runs` showing overlapping RUNNING windows. Second signal: a
+limit set but left on the default `on_limit: SKIP` where the dropped runs mattered — event-driven
+pipelines (sensor/webhook) silently losing a run per event, or a cron pipeline whose SKIPPED runs
+mean the refresh simply didn't happen. Orchestra never cancels in-progress runs to make room; the
+limit and its queue are scoped per pipeline + environment (+ Git branch). → Set `max_active`, then
+`on_limit: QUEUE` where each trigger does distinct work, `QUEUE_LATEST` where only the latest state
+matters (and on frequent crons, to avoid an unbounded backlog), leaving `SKIP` where a delayed run
+is genuinely redundant. Queued runs expire as SKIPPED after 24 hours, so a queue that is always
+full is under-provisioned rather than fixed. Docs:
+`/docs/core-concepts/pipelines/pipeline-runs#what-happens-when-the-concurrency-limit-is-reached`.
 
 **1.9 Prefer inputs/env vars/conditionals over duplication** — *Medium*
 Good: variation handled with `${{ inputs.* }}`, `${{ ENV.* }}`, and conditional expressions. Signal:
@@ -215,9 +223,49 @@ sensitive data; 5 MB/run limit). Signal: `set_outputs: true` on tasks whose outp
 references. → Disable where unused. Docs: `/docs/core-concepts/tasks/setting-outputs`.
 
 **5.6 Stale assets are a governance signal** — *Low*
-Good: assets have Orchestra operations within ~7 days; uncovered assets get scheduled Asset Runs.
-Signal: `list_assets` entries with no operation in 7+ days (confirm via `list_operations`). → Bring
-under a pipeline / schedule Asset Runs. Docs: `/docs/core-concepts/assets`.
+Good: assets have Orchestra operations within ~7 days. Signal: `list_assets` entries with no
+operation in 7+ days (confirm via `list_operations`). → Bring under a pipeline. Where the work
+genuinely runs outside Orchestra and only the metadata is wanted, recommend a scheduled Python
+collector (see 5.7) — not scheduled asset collection, which is being removed. Docs:
+`/docs/core-concepts/assets`.
+
+**5.7 Not relying on scheduled asset collection** — *Medium* `[MANUAL]`
+Scheduled asset collection (Asset runs) is deprecated and stops working on **23 October 2026**, so
+a workspace that leans on it for asset coverage loses that coverage on a fixed date. Asset
+configurations aren't exposed by the MCP: `list_assets` shows the assets, not what collected them,
+so treat a warehouse whose assets keep refreshing with no Orchestra operation behind them as a
+prompt to ask, not as a finding. → Replace with the Python asset-collection template: a scheduled
+`PYTHON` task reads tables, views and lineage from Snowflake, BigQuery or Databricks and writes
+them through the asset API. It matches on the same `externalId`, so it updates the assets an Asset
+run already created instead of duplicating them — point the Python connection's linked warehouse
+connection at the same connection the old configuration used. Docs:
+https://docs.getorchestra.io/docs/core-concepts/assets,
+https://docs.getorchestra.io/docs/templates/asset-collection.
+
+**5.8 A dbt workspace has a monitor that groups by lineage** — *Medium*
+Good: workspaces running dbt have a monitor matching the dbt Core / dbt Cloud integrations with
+**Operation failures only** on and **Group by** set to downstream dbt models — one incident per
+broken model plus failures up to two levels downstream of it, instead of one incident for
+everything a dbt task broke. The dbt job's own task-level failures (parse errors) are deliberately
+left out of that monitor and fall through to Orchestra's own grouping. Signal: `list_monitors`
+shows dbt integrations claimed only by a monitor grouping by task or pipeline, or no monitor
+claiming them at all, while `list_task_runs` shows dbt tasks running. → Add the recommended dbt
+monitor. Caveat to state when recommending it: lineage comes from previous runs, so newly added
+models or changed dependencies may not group accurately yet. Docs:
+`/docs/core-concepts/incidents/monitors`.
+
+**5.9 Monitors route to a destination and name someone** — *Medium*
+Good: each monitor sets an assignee, and subscribers where more than one person needs telling —
+both are mentioned in the incident's Slack alerts, and either can be a Slack-only user who is
+notified without being able to open the incident in Orchestra. Monitors that claim external events
+also set their own alert destinations, since external events have no pipeline whose destinations
+they could inherit. Signal: `list_monitors` entries with no assignee and no subscribers, or an
+external-event monitor with no destinations (its incidents alert nobody). → Set an owner, and
+destinations where there is no pipeline behind the events. Note while reviewing: a monitor grouping
+by asset or by downstream dbt models puts one task run's failures on several incidents, and each
+incident alerts separately, so check the alert budget in `get_incident_settings` is sized for that
+rather than reading the extra alerts as misconfiguration. Docs:
+`/docs/core-concepts/incidents/monitors`, `/docs/core-concepts/incidents/alerts`.
 
 ## 6. Security and access control
 

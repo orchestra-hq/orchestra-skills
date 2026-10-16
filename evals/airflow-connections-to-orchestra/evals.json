@@ -7,40 +7,138 @@
       "id": "snowflake-operator-conn-id-basic",
       "prompt": "Convert this Airflow DAG to an Orchestra pipeline task, focusing on how the SnowflakeOperator's snowflake_conn_id should be represented (see files/snowflake_operator_dag.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
       "expected_output": "A SNOWFLAKE task whose connection: references either a name_XXXXX connection (e.g. snowflake_prod_XXXXX) or a ${{ ENV.* }} variable derived from snowflake_conn_id='snowflake_prod' — never a literal account/user/password. warehouse/database/role are not written as task parameters since they belong to the connection, not duplicated per task, because the source doesn't vary them.",
-      "files": ["snowflake_operator_dag.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "snowflake_operator_dag.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "The task uses the SNOWFLAKE integration", "check": "some_task", "field": "integration", "equals": "SNOWFLAKE" },
-        { "text": "snowflake_conn_id='snowflake_prod' is referenced in the connection: value (e.g. as part of a snowflake_prod_XXXXX name or an ${{ ENV.* }} var), not dropped or replaced with an invented name unrelated to the source conn_id", "check": "regex", "pattern": "snowflake_prod", "ignore_case": true, "min_count": 1 },
-        { "text": "warehouse='ANALYTICS_WH', database='ANALYTICS', and role='TRANSFORMER' are not duplicated as literal task parameters — they belong on the connection and the source never varies them per task" }
+        {
+          "text": "The task uses the SNOWFLAKE integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "SNOWFLAKE"
+        },
+        {
+          "text": "snowflake_conn_id='snowflake_prod' is referenced in the connection: value (e.g. as part of a snowflake_prod_XXXXX name or an ${{ ENV.* }} var), not dropped or replaced with an invented name unrelated to the source conn_id",
+          "check": "regex",
+          "pattern": "snowflake_prod",
+          "ignore_case": true,
+          "min_count": 1
+        },
+        {
+          "text": "warehouse='ANALYTICS_WH', database='ANALYTICS', and role='TRANSFORMER' are not duplicated as literal task parameters — they belong on the connection and the source never varies them per task"
+        }
       ]
     },
     {
       "id": "variable-vs-connection-distinction",
       "prompt": "Convert this Airflow DAG to Orchestra pipeline tasks, making sure Variable.get() values land in inputs: and BaseHook.get_connection()/conn_id= values land in connection: — they must not be conflated (see files/orders_pipeline_dag.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
       "expected_output": "inputs.target_table (from Variable.get('target_table', default_var='orders')) and inputs.alerts_channel (from Variable.get('alerts_channel', default_var='#data-alerts')) are declared under inputs: with their defaults. The load_orders task's connection: is derived from snowflake_conn_id='snowflake_prod', and the notify_slack task's connection: is derived from BaseHook.get_connection('slack_alerts') — neither Variable value is written as a connection:, and neither conn_id/connection name is written as an inputs: field.",
-      "files": ["orders_pipeline_dag.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "orders_pipeline_dag.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "inputs.target_table is declared with default 'orders'", "check": "yaml_eq", "path": "inputs.target_table.default", "value": "orders" },
-        { "text": "inputs.alerts_channel is declared with default '#data-alerts'", "check": "yaml_eq", "path": "inputs.alerts_channel.default", "value": "#data-alerts" },
-        { "text": "slack_alerts (from BaseHook.get_connection('slack_alerts')) is referenced as part of a connection: value", "check": "regex", "pattern": "slack_alerts", "ignore_case": true, "min_count": 1 },
-        { "text": "target_table and alerts_channel — both sourced from Variable.get() — land under inputs:, not as a connection: value or a hardcoded literal disconnected from the input" },
-        { "text": "snowflake_prod and slack_alerts — both sourced from a conn_id/BaseHook.get_connection() pointer — land as connection: references, not as inputs: fields or literal secret values" }
+        {
+          "text": "inputs.target_table is declared with default 'orders'",
+          "check": "yaml_eq",
+          "path": "inputs.target_table.default",
+          "value": "orders"
+        },
+        {
+          "text": "inputs.alerts_channel is declared with default '#data-alerts'",
+          "check": "yaml_eq",
+          "path": "inputs.alerts_channel.default",
+          "value": "#data-alerts"
+        },
+        {
+          "text": "slack_alerts (from BaseHook.get_connection('slack_alerts')) is referenced as part of a connection: value",
+          "check": "regex",
+          "pattern": "slack_alerts",
+          "ignore_case": true,
+          "min_count": 1
+        },
+        {
+          "text": "target_table and alerts_channel — both sourced from Variable.get() — land under inputs:, not as a connection: value or a hardcoded literal disconnected from the input"
+        },
+        {
+          "text": "snowflake_prod and slack_alerts — both sourced from a conn_id/BaseHook.get_connection() pointer — land as connection: references, not as inputs: fields or literal secret values"
+        }
       ]
     },
     {
       "id": "linked-connection-credentials",
       "prompt": "Convert this task to an Orchestra pipeline task, including how the Snowflake credentials behind BaseHook.get_connection('snowflake_prod') should reach the running code (see files/rowcount_python_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
       "expected_output": "A PYTHON / PYTHON_EXECUTE_SCRIPT task whose code reads the Snowflake credentials from the Snowflake connection *linked* on the Python connection — via orchestra.get_linked_connection(\"snowflake\", ...) or the injected <INTEGRATION>__<CONNECTION_ID>__<FIELD> environment variables (e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD) — rather than the Snowflake account/user/password being copied into the Python connection's own Secrets or written into the YAML. A deleted or undecryptable linked connection is skipped silently, so the code must not assume the variables are present.",
-      "files": ["rowcount_python_task.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "rowcount_python_task.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "The converted code reads the warehouse credentials from a linked connection — get_linked_connection(...) or an injected SNOWFLAKE__<CONNECTION_ID>__SNOWFLAKE_* environment variable — rather than re-declaring them", "check": "regex", "pattern": "get_linked_connection|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_", "min_count": 1 },
-        { "text": "No Snowflake account/user/password value is written into the YAML", "check": "no_hardcoded_secret" },
-        { "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place" },
-        { "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label" },
-        { "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check" }
+        {
+          "text": "The converted code reads the warehouse credentials from a linked connection — get_linked_connection(...) or an injected SNOWFLAKE__<CONNECTION_ID>__SNOWFLAKE_* environment variable — rather than re-declaring them",
+          "check": "regex",
+          "pattern": "get_linked_connection|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_",
+          "min_count": 1
+        },
+        {
+          "text": "No Snowflake account/user/password value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place"
+        },
+        {
+          "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label"
+        },
+        {
+          "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check"
+        }
+      ]
+    },
+    {
+      "id": "secrets-backend-external-credential-store",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/secrets_backend_dag.py). Note what airflow.cfg says about where the connection actually resolves from, and tell me how the credential should reach Orchestra. Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A SNOWFLAKE task whose connection: is derived from snowflake_conn_id='snowflake_analytics' as a name_XXXXX or ${{ ENV.* }} reference, with no credential inlined. Alongside the YAML, the response recognises the AWS Secrets Manager secrets backend in airflow.cfg and offers the external credential store route — create an Orchestra AWS Secrets Manager connection, then set Credential Store on the Snowflake connection and give it the Secret ARN — instead of asserting the password must be re-entered by hand. It should not invent an account/user/password from the DAG, which contains none.",
+      "files": [
+        "secrets_backend_dag.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
+      "assertions": [
+        {
+          "text": "snowflake_conn_id='snowflake_analytics' is referenced in the connection: value rather than dropped or replaced with an unrelated invented name",
+          "check": "regex",
+          "pattern": "snowflake_analytics",
+          "ignore_case": true,
+          "min_count": 1
+        },
+        {
+          "text": "No Snowflake credential value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "Recognises from airflow.cfg that connections resolve through an AWS Secrets Manager secrets backend, so the DAG repo holds no host/user/password to extract"
+        },
+        {
+          "text": "Offers the external credential store route — create an Orchestra AWS Secrets Manager connection, then set Credential Store on the Snowflake connection and point it at the Secret ARN — rather than stating flatly that the credential must be re-entered by hand in Orchestra"
+        },
+        {
+          "text": "Notes that the AWS Secrets Manager connection has to exist before AWS Secrets Manager can be chosen as the credential store, and that the secret's value must be a JSON object holding the Snowflake connection's parameters — every required one, not only the password"
+        },
+        {
+          "text": "Does not fabricate a Snowflake account, user, or password — the DAG and airflow.cfg contain none"
+        },
+        {
+          "text": "Does not assume the existing secret can be read as-is — an Airflow connection URI or extra blob is not the shape Orchestra reads, so the secret has to be rewritten as the Orchestra connection's parameters before Credential Store will accept it"
+        }
       ]
     }
   ]

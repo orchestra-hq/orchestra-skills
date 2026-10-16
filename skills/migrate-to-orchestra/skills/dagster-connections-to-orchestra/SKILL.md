@@ -102,7 +102,18 @@ task-001:
     statement: 'SELECT 1'
 ```
 
-For secrets fetched at runtime, use `AWS_SECRETS_MANAGER` or `AZURE_KEY_VAULT` as a preceding task that sets an output, then reference it downstream.
+`AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are credential stores a connection reads from, not task integrations — neither has an `integration_job`, so there is no task that fetches a secret mid-run for a later task to consume. A resource that resolves its credential from one of them is handled on the connection, below.
+
+### Credentials already held in a secret store
+
+A resource that resolves its secret at runtime from a secret store — `SecretsManagerResource` / `secretsmanager_resource` (`dagster-aws`), or an `azure-keyvault-secrets` client wrapped in a `ConfigurableResource` — usually needs no re-keying at all. An Orchestra connection can read its own credentials straight out of **AWS Secrets Manager** or **Azure Key Vault**:
+
+- Create the Orchestra connection to the store first. A store only appears in the target connection's **Credential Store** dropdown once a connection to it exists.
+- On the target connection, set **Credential Store** to that store and identify the secret — the **Secret ARN** for AWS Secrets Manager, the **secret name** for Azure Key Vault.
+- The secret's value must be a JSON object holding exactly the keys that integration expects — the parameter IDs from its **Authentication parameters** table, and every required one, not only the sensitive fields. In Azure Key Vault, that whole object is the secret's value — don't split it into one vault secret per field.
+- Orchestra reads the secret when the connection is saved and rejects it if it can't be read or its keys don't match, so a wrong key set surfaces there rather than at run time. After that it reads the latest version on each use, so rotating the secret in the store needs no change in Orchestra.
+
+Only those two stores work this way; a resource backed by Hashicorp Vault or GCP Secret Manager still means a manual re-entry. Both store integrations are in beta, so confirm they're enabled on the account before planning the migration around them. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
 
 ---
 
@@ -173,6 +184,7 @@ pipeline:
 - [ ] Identify each Dagster resource and the secret(s) it holds
 - [ ] Find the equivalent Orchestra connection type above
 - [ ] Create the connection in Orchestra (Settings -> Connections -> Add Connection)
+- [ ] If the resource resolves its secret from AWS Secrets Manager or Azure Key Vault, point the connection at that store via **Credential Store** instead of re-keying the value
 - [ ] Note the full connection name including the 5-digit suffix
 - [ ] Replace placeholder `connection: <name>` with the real name
 - [ ] For environment-specific resources, set env vars and use `${{ ENV.VAR }}`
@@ -189,11 +201,13 @@ pipeline:
 - **GCP service account** — paste the full JSON into the GCP connection key field.
 - **Airbyte Cloud vs Server** — `AirbyteCloudResource` -> Cloud connection; `AirbyteResource(host=,port=)` -> Server connection.
 - **Don't copy a warehouse credential into a Python/dbt connection's Secrets** — if it already exists as its own Orchestra connection, link it and read the injected `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` variables instead.
+- **A secret store already in play may remove the re-key entirely** — if the resource reads from AWS Secrets Manager or Azure Key Vault, propose **Credential Store** on the Orchestra connection before telling the user to re-enter the value by hand.
 - **`EnvVar`** — secrets -> connection; non-secret config -> `inputs:`.
 
 ## References
 
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
 - Dagster resources: https://docs.dagster.io/concepts/resources

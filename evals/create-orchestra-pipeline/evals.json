@@ -147,7 +147,7 @@
           "pattern": "timeout:\\s*2700\\b"
         },
         {
-          "text": "`body` is a quoted JSON string, not a nested YAML mapping \u2014 the parameter's schema type is string, so a bare mapping is rejected"
+          "text": "`body` is a quoted JSON string, not a nested YAML mapping — the parameter's schema type is string, so a bare mapping is rejected"
         },
         {
           "text": "`custom_headers` is likewise a quoted JSON string carrying X-Partner-Id, not a nested YAML mapping"
@@ -162,7 +162,7 @@
     },
     {
       "id": "webhook-payload-mapped-to-inputs",
-      "prompt": "We want an Orchestra pipeline called 'Partner Sync Reaction' that a partner's system triggers by POSTing their own event JSON \u2014 it looks like {\"connection_id\": \"abc-123\", \"event\": \"sync_completed\"} and we can't change its shape. The pipeline should run a Python task, but only when connection_id is abc-123. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "prompt": "We want an Orchestra pipeline called 'Partner Sync Reaction' that a partner's system triggers by POSTing their own event JSON — it looks like {\"connection_id\": \"abc-123\", \"event\": \"sync_completed\"} and we can't change its shape. The pipeline should run a Python task, but only when connection_id is abc-123. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
       "expected_output": "An Orchestra v1 pipeline YAML with the webhook trigger enabled and pipeline `inputs` that the partner's payload is mapped into via `${{ outputs.payload[...] }}`, with the task gated by a `condition` reading the mapped input as `${{ inputs.<name> }}`.",
       "files": [],
       "assertions": [
@@ -195,10 +195,183 @@
           "text": "The payload reaches the pipeline through `${{ outputs.payload }}` (whole body or a subscript such as `${{ outputs.payload['connection_id'] }}`) in the webhook trigger's run input mapping"
         },
         {
-          "text": "Does not reference `${{ outputs.payload }}` from a task parameter or condition directly \u2014 it is only readable in the trigger's run input mapping, and must be mapped to an input first"
+          "text": "Does not reference `${{ outputs.payload }}` from a task parameter or condition directly — it is only readable in the trigger's run input mapping, and must be mapped to an input first"
         },
         {
-          "text": "Does not try to reshape the partner's payload into Orchestra's start-pipeline format, or treat a non-matching body as an error \u2014 any JSON body starts the run"
+          "text": "Does not try to reshape the partner's payload into Orchestra's start-pipeline format, or treat a non-matching body as an error — any JSON body starts the run"
+        }
+      ]
+    },
+    {
+      "id": "aws-batch-submit-job-mapping-params",
+      "prompt": "Create an Orchestra pipeline called 'Nightly Transform' with a single AWS Batch task that submits to the analytics-prod job queue using the nightly-transform job definition, pinned to revision 3. Override the container command to `python transform.py` and set STAGE=prod in the container's environment. AWS Batch should kill an attempt that has been running for more than 30 minutes. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit — rather than a `configuration.timeout`, which would only fail the task and leave the job running.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_BATCH integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_BATCH"
+        },
+        {
+          "text": "Uses the AWS_BATCH_SUBMIT_JOB job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_BATCH_SUBMIT_JOB"
+        },
+        {
+          "text": "The job definition is pinned to revision 3",
+          "check": "regex",
+          "pattern": "job_definition:\\s*[\"']?nightly-transform:3"
+        },
+        {
+          "text": "The 30-minute attempt limit is expressed as timeout_seconds: 1800, in seconds",
+          "check": "regex",
+          "pattern": "timeout_seconds:\\s*1800\\b"
+        },
+        {
+          "text": "`container_overrides` is a nested YAML mapping, not a quoted JSON string — unlike HTTP `body` or Python `environment_variables`, this parameter's schema type really is an object"
+        },
+        {
+          "text": "The container environment is a list of {name, value} objects (STAGE / prod), not a bare key-value mapping"
+        },
+        {
+          "text": "The attempt limit is set with the task's own `timeout_seconds` rather than only a `configuration.timeout` — a task timeout fails the task without terminating the Batch job"
+        },
+        {
+          "text": "Does not set timeout_seconds below 60, the schema minimum"
+        }
+      ]
+    },
+    {
+      "id": "secret-store-is-not-a-task",
+      "prompt": "Create an Orchestra pipeline called 'Daily Revenue' that first pulls the Snowflake credentials out of our Azure Key Vault and then uses them to run `SELECT * FROM revenue` on Snowflake. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML containing only the SNOWFLAKE / SNOWFLAKE_RUN_QUERY task, with its credentials referenced through `connection:`. No Key Vault task is authored: AZURE_KEY_VAULT is an integration with no integration_job — a credential store a connection reads its own credentials from — so the fetch is configured as Credential Store on the Snowflake connection and the credentials never move through the pipeline. The response says so rather than inventing a job name.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Authors the Snowflake query task",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "SNOWFLAKE_RUN_QUERY"
+        },
+        {
+          "text": "No secret-fetch task is invented — every task in the pipeline is the SNOWFLAKE one",
+          "check": "every_task",
+          "field": "integration",
+          "equals": "SNOWFLAKE"
+        },
+        {
+          "text": "No credential value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "Explains that AZURE_KEY_VAULT has no integration_job and cannot be a task — it is a credential store selected on the Snowflake connection, so the vault lookup happens when Orchestra uses that connection, not as a pipeline step"
+        },
+        {
+          "text": "Does not invent a job name such as AZURE_KEY_VAULT_GET_SECRET, and does not substitute a PYTHON or HTTP task that calls Key Vault itself to work around the missing job"
+        },
+        {
+          "text": "Does not pass the credential between tasks via set_outputs or a parameter reference — there is no secret value in the pipeline to pass"
+        }
+      ]
+    },
+    {
+      "id": "run-agent-optional-parameters",
+      "prompt": "Add a task to pipeline.yml called 'Summarise Incidents' that runs our Orchestra agent a1b2c3d4-0000-4000-8000-000000000001 with the prompt 'Summarise today's open incidents', and feed its answer into the Slack task that already posts to #data-alerts. Keep the agent on whatever model and effort it is already configured with. Just the YAML file, don't deploy it.",
+      "expected_output": "An ORCHESTRA / RUN_AGENT task carrying only agent_id, prompt and set_outputs: true, with model_id, effort, llm_integration and llm_connection_id left out so the task inherits the agent's own settings, and the Slack task referencing the agent task's output rather than being left unwired.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Uses the ORCHESTRA integration for the agent task",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "ORCHESTRA"
+        },
+        {
+          "text": "Uses the RUN_AGENT job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "RUN_AGENT"
+        },
+        {
+          "text": "The agent id given in the request is used verbatim",
+          "check": "regex",
+          "pattern": "a1b2c3d4-0000-4000-8000-000000000001"
+        },
+        {
+          "text": "set_outputs is true on the agent task, since a downstream task reads its answer",
+          "check": "regex",
+          "pattern": "set_outputs:\\s*true"
+        },
+        {
+          "text": "model_id and effort are omitted rather than guessed — the request says to keep the agent's own settings, and each optional parameter falls back to the agent when left out"
+        },
+        {
+          "text": "No llm_integration / llm_connection_id is invented, and no API key appears anywhere in the YAML"
+        },
+        {
+          "text": "The Slack task consumes the agent task's output through an OUTPUTS reference and depends on it, rather than set_outputs being set but never read"
+        }
+      ]
+    },
+    {
+      "id": "concurrency-on-limit-queue-latest",
+      "prompt": "Our 'Exec Dashboard Refresh' pipeline runs on a 6-field cron every 15 minutes and rebuilds the same aggregate tables each time, but a run sometimes takes 25 minutes and we're getting overlapping runs hammering the warehouse. Cap it to one run at a time, and make sure a trigger that lands while a run is in progress isn't just thrown away — we always want one more refresh after the current one, and only the freshest one. Write the pipeline YAML to pipeline.yml. Don't deploy it.",
+      "expected_output": "A pipeline with configuration.concurrency.max_active: 1 and on_limit: QUEUE_LATEST — the refresh is idempotent and only the latest state matters, and on a 15-minute cron whose runs can take 25 minutes plain QUEUE would build an ever-growing backlog while the default SKIP would throw the trigger away, which the request rules out. Does not try to solve it by cancelling the in-progress run, which Orchestra never does.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "configuration.concurrency.max_active is 1",
+          "check": "yaml_eq",
+          "path": "configuration.concurrency.max_active",
+          "value": 1
+        },
+        {
+          "text": "configuration.concurrency.on_limit is QUEUE_LATEST — only the latest refresh matters, and on a cron whose runs outlast the interval QUEUE would build an unbounded backlog",
+          "check": "yaml_eq",
+          "path": "configuration.concurrency.on_limit",
+          "value": "QUEUE_LATEST"
+        },
+        {
+          "text": "on_limit is set explicitly rather than left to the default, since the default SKIP would discard the trigger the request says to keep",
+          "check": "regex",
+          "pattern": "on_limit:\\s*QUEUE_LATEST"
+        },
+        {
+          "text": "Does not claim or configure cancellation of the in-progress run to free the slot — Orchestra never cancels in-progress runs to honour a concurrency limit"
+        },
+        {
+          "text": "Does not invent a concurrency field outside configuration.concurrency (no top-level concurrency:, no max_active on a task)"
         }
       ]
     }

@@ -56,7 +56,7 @@
     {
       "id": "clean-retrofit",
       "prompt": "Add dbt Slim CI to our production pipeline in files/dbt_production.yml. It's Git-backed in our dbt repo (acme/analytics-dbt, default branch main) and the project has incremental models. Use CI and Production as the Orchestra environment names. Write the updated pipeline YAML to pipeline.yml and the GitHub Actions workflow to dbt_slim_ci.yml in the current directory. Don't call Orchestra, push, or deploy.",
-      "expected_output": "pipeline.yml keeps the existing tasks and schedule, adds dbt_branch / dbt_command / dbt_ci_schema_suffix inputs, parametrises run_dbt's commands, branch and DBT_CI_SCHEMA_SUFFIX, and sets max_active from ${{ ENV.DBT_PIPELINE_CONCURRENCY }}. dbt_slim_ci.yml has PR, deploy and clean-up jobs on run-pipeline v1.7.0+ with task_ids run_dbt, cancel_on_exit on the PR job, and the clone + modified_incremental commands. See expected/golden_pipeline.yml.",
+      "expected_output": "pipeline.yml keeps the existing tasks and schedule, adds dbt_branch / dbt_command / dbt_ci_schema_suffix inputs, parametrises run_dbt's commands, branch and DBT_CI_SCHEMA_SUFFIX, and sets max_active from ${{ ENV.DBT_PIPELINE_CONCURRENCY }} and on_limit from ${{ ENV.DBT_PIPELINE_ON_LIMIT }}. dbt_slim_ci.yml has PR, deploy and clean-up jobs on run-pipeline v1.7.0+ with task_ids run_dbt, cancel_on_exit on the PR job, and the clone + modified_incremental commands. See expected/golden_pipeline.yml.",
       "files": [
         "dbt_production.yml"
       ],
@@ -104,6 +104,11 @@
           "text": "Concurrency comes from an environment variable",
           "check": "regex",
           "pattern": "max_active:\\s*\\$\\{\\{\\s*ENV\\.DBT_PIPELINE_CONCURRENCY"
+        },
+        {
+          "text": "The queueing mode comes from an environment variable too, so CI and Production can differ",
+          "check": "regex",
+          "pattern": "on_limit:\\s*\\$\\{\\{\\s*ENV\\.DBT_PIPELINE_ON_LIMIT"
         },
         {
           "text": "Keeps the daily schedule",
@@ -191,6 +196,86 @@
         },
         {
           "text": "Offers the commit SHA the tag points at, or a long-lived release branch, as the supported way to pin the baseline"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
+    },
+    {
+      "id": "defer-after-clone",
+      "prompt": "Our Slim CI dbt_command is `clone --state latest_production --target ci; dbt build --full-refresh --selector modified_incremental --defer --state latest_production --target ci; dbt build -s state:modified+ --defer --state latest_production --target ci`. The clone has no selector, so it clones the whole target into ci_<PR number>. Do the two build commands still need --defer? Our deploy-on-merge job runs the same two builds with no clone. Don't write any files or call Orchestra.",
+      "expected_output": "Says --defer is not needed on the builds in the PR job: the unselected clone copies the whole target into ci_<PR number>, so unmodified upstream models resolve from the clones rather than from production. Adds that --defer becomes necessary again if the clone is narrowed to a subset of the target, for example by passing a selector to dbt clone, and that --state latest_production stays either way because state:modified+ and the modified_incremental selector compare against it. Keeps --defer on the deploy-on-merge job, which never clones. Changes nothing.",
+      "files": [
+        "dbt_production.yml"
+      ],
+      "assertions": [
+        {
+          "text": "States that --defer is not needed on the build commands after a dbt clone that covers the whole target, because unmodified upstream models can be read from the clones in ci_<PR number>"
+        },
+        {
+          "text": "Says --defer is still required after a clone that covers only a subset of the target, for example when a selector is passed to dbt clone"
+        },
+        {
+          "text": "Keeps --state latest_production on the build commands either way, because state:modified+ and the modified_incremental selector compare against that state"
+        },
+        {
+          "text": "Keeps --defer on the deploy-on-merge job, which runs no clone"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
+    },
+    {
+      "id": "concurrency-on-limit-shared-pipeline",
+      "prompt": "We share one pipeline between production and Slim CI with configuration.concurrency.max_active: 1, and PR runs keep coming back SKIPPED when prod is running. Someone suggested setting on_limit: QUEUE_LATEST so the PR run waits instead of being dropped. Is that the right fix? Advise only — don't change anything.",
+      "expected_output": "Says changing on_limit alone does not fix it while a single max_active: 1 is shared by both environments: the PR run would wait behind the prod run instead of running. The fix is to scope both settings per environment — max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} and on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} — with CI = 5 / QUEUE_LATEST and Production = 1 / QUEUE. Raises the QUEUE_LATEST trade-off in CI: the queue is scoped per pipeline and environment, so once CI is at its limit a newer PR's run marks an older PR's still-waiting run SKIPPED, and run-pipeline only logs a warning for a skipped run, so set max_active high enough that PRs rarely queue, check run-pipeline's status output, or use QUEUE in CI when every PR run must report a real result. May note the 24-hour queue expiry.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Says setting on_limit alone does not fix it while max_active: 1 is shared by both environments — the PR run would wait behind the prod run rather than run"
+        },
+        {
+          "text": "Recommends scoping both max_active and on_limit per Orchestra environment with environment variables",
+          "check": "regex",
+          "pattern": "DBT_PIPELINE_ON_LIMIT",
+          "min_count": 1
+        },
+        {
+          "text": "Gives the documented per-environment values: QUEUE_LATEST in CI and QUEUE in Production",
+          "check": "regex",
+          "pattern": "QUEUE_LATEST",
+          "min_count": 1
+        },
+        {
+          "text": "Flags the QUEUE_LATEST trade-off in CI: the queue is scoped per pipeline and environment, so a newer PR's run marks an older PR's still-waiting run SKIPPED and that PR reports a result for a run that never happened"
+        },
+        {
+          "text": "Notes that run-pipeline only logs a warning for a SKIPPED run, so its status output must be checked for a skipped run to block the PR"
+        }
+      ]
+    },
+    {
+      "id": "concurrency-on-limit-production-deploy",
+      "prompt": "Our production dbt pipeline runs on a schedule and the same pipeline is triggered by our deploy-on-merge GitHub Action. configuration.concurrency.max_active is 1 in Production. Twice this week a merge landed while the scheduled run was going and the deployment run came back SKIPPED, so main was never built. What should we set? Advise only — don't change anything.",
+      "expected_output": "Identifies the default on_limit: SKIP as the cause — the deployment run arrives at the limit and is created SKIPPED rather than waiting. Recommends on_limit: QUEUE for Production so the deployment run is held as QUEUED until the scheduled run finishes and then starts, never skipped. Does not recommend QUEUE_LATEST for Production, since a later run would skip the waiting deployment run. Suggests setting it as on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} alongside max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} so CI and Production can differ. May note that a queued run expires as SKIPPED after 24 hours, and that a queued run uses the pipeline version current when it starts.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies the default on_limit of SKIP as why the deployment run was skipped rather than queued behind the scheduled run"
+        },
+        {
+          "text": "Recommends QUEUE for Production so the deployment run waits as QUEUED and then starts",
+          "check": "regex",
+          "pattern": "\\bQUEUE\\b",
+          "min_count": 1
+        },
+        {
+          "text": "Does not recommend QUEUE_LATEST for Production, or explains that it would skip the waiting deployment run when a later run arrives"
+        },
+        {
+          "text": "Suggests setting on_limit through an Orchestra environment variable alongside max_active so CI and Production can differ"
         },
         {
           "text": "Writes no files and makes no Orchestra calls"

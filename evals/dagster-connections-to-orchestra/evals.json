@@ -7,37 +7,120 @@
       "id": "snowflake-resource-basic",
       "prompt": "Convert this Dagster asset to an Orchestra pipeline task, focusing on how the SnowflakeResource's credentials should be represented (see files/snowflake_resource_asset.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
       "expected_output": "A SNOWFLAKE task whose connection: references either a name_XXXXX connection or a ${{ ENV.* }} variable — never the literal account/user/password from the EnvVar calls. warehouse/database/role are not written as task parameters since they belong to the connection, not duplicated per task unless the source genuinely varies them.",
-      "files": ["snowflake_resource_asset.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "snowflake_resource_asset.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "The task uses the SNOWFLAKE integration", "check": "some_task", "field": "integration", "equals": "SNOWFLAKE" },
-        { "text": "SNOWFLAKE_ACCOUNT / SNOWFLAKE_USER / SNOWFLAKE_PASSWORD env var names are not written as literal parameter values in the YAML" }
+        {
+          "text": "The task uses the SNOWFLAKE integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "SNOWFLAKE"
+        },
+        {
+          "text": "SNOWFLAKE_ACCOUNT / SNOWFLAKE_USER / SNOWFLAKE_PASSWORD env var names are not written as literal parameter values in the YAML"
+        }
       ]
     },
     {
       "id": "airbyte-cloud-vs-server-distinction",
       "prompt": "Convert this Dagster job to Orchestra pipeline tasks, making sure the two Airbyte resources map to the correct Orchestra connection types (see files/airbyte_cloud_and_server.py). Write the pipeline YAML to pipeline.yml in the current directory — no live sync, no deploy.",
       "expected_output": "Two tasks: one using an Airbyte Cloud-style connection (from AirbyteCloudResource, API-key auth) and one using an Airbyte Server-style connection (from AirbyteResource(host=,port=), self-hosted), each with the correct connection_id from the source, and neither resource's credentials (AIRBYTE_CLOUD_API_KEY, AIRBYTE_SERVER_USER/PASSWORD) written as literal values.",
-      "files": ["airbyte_cloud_and_server.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "airbyte_cloud_and_server.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "Both Airbyte tasks are distinguished from each other rather than collapsed into one identical connection type — AirbyteCloudResource and AirbyteResource(host=,port=) map to different Orchestra connections", "check": "regex", "pattern": "AIRBYTE", "ignore_case": true, "min_count": 2 },
-        { "text": "Connection ids 11111111-2222-3333-4444-555555555555 and 66666666-7777-8888-9999-000000000000 are carried over as the sync targets (as parameters, not as the connection: name itself)", "check": "regex", "pattern": "(11111111-2222-3333-4444-555555555555|66666666-7777-8888-9999-000000000000)" },
-        { "text": "AIRBYTE_SERVER_USER and AIRBYTE_SERVER_PASSWORD are not written as literal parameter values" }
+        {
+          "text": "Both Airbyte tasks are distinguished from each other rather than collapsed into one identical connection type — AirbyteCloudResource and AirbyteResource(host=,port=) map to different Orchestra connections",
+          "check": "regex",
+          "pattern": "AIRBYTE",
+          "ignore_case": true,
+          "min_count": 2
+        },
+        {
+          "text": "Connection ids 11111111-2222-3333-4444-555555555555 and 66666666-7777-8888-9999-000000000000 are carried over as the sync targets (as parameters, not as the connection: name itself)",
+          "check": "regex",
+          "pattern": "(11111111-2222-3333-4444-555555555555|66666666-7777-8888-9999-000000000000)"
+        },
+        {
+          "text": "AIRBYTE_SERVER_USER and AIRBYTE_SERVER_PASSWORD are not written as literal parameter values"
+        }
       ]
     },
     {
       "id": "linked-connection-credentials",
       "prompt": "Convert this task to an Orchestra pipeline task, including how the Snowflake credentials behind the SnowflakeResource injected into the op should reach the running code (see files/rowcount_op.py). Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
       "expected_output": "A PYTHON / PYTHON_EXECUTE_SCRIPT task whose code reads the Snowflake credentials from the Snowflake connection *linked* on the Python connection — via orchestra.get_linked_connection(\"snowflake\", ...) or the injected <INTEGRATION>__<CONNECTION_ID>__<FIELD> environment variables (e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD) — rather than the Snowflake account/user/password being copied into the Python connection's own Secrets or written into the YAML. A deleted or undecryptable linked connection is skipped silently, so the code must not assume the variables are present.",
-      "files": ["rowcount_op.py"],
-      "assertions_ref": ["connections"],
+      "files": [
+        "rowcount_op.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
       "assertions": [
-        { "text": "The converted code reads the warehouse credentials from a linked connection — get_linked_connection(...) or an injected SNOWFLAKE__<CONNECTION_ID>__SNOWFLAKE_* environment variable — rather than re-declaring them", "check": "regex", "pattern": "get_linked_connection|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_", "min_count": 1 },
-        { "text": "No Snowflake account/user/password value is written into the YAML", "check": "no_hardcoded_secret" },
-        { "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place" },
-        { "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label" },
-        { "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check" }
+        {
+          "text": "The converted code reads the warehouse credentials from a linked connection — get_linked_connection(...) or an injected SNOWFLAKE__<CONNECTION_ID>__SNOWFLAKE_* environment variable — rather than re-declaring them",
+          "check": "regex",
+          "pattern": "get_linked_connection|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_",
+          "min_count": 1
+        },
+        {
+          "text": "No Snowflake account/user/password value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place"
+        },
+        {
+          "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label"
+        },
+        {
+          "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check"
+        }
+      ]
+    },
+    {
+      "id": "secrets-manager-external-credential-store",
+      "prompt": "Convert this Dagster asset to an Orchestra pipeline task (see files/secrets_manager_resource.py). Note where the credential actually resolves from and tell me how it should reach Orchestra. Write the pipeline YAML to pipeline.yml in the current directory — no live warehouse access, no deploy.",
+      "expected_output": "A SNOWFLAKE task whose connection: is a name_XXXXX or ${{ ENV.* }} reference with no credential inlined. Alongside the YAML, the response recognises that the resource resolves its credential from AWS Secrets Manager and offers the external credential store route — create an Orchestra AWS Secrets Manager connection, then set Credential Store on the Snowflake connection and give it the Secret ARN — instead of asserting the account/user/password must be re-entered by hand. It should not invent credential values, which the source does not contain.",
+      "files": [
+        "secrets_manager_resource.py"
+      ],
+      "assertions_ref": [
+        "connections"
+      ],
+      "assertions": [
+        {
+          "text": "The task uses the SNOWFLAKE integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "SNOWFLAKE"
+        },
+        {
+          "text": "No Snowflake credential value is written into the YAML",
+          "check": "no_hardcoded_secret"
+        },
+        {
+          "text": "Recognises that the credential resolves from AWS Secrets Manager at run time, so the Dagster repo holds no account/user/password to extract"
+        },
+        {
+          "text": "Offers the external credential store route — create an Orchestra AWS Secrets Manager connection, then set Credential Store on the Snowflake connection and point it at the Secret ARN — rather than stating flatly that the credential must be re-entered by hand in Orchestra"
+        },
+        {
+          "text": "Notes that the AWS Secrets Manager connection has to exist before AWS Secrets Manager can be chosen as the credential store, and that the secret's value must be a JSON object holding the Snowflake connection's parameters — every required one, not only the password"
+        },
+        {
+          "text": "Does not invent a preceding task that fetches the secret — AWS_SECRETS_MANAGER has no integration_job, so Credential Store on the connection is the only route, not an AWS_SECRETS_MANAGER task feeding a downstream task"
+        },
+        {
+          "text": "Does not fabricate a Snowflake account, user, or password — the source contains none"
+        }
       ]
     }
   ]

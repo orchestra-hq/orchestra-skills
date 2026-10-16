@@ -107,6 +107,14 @@ If the Airflow deployment configures a Secrets Backend (AWS Secrets Manager, Has
 - Note in your conversion output that the real credential values must be retrieved from the Secrets Backend (or from whoever administers it) rather than from anything visible in the DAG repo — there is nothing further to grep for.
 - Never guess at a host/user/password to fill in a placeholder; leave the Orchestra connection fields for the user to complete from the actual secret.
 
+**If the backend is AWS Secrets Manager or Azure Key Vault, the credential may not need re-entering at all.** An Orchestra connection can read its credentials straight from either of those stores instead of holding them itself: create an Orchestra connection to the store, then set **Credential Store** on the target connection and identify the secret — the **Secret ARN** for AWS Secrets Manager, the **secret name** for Azure Key Vault. Two constraints to flag when you propose this:
+
+- A store only appears in the **Credential Store** dropdown once a connection to that store exists, so create the store connection first.
+- The secret's value must be a JSON object holding exactly the keys the target integration expects — the parameter IDs from its **Authentication parameters** table, and every required one, not only the sensitive fields. An Airflow URI or `extra` blob is not that shape, so a secret written for Airflow usually has to be rewritten as the Orchestra connection's parameters before it can be read this way. In Azure Key Vault the whole JSON object is the secret's value, and the secret's name may contain only letters, numbers and hyphens — an Airflow `conn_id` with underscores can't be reused verbatim.
+- Orchestra reads the secret when the connection is saved and rejects it if it can't be read or its keys don't match, so a mismatch surfaces at save time rather than mid-run. After that it reads the latest version on each use, so rotating the secret in the store needs no change in Orchestra.
+
+Hashicorp Vault and GCP Secret Manager are not supported as Orchestra credential stores, so a DAG backed by either still means a manual re-entry. Both supported stores are in beta, so confirm they're enabled on the account before proposing this route. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
+
 ---
 
 ## Linked Connections — Reuse a Connection, Don't Copy Its Secrets
@@ -172,7 +180,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - [ ] Grep the DAG source for every `_conn_id=` kwarg, `BaseHook.get_connection(`, and `Connection(` usage
 - [ ] Grep the deployment/env files for `AIRFLOW_CONN_*` (connections) separately from `AIRFLOW_VAR_*` (config)
 - [ ] For each distinct `conn_id`, identify the operator/hook it's passed to and look up the Orchestra connection type (table above)
-- [ ] Check whether a Secrets Backend is configured (`airflow.cfg` `[secrets] backend`) — if so, note that no further credential detail can be extracted from source
+- [ ] Check whether a Secrets Backend is configured (`airflow.cfg` `[secrets] backend`) — if so, note that no further credential detail can be extracted from source, and when that backend is AWS Secrets Manager or Azure Key Vault, propose pointing the Orchestra connection at the same secret via **Credential Store** rather than re-keying it
 - [ ] For a `conn_id` consumed inside Python/dbt code rather than by a dedicated operator, link that credential's own Orchestra connection on the Python/dbt Core connection instead of copying its secrets across
 - [ ] Create the Orchestra connection (Settings → Connections) and record its `name_XXXXX` suffix
 - [ ] Replace every Airflow `conn_id="..."` reference with the matching Orchestra `connection: name_XXXXX` in the YAML
@@ -187,7 +195,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - **`conn_id=` is generic; the operator class disambiguates the type** — the same generic kwarg name is used by Power BI, HTTP, and many community-provider operators, so identify the type from the operator/hook class, not the kwarg name alone.
 - **`AIRFLOW_CONN_*` URIs are real credentials in plain sight** — if a deployment manifest or `.env` file has one, treat the value as sensitive; don't echo it back into any generated file, only use it to identify what fields the new Orchestra connection needs.
 - **Don't copy a warehouse credential into a Python/dbt connection's Secrets** — if it already exists as its own Orchestra connection, link it and read the injected `<INTEGRATION>__<CONNECTION_ID>__<FIELD>` variables; a copied secret is a second copy to rotate, and a linked one that's deleted just goes missing rather than failing loudly.
-- **Secrets Backend means nothing to extract** — this is normal, not a blocker; still create the Orchestra connection, just leave the value fields for the user.
+- **Secrets Backend means nothing to extract** — this is normal, not a blocker; still create the Orchestra connection, just leave the value fields for the user. If that backend is AWS Secrets Manager or Azure Key Vault, offer the external credential store route instead of a manual re-key — the secret stays where it is and Orchestra reads it.
 - **`Variable` is not a secret store** — even though it's fetched with a `.get()` call that superficially resembles `Secret.load()` in other orchestrators, Airflow Variables map to `inputs:`, not to a connection.
 - **dbt-over-SSH still isn't `LINUX_SSH`** — if a `conn_id`/`ssh_conn_id` is feeding a dbt CLI invocation, defer to `dbt-core-airflow-to-orchestra`, not this skill's SSH mapping.
 
@@ -196,5 +204,6 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - Airflow connections concepts: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/connections.html
 - Airflow secrets backends: https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments

@@ -60,8 +60,10 @@ pipeline:
 | MARIADB | MARIADB_RUN_QUERY | `statement` |
 | GCP_CLOUD_STORAGE | GCP_CLOUD_STORAGE_GET_FILE / GCP_CLOUD_STORAGE_PUT_FILE | `bucket`, file paths |
 | ORCHESTRA | APPROVAL | `message_integration`, `message_connection_id`, `message_destination` |
+| ORCHESTRA | RUN_AGENT | `agent_id`, `prompt`, `set_outputs`, `model_id`, `effort`, `llm_integration`, `llm_connection_id` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
+| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 
@@ -70,6 +72,38 @@ Glue, `environment_variables` on Python and dbt Core — are **strings**, not YA
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
+
+AWS Batch is the exception: `parameters` and `container_overrides` on `AWS_BATCH_SUBMIT_JOB`
+really are YAML mappings, not quoted strings. Check the schema for the specific parameter
+rather than applying either habit across the board.
+
+`AWS_BATCH_SUBMIT_JOB` submits one job to a queue and waits for it. Single-container jobs on
+EC2 or Fargate only — array jobs and multi-node parallel jobs aren't supported. A
+`job_definition` without `:<revision>` resolves to the latest active revision. `timeout_seconds`
+is a per-attempt limit with a minimum of 60, enforced by Batch. A task that hits its own
+`configuration.timeout` fails **without terminating the job** — a running job keeps running and
+a queued one can still start later — so bound queue waits with a job state time limit action on
+the queue rather than relying on the task timeout; cancelling the task does terminate the job.
+Orchestra injects `ORCHESTRA_ACCOUNT_ID`, `ORCHESTRA_PIPELINE_RUN_ID`, `ORCHESTRA_TASK_RUN_ID`
+and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_overrides.environment`
+adds to that rather than replacing it. The integration is in beta and may not be enabled on an
+account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
+[Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
+
+`AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
+`integration_job`: they are credential stores a connection reads its own credentials from, not
+task types. There is no task that fetches a secret mid-run for a later task to consume, so a
+pipeline that needs one is really a connection that should name the store as its **Credential
+Store**. Both are in beta. See [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault)
+and [AWS Secrets Manager](https://docs.getorchestra.io/docs/integrations/aws_secrets_manager).
+
+`RUN_AGENT` creates an agent session from `prompt` and waits for it. Only `agent_id` and
+`prompt` are required: `model_id`, `effort`, `llm_integration` and `llm_connection_id` each fall
+back to the agent's own setting when omitted, so leave them out unless the run needs to differ
+from the agent. `llm_connection_id` names a connection the account already holds — naming one it
+doesn't fails the run — and never an API key written into the YAML. Nothing can prompt the
+session again once it is created, so everything the agent needs goes in that first `prompt`. See
+[Run Agent](https://docs.getorchestra.io/docs/integrations/orchestra/run_agent).
 
 ## Connection format
 
@@ -96,6 +130,7 @@ configuration:          # pipeline-level default; a task's own configuration: ov
   timeout: 3600           # integer seconds, 0..259200 (3 days)
   concurrency:
     max_active: 1          # integer >= 0, or ${{ ENV.VAR }}; null/omit = no limit
+    on_limit: SKIP         # SKIP (default) | QUEUE | QUEUE_LATEST — only meaningful with max_active
 ```
 
 `timeout` is counted from when the task run is **queued**, not from when it starts executing,
@@ -109,6 +144,41 @@ See [task timeouts](https://docs.getorchestra.io/docs/core-concepts/tasks#task-t
 `max_active` can reference an environment variable (`${{ ENV.PIPELINE_CONCURRENCY }}`) so one
 pipeline gets a different limit per environment — e.g. several parallel Slim CI runs in staging,
 one at a time in production. See [pipeline concurrency](https://docs.getorchestra.io/docs/core-concepts/pipelines/pipeline-runs).
+
+`on_limit` decides what happens to a run that arrives while the pipeline is already at
+`max_active`. Orchestra never cancels an in-progress run to make room, whichever mode is set:
+
+| `on_limit` | What happens to the waiting run |
+|------------|---------------------------------|
+| `SKIP` (default) | Created as `SKIPPED` and never starts. |
+| `QUEUE` | Held as `QUEUED`; waiting runs start in arrival order as slots free. |
+| `QUEUE_LATEST` | Only the newest waiting run is held; an already-waiting run is marked `SKIPPED` when a newer one arrives. |
+
+Pick the mode from whether a delayed run still has work to do, not from how the source
+orchestrator happened to behave. `QUEUE` fits one-run-per-event triggers (a sensor or webhook per
+file landed), where every trigger does distinct work. `QUEUE_LATEST` fits refreshes where only the
+latest state matters, and is the safer choice on a frequent cron: if runs outlast the interval,
+`QUEUE` grows an unbounded backlog while `QUEUE_LATEST` keeps at most one run waiting. `SKIP` fits
+a run that is pointless once it can't start immediately.
+
+Queueing adds a `QUEUED` pipeline-run status, so anything that enumerates or asserts on run
+statuses needs to allow for it. Other queue behaviour worth knowing before recommending `QUEUE`:
+
+- Each environment — and, for Git-backed pipelines, each branch — has its own queue, the same
+  scope `max_active` is counted over.
+- A run that waits 24 hours without starting expires and is marked `SKIPPED`.
+- Pausing a pipeline marks its waiting scheduled, sensor, trigger-event and webhook runs `SKIPPED`.
+- A queued run uses the pipeline version current when it *starts*, not when it was queued, unless
+  the trigger pinned a version or Git commit. Don't queue behind a deploy and expect the old
+  definition.
+- When a pipeline trigger task starts a child run that queues, the child's wait counts against the
+  parent task's `timeout`, so the parent needs a timeout that covers the wait.
+- A pipeline that triggers *itself* is skipped rather than queued at the limit, since the child
+  would wait on a slot its own parent holds. Longer cycles (A triggers B triggers A) aren't
+  detected — the run sits `QUEUED` until the 24-hour expiry skips it, which then fails the parent
+  task. Don't convert a cyclic trigger graph to `QUEUE`.
+
+See [what happens when the concurrency limit is reached](https://docs.getorchestra.io/docs/core-concepts/pipelines/pipeline-runs#what-happens-when-the-concurrency-limit-is-reached).
 
 `retry_delay` is minutes despite sources like Dagster/Airflow/Prefect typically expressing retry
 delay in seconds — convert and round up, and clamp to 120 if the source value is larger.
