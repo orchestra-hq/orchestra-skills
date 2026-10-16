@@ -1,6 +1,6 @@
 {
   "skill_name": "account-health-check",
-  "description": "The asset-governance half of the health check (rubric checks 5.6 and 5.7). The skill's output is a conversational review, not a pipeline artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file.",
+  "description": "Rubric checks the health check is graded on here: asset governance (5.6, 5.7), pipeline concurrency (1.8), and incident routing (5.8, 5.9). The skill's output is a conversational review, not a pipeline artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file.",
   "evals": [
     {
       "id": "asset-runs-deprecated-not-recommended",
@@ -60,6 +60,76 @@
         },
         {
           "text": "Mentions that queued runs are not held indefinitely — a run waiting 24 hours expires as SKIPPED — so a permanently full queue means the limit is under-provisioned"
+        }
+      ]
+    },
+    {
+      "id": "dbt-monitor-groups-by-downstream-models",
+      "prompt": "Reviewing our incident setup. We run dbt Core nightly — one task, about 200 models. list_monitors shows a single monitor matching the DBT_CORE integration, grouping by Task, with nothing else set. When a model breaks we get one giant incident covering every model that failed that night, including ones in totally unrelated parts of the project, so nobody can tell what actually broke first. What should we change? Don't call any live Orchestra tools — just tell me what you'd recommend.",
+      "expected_output": "Flags the Task grouping as the cause: everything one dbt task breaks lands on one incident. Recommends the dbt monitor Orchestra documents — match the dbt integrations, turn on Operation failures only, and group by downstream dbt models — so each failing model opens its own incident covering failures up to two levels downstream of it, and unrelated models that fail in the same run get separate incidents. Explains that Operation failures only means the monitor claims model and test failures rather than the dbt task's own failures, so parse-time errors fall through to Orchestra's own grouping instead, and that it cannot be the monitor's only condition — the monitor still needs the integration (or a pipeline, asset, connection or label) to match on. States the lineage caveat: grouping is built from previous runs, so new models or changed dependencies may not group accurately. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies grouping by Task as why one dbt run produces a single incident covering every failed model"
+        },
+        {
+          "text": "Recommends grouping by downstream dbt models, and says an incident covers the failing model plus failures up to two levels downstream of it",
+          "check": "regex",
+          "pattern": "(?i)downstream",
+          "min_count": 1
+        },
+        {
+          "text": "Recommends turning on Operation failures only so the monitor claims dbt model/test failures rather than the dbt task's own failure",
+          "check": "regex",
+          "pattern": "(?i)operation failures only",
+          "min_count": 1
+        },
+        {
+          "text": "States that Operation failures only cannot be used on its own — it narrows the other Events fields, so the monitor still needs at least one pipeline, asset, integration, connection or external-event label"
+        },
+        {
+          "text": "Says the dbt task's own task-level failures, such as parse errors, are deliberately left to Orchestra's own grouping logic rather than claimed by this monitor"
+        },
+        {
+          "text": "Gives the lineage caveat: grouping is derived from previous runs, so newly added models or changed dependencies may not be grouped accurately"
+        },
+        {
+          "text": "Does not recommend grouping by Pipeline or by Monitor as the fix, since both make the single-incident problem worse rather than better"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
+        }
+      ]
+    },
+    {
+      "id": "monitor-ownership-and-split-incident-alerts",
+      "prompt": "Two things from our incident review. First, none of our four monitors has anyone set on it, and one of them only claims external events pushed in from our ingestion tool — that one has no alert destinations either, and we've never seen an alert from it. Second, since we changed our dbt monitor to group by asset, a single bad dbt run now fires five or six separate Slack alerts instead of one, and people think the alerting is broken. Is it? Don't call any live Orchestra tools.",
+      "expected_output": "Recommends setting an assignee on each monitor, plus subscribers where more than one person needs telling, and notes both are mentioned in the incident's Slack alerts and may be Slack-only users who are notified without being able to open the incident in Orchestra. Explains the silent external-event monitor correctly: external events have no pipeline whose destinations could be inherited, so a monitor claiming them sends nothing unless it sets its own destinations. Says the multiple Slack alerts are expected, not a fault: grouping by asset puts one task run's failures on several incidents and each incident alerts separately, covering only its own failures; points at the per-incident alert budget in incident settings, and at coarser grouping, as the levers if the volume is unwanted. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Recommends setting an assignee, and subscribers where more than one person needs telling, on the monitors that have neither",
+          "check": "regex",
+          "pattern": "(?i)subscriber",
+          "min_count": 1
+        },
+        {
+          "text": "States that the assignee and subscribers are mentioned in the incident's Slack alerts, and that either can be a Slack-only user notified in Slack without being able to open the incident in Orchestra"
+        },
+        {
+          "text": "Explains the external-event monitor's silence as expected: external events have no pipeline, so its incidents alert nobody unless the monitor sets its own alert destinations"
+        },
+        {
+          "text": "Says the five or six Slack alerts are correct behaviour rather than a misconfiguration — grouping by asset lands one task run's failures on several incidents, and each incident sends its own alert covering only its own failures"
+        },
+        {
+          "text": "Points at the per-incident alert budget (and the roll-up notice once it is spent), or at coarser grouping, as the lever if the alert volume is unwanted"
+        },
+        {
+          "text": "Does not treat the split alerts as a bug to be reported, and does not recommend muting the dbt monitor as the first response"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
         }
       ]
     }

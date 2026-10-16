@@ -8,7 +8,8 @@ verification** instead of asserting pass/fail.
 
 Detection runs against data from Step 2: `list_pipelines` (inventory + `storageProvider` + schedule),
 `get_pipeline` (full definition), `list_pipeline_runs`/`list_task_runs`/`list_operations` (runtime),
-`list_assets` (governance). Match field names on concept, not one spelling (`max_active`/`maxActive`,
+`list_assets` (governance), `list_monitors`/`get_incident_settings` (incident routing).
+Match field names on concept, not one spelling (`max_active`/`maxActive`,
 `set_outputs`/`setOutputs`, `task_groups`/`taskGroups`).
 
 ## Contents
@@ -240,6 +241,31 @@ run already created instead of duplicating them — point the Python connection'
 connection at the same connection the old configuration used. Docs:
 https://docs.getorchestra.io/docs/core-concepts/assets,
 https://docs.getorchestra.io/docs/templates/asset-collection.
+
+**5.8 A dbt workspace has a monitor that groups by lineage** — *Medium*
+Good: workspaces running dbt have a monitor matching the dbt Core / dbt Cloud integrations with
+**Operation failures only** on and **Group by** set to downstream dbt models — one incident per
+broken model plus failures up to two levels downstream of it, instead of one incident for
+everything a dbt task broke. The dbt job's own task-level failures (parse errors) are deliberately
+left out of that monitor and fall through to Orchestra's own grouping. Signal: `list_monitors`
+shows dbt integrations claimed only by a monitor grouping by task or pipeline, or no monitor
+claiming them at all, while `list_task_runs` shows dbt tasks running. → Add the recommended dbt
+monitor. Caveat to state when recommending it: lineage comes from previous runs, so newly added
+models or changed dependencies may not group accurately yet. Docs:
+`/docs/core-concepts/incidents/monitors`.
+
+**5.9 Monitors route to a destination and name someone** — *Medium*
+Good: each monitor sets an assignee, and subscribers where more than one person needs telling —
+both are mentioned in the incident's Slack alerts, and either can be a Slack-only user who is
+notified without being able to open the incident in Orchestra. Monitors that claim external events
+also set their own alert destinations, since external events have no pipeline whose destinations
+they could inherit. Signal: `list_monitors` entries with no assignee and no subscribers, or an
+external-event monitor with no destinations (its incidents alert nobody). → Set an owner, and
+destinations where there is no pipeline behind the events. Note while reviewing: a monitor grouping
+by asset or by downstream dbt models puts one task run's failures on several incidents, and each
+incident alerts separately, so check the alert budget in `get_incident_settings` is sized for that
+rather than reading the extra alerts as misconfiguration. Docs:
+`/docs/core-concepts/incidents/monitors`, `/docs/core-concepts/incidents/alerts`.
 
 ## 6. Security and access control
 
