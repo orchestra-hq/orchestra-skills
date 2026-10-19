@@ -63,9 +63,79 @@ Apply only missing pieces. Do not rename unrelated tasks or restructure groups.
 
 Orchestra injects artifacts before each dbt task run from **that same task's** last **successful** run on the dbt repo **default branch** (unless `production_run_identifier` overrides). History is per dbt Core task, not per pipeline — CI deferring to production state only works when CI runs the production task itself. Empty state: run a successful non-defer prod build of that task on the default branch once before Slim CI. See [dbt artifacts - `latest_production`](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#dbt-artifacts-latest_production) and [completion-report.md](completion-report.md).
 
-## `dbt clone` and `--defer`
+## Giving CI a production-like starting point
 
-Cloning the **whole** dbt target into `ci_<PR number>` leaves the later `dbt build` commands able to read unmodified upstream models from the clones, so `--defer` is not needed on them. `--defer` is only required after a clone when the clone covered a **subset** of the target (e.g. a selector was passed to `dbt clone`) — then the uncloned upstreams still have to resolve to production. Keep `--state latest_production` regardless: `state:modified+` and the `modified_incremental` selector compare against it whether or not anything defers. A deploy job that doesn't clone at all still needs `--defer`. See [Set up dbt Slim CI and CD with Orchestra](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#set-up-dbt-slim-ci-and-cd-with-orchestra).
+Two supported strategies. Pick one with the user before writing `dbt_command`; they differ in what
+lands in `ci_<PR number>`, not just in speed.
+
+| | `dbt clone` | `--defer` only |
+|---|---|---|
+| Pick it when | Incremental merge logic has to be tested against real existing production data; the CI build role must be kept out of production; or `ci_<PR number>` has to hold the whole project (to query it, or point BI at it) | Runs should be fast and the change is simple model logic on a subset of the project; the `ci` target can read production directly |
+| `ci_<PR number>` holds | Every production relation, plus the modified models | Only modified models and everything downstream — nothing is created for unmodified models |
+| Unmodified upstreams read from | Clones in `ci_<PR number>` | Production schemas, always current |
+| Unmodified incrementals downstream of a change | Run incrementally on the cloned data | Built from scratch — slow on large tables |
+| Freshness | Point-in-time copy, goes stale as production moves | Always the latest production tables |
+| `ci` target needs | Read production, create clones or views in the CI schema | Read production, create tables in the CI schema |
+
+Commands for each (the task prefixes `dbt`, so chained commands after `;` start with `dbt`):
+
+```bash
+# dbt clone
+dbt clone --state latest_production --target ci
+dbt build --full-refresh --selector modified_incremental --defer --state latest_production --target ci
+dbt build -s state:modified+ --defer --state latest_production --target ci
+
+# --defer only (same two builds the deploy-on-merge job runs; only the target differs)
+dbt build --full-refresh --selector modified_incremental --defer --state latest_production --target ci
+dbt build -s state:modified+ --defer --state latest_production --target ci
+```
+
+Under `--defer` only, nothing is cloned, so the first `build` is what creates the modified
+incremental models in `ci_<PR number>` and gives the second an existing table to run incrementally
+against — `is_incremental()` is exercised, but against a table just built from scratch rather than
+against existing production data. That is the real test-fidelity cost of skipping the clone.
+
+### `--favor-state`
+
+`--defer` prefers a relation that **already exists in `ci_<PR number>`** over the production one. If
+an earlier commit on the PR built a model and a later commit reverts it, CI silently reads the stale
+copy. Add `--favor-state` to the build commands to always resolve unselected models to production.
+Recommend it on any long-lived PR schema; it matters most in the `--defer`-only strategy, where the
+CI schema accumulates only what previous commits happened to build.
+
+### `--defer` after a clone
+
+Cloning the **whole** target leaves the later builds able to read unmodified upstreams from the
+clones, so `--defer` is not required for them. It becomes required again when the clone covered a
+**subset** of the target (e.g. a selector was passed to `dbt clone`), for whatever the clone left
+out. Keep `--state latest_production` either way: `state:modified+` and the `modified_incremental`
+selector compare against it whether or not anything defers. A deploy job that never clones always
+needs `--defer`.
+
+### Keeping the CI build role out of production
+
+With `dbt clone`, run the clone under a **separate target** whose role can read production; the CI
+build then reads only the clones and needs no production access. This depends on zero-copy clones —
+on warehouses without them `dbt clone` creates views that still read production, so the isolation is
+lost. `--defer` only cannot offer this: it reads production by design.
+
+See [Set up dbt Slim CI and CD with Orchestra](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#set-up-dbt-slim-ci-and-cd-with-orchestra).
+
+## Development workflows with `--defer`
+
+Because `--defer` only reads production, a developer can build just their own changes against
+production data without copying anything, reusing the same parametrised pipeline:
+
+- **In Orchestra:** run the pipeline manually in the `CI` environment with `dbt_branch` = feature
+  branch, `dbt_ci_schema_suffix` = a personal suffix such as `dev_<name>`, and `dbt_command` =
+  `build -s state:modified+ --defer --state latest_production --target ci`. The `drop_ci_schema`
+  macro cleans up afterwards.
+- **Locally:** download the production `manifest.json` from a task run into e.g. `prod_state/`, then
+  `dbt build -s state:modified+ --defer --state prod_state` against a personal dev target.
+
+Offer this when the user asks about developer workflows; do not add it to the CI workflow file.
+
+See [Use `--defer` for development workflows](https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#use-defer-for-development-workflows).
 
 ## Separate pipeline repo
 
