@@ -1,0 +1,63 @@
+{
+  "skill_name": "databricks-cost-drivers",
+  "evals": [
+    {
+      "id": 0,
+      "name": "top-spenders-default-window",
+      "prompt": "What's costing the most in Databricks right now?",
+      "expected_output": "Since no window was given, defaults to the last 30 days, pulls Databricks-task run data via Orchestra MCP tools (list_pipeline_runs plus task/operation detail), and returns a ranked table of the top 10 jobs/pipelines by cost or cost-proxy with % of total spend and trend vs the prior period, followed by 2-3 sentences on anything trending up sharply.",
+      "files": [],
+      "assertions": [
+        "Defaults to a 30-day lookback window since the user did not specify one",
+        "Uses Orchestra MCP tools (e.g. list_pipeline_runs) to gather real run data rather than estimating or guessing durations/costs",
+        "Returns a ranked table with columns for job/pipeline, avg cost or cost-proxy, % of total spend, and trend vs prior period",
+        "Limits the ranked table to the top 10",
+        "States explicitly whether figures are exact billing-system figures or a duration-based cost-proxy, rather than presenting a proxy as an exact dollar cost",
+        "Does not recommend specific fixes (e.g. rightsizing, cluster changes) -- points to the cluster-review/job-optimisation skills instead",
+        "Follows with a short (2-3 sentence) narrative on anything trending up sharply, not just the bare table"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "weekly-trend-review",
+      "prompt": "Give me this week's Databricks cost review -- I want to know what's trending up compared to last week.",
+      "expected_output": "Scopes the review to the requested weekly window, computes each top job's trend against the prior window of the same length (up/down/flat with %), and clearly separates 'still a top spender' jobs from ones that are newly trending up.",
+      "files": [],
+      "assertions": [
+        "Uses a window matching 'this week' (7 days) rather than silently defaulting to 30 days when the user specified weekly",
+        "Computes trend vs the prior window of the same length (not vs an arbitrary or unstated baseline)",
+        "Reports trend direction and percentage, not just up/down without magnitude",
+        "Distinguishes jobs that are consistently large spenders from jobs that are newly trending up this week",
+        "Uses Orchestra MCP tools to gather actual run data rather than estimating figures"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "anomaly-vs-driver-distinction",
+      "prompt": "One of our jobs is always our biggest Databricks cost -- that's expected. But I have a feeling something else spiked recently. Can you check?",
+      "expected_output": "Ranks the top spenders as usual but explicitly separates 'expected top spender, not anomalous' from a distinct anomaly flag: any job whose cost/duration jumped materially more than its own historical volatility would suggest, calling that out separately from the top-N listing and pointing to the cluster-review/job-optimisation skills for a fix.",
+      "files": [],
+      "assertions": [
+        "Does not flag the consistently-largest job as anomalous just because it is the top spender",
+        "Identifies anomalies based on a job's jump relative to its own historical volatility, not just absolute cost rank",
+        "Presents the anomaly flag separately from the top-10 ranked table rather than conflating the two",
+        "Points to the cluster-review or job-optimisation skills for remediation rather than attempting to fix the anomaly itself",
+        "Uses real run data via Orchestra MCP tools rather than guessing which job spiked"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "no-exact-dbu-cost-available",
+      "prompt": "Which Databricks jobs are costing us the most? We don't have a Databricks SQL/system-tables integration connected, just Orchestra.",
+      "expected_output": "Falls back to a duration x cluster-size cost-proxy score per job since exact DBU $ cost isn't available from Orchestra metadata alone, clearly labels the ranking as a proxy rather than a billed dollar figure, and does not claim access to system.billing.usage that isn't actually connected.",
+      "files": [],
+      "assertions": [
+        "Uses duration x cluster-size (or an equivalent metadata-based proxy) as the ranking basis since no billing system-tables integration is available",
+        "Clearly labels the figures as a cost-proxy, not an exact billed dollar amount",
+        "Does not claim to query system.billing.usage or system.billing.list_prices when the user said that integration isn't connected",
+        "Does not fabricate a specific dollar cost figure to fill the gap",
+        "Still produces a usable ranked top-10 list based on the available proxy metadata"
+      ]
+    }
+  ]
+}
