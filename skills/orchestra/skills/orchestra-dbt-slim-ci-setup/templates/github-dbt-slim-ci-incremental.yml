@@ -2,24 +2,19 @@
 # github-dbt-slim-ci.yml. Requires the modified_incremental selector (templates/dbt/selectors.yml).
 #
 # A plain `build -s state:modified+` only tests one code path of a changed incremental model.
-# On a PR this:
-#   1. clones prod relations into ci_<PR number> so incremental models have data to build onto
-#      (zero-copy on Snowflake/BigQuery/Databricks; views elsewhere),
-#   2. full-refreshes modified incremental models (and their modified ancestors),
-#   3. builds everything modified + downstream without --full-refresh, testing is_incremental().
-# Skip step 1 to rely on --defer alone; modified incrementals then have no existing CI table.
-#
-# --defer after a clone: the clone below is unselected, so it copies the whole target into
-# ci_<PR number> and steps 2-3 can read unmodified upstreams from the clones -- --defer is not
-# required for them. It stays in COMMON because (a) the dbt-deploy job reuses COMMON and never
-# clones, and (b) narrowing the clone with a selector (a subset of the target) makes --defer
-# required again for whatever the clone left out. --state is needed either way: state:modified+
-# and the modified_incremental selector both compare against it.
+# Both strategies below fix that by full-refreshing modified incrementals before building
+# everything that changed. They differ in how CI gets a production-like starting point --
+# compare them in references/retrofit-checklist.md and pick one with the user.
 # The task's commands are `dbt ${{ inputs.dbt_command }}`, so each chained command after `;` starts with `dbt`.
 
+# ---------------------------------------------------------------------------
+# Strategy A: dbt clone -- copy production into ci_<PR number> before building.
+# Use when incremental merge logic must be tested against real existing production data, when the
+# CI build role must stay out of production, or when ci_<PR number> has to hold the whole project.
+# ---------------------------------------------------------------------------
 # dbt-slim-ci job:
 env:
-  COMMON: "--defer --state latest_production --target ci"
+  COMMON: "--defer --favor-state --state latest_production --target ci"
 with:
   run_inputs: |
     {
@@ -28,6 +23,56 @@ with:
       "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
     }
 
-# dbt-deploy job (same commands, no clone; set COMMON's --target to prod):
+# 1. clone copies prod relations into ci_<PR number> so incremental models have data to build onto
+#    (zero-copy on Snowflake/BigQuery/Databricks; views elsewhere, which still read production).
+# 2. full-refreshes modified incremental models (and their modified ancestors).
+# 3. builds everything modified + downstream without --full-refresh, testing is_incremental()
+#    against the cloned production data.
+#
+# --defer after a clone: the clone above is unselected, so it copies the whole target into
+# ci_<PR number> and steps 2-3 can read unmodified upstreams from the clones -- --defer is not
+# required for them. It stays in COMMON because (a) the dbt-deploy job reuses COMMON and never
+# clones, and (b) narrowing the clone with a selector (a subset of the target) makes --defer
+# required again for whatever the clone left out. --state is needed either way: state:modified+
+# and the modified_incremental selector both compare against it.
+#
+# To keep the CI build role away from production, run the clone under a separate target whose role
+# can read production; the build then reads only the clones. Needs zero-copy clones -- the views
+# created on other warehouses still read production, so the isolation is lost.
+
+# ---------------------------------------------------------------------------
+# Strategy B: --defer only -- build just the changes, read everything else from production.
+# Use for fast runs on simple model-logic changes when the ci target can read production directly.
+# Nothing is cloned, so ci_<PR number> holds only modified models and their downstream.
+# ---------------------------------------------------------------------------
+# dbt-slim-ci job:
+env:
+  COMMON: "--defer --favor-state --state latest_production --target ci"
+with:
+  run_inputs: |
+    {
+      "dbt_command": "build --full-refresh --selector modified_incremental ${{ env.COMMON }}; dbt build -s state:modified+ ${{ env.COMMON }}",
+      "dbt_branch": "${{ github.head_ref }}",
+      "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
+    }
+
+# 1. The first build creates the modified incrementals, and their modified ancestors, in
+#    ci_<PR number> from scratch -- testing the full-refresh path, and giving the second build an
+#    existing table to run incrementally against.
+# 2. The second build runs and tests everything modified + downstream, reading unmodified upstreams
+#    straight from production. is_incremental() is exercised, but against a table just built from
+#    scratch rather than against existing production data -- the fidelity cost of skipping the clone.
+#
+# These are the same two commands as the deploy-on-merge job; only the target differs.
+
+# ---------------------------------------------------------------------------
+# --favor-state (both strategies)
+# ---------------------------------------------------------------------------
+# By default --defer prefers a relation that already exists in ci_<PR number> over production, so a
+# model built by an earlier commit and reverted by a later one is read stale. --favor-state always
+# resolves unselected models to production. Most valuable under strategy B, where the CI schema only
+# ever holds what previous commits happened to build.
+
+# dbt-deploy job (same two builds, no clone; set COMMON's --target to prod):
 #   "dbt_command": "build --full-refresh --selector modified_incremental ${{ env.COMMON }}; dbt build -s state:modified+ ${{ env.COMMON }}",
 #   "dbt_branch": "main"

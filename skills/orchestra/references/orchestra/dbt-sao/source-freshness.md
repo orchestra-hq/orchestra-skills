@@ -20,9 +20,17 @@ the project already does rather than forcing a form.
 - **dbt < 1.9** — `freshness` and `loaded_at_field` sit at the source/table **root** level.
 - **dbt 1.9+** — `freshness` lives under a `config:` block.
 - **dbt 1.10+** — `loaded_at_field` also moves under `config:`; `loaded_at_query` is added.
+- **dbt 2.x** — same `config:` form as 1.10+.
 
 Both forms still parse in current dbt, but author the canonical `config:` form for 1.9+. If the
 file already uses root-level freshness and the project is pre-1.9, stay consistent with it.
+
+For SAO specifically the root-level form shouldn't come up: Orchestra supports **dbt Core
+1.10.x–1.12.x** and **dbt 2.x** (`>=2,<3`), so a supported project is always on the `config:`
+form with `loaded_at_query` available. A project on an older dbt is below what SAO supports —
+flag that rather than authoring to the root-level form and assuming Orchestra will consume it.
+The major version also decides what happens when you omit the `loaded_at_*` settings entirely;
+see [README.md](README.md).
 
 ## Canonical form (dbt 1.9+/1.10+)
 

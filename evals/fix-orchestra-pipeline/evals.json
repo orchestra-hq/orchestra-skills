@@ -1,0 +1,29 @@
+{
+  "skill_name": "fix-orchestra-pipeline",
+  "description": "Advice-only cases covering how a fix to a Git-backed pipeline actually reaches the live pipeline. No files are produced; assertions are graded from the transcript.",
+  "evals": [
+    {
+      "id": "git-backed-fix-not-live-until-default-branch",
+      "prompt": "Our nightly pipeline failed on a bad task parameter. It's Git-backed (storageProvider GITHUB) and you've already opened a PR with the corrected YAML on a branch called fix/nightly-params. The team lead is asking whether tonight's scheduled run will pick the fix up now that the PR exists. Answer the question — don't change anything or open anything else.",
+      "expected_output": "Says no: the PR alone changes nothing, because a Git-backed pipeline only updates when the commit lands on that pipeline's default branch, at which point the provider's push webhook has Orchestra fetch, validate and update it. Tonight's scheduled run would still use the default branch's current definition. Offers the way to prove the fix before the merge: trigger a run against fix/nightly-params, since a run against a branch uses that branch's version of the pipeline file. Does not suggest update_pipeline, which cannot write to a Git-backed pipeline. Changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Answers no — the scheduled run will not pick the fix up while the PR is unmerged"
+        },
+        {
+          "text": "States that a Git-backed pipeline is only updated when the change reaches that pipeline's default branch, via the provider's push webhook to Orchestra"
+        },
+        {
+          "text": "States that a run triggered against a branch uses that branch's version of the pipeline file, so the fix can be validated on fix/nightly-params before the merge"
+        },
+        {
+          "text": "Does not suggest update_pipeline or any other MCP write as a way to apply the fix to a Git-backed pipeline"
+        },
+        {
+          "text": "Writes no files, opens no further PR, and makes no Orchestra write calls"
+        }
+      ]
+    }
+  ]
+}

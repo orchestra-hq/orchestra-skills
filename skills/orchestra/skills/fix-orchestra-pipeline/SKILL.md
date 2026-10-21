@@ -303,4 +303,9 @@ Always end a successful fix with a compact summary block:
 - **Git-backed vs Orchestra-backed.** Only Orchestra-backed pipelines can be updated via
   `update_pipeline`.
   Git-backed pipelines require code changes committed to the repository. Check `storageProvider`
-  in the `list_pipelines` response to determine which type it is.
+  in the `list_pipelines` response to determine which type it is. Opening the PR does not fix the
+  live pipeline: a pipeline definition change only takes effect once it merges into that
+  pipeline's default branch, so tell the user the fix is pending review, and verify beforehand
+  with a run against the fix branch, which uses that branch's version of the file
+  (`../../references/orchestra/pipeline/yaml-authoring.md` → "Git-backed pipelines: how a change
+  goes live").

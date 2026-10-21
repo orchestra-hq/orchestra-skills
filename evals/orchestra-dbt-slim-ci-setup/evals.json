@@ -229,12 +229,12 @@
     },
     {
       "id": "concurrency-on-limit-shared-pipeline",
-      "prompt": "We share one pipeline between production and Slim CI with configuration.concurrency.max_active: 1, and PR runs keep coming back SKIPPED when prod is running. Someone suggested setting on_limit: QUEUE_LATEST so the PR run waits instead of being dropped. Is that the right fix? Advise only — don't change anything.",
-      "expected_output": "Says changing on_limit alone does not fix it while a single max_active: 1 is shared by both environments: the PR run would wait behind the prod run instead of running. The fix is to scope both settings per environment — max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} and on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} — with CI = 5 / QUEUE_LATEST and Production = 1 / QUEUE. Raises the QUEUE_LATEST trade-off in CI: the queue is scoped per pipeline and environment, so once CI is at its limit a newer PR's run marks an older PR's still-waiting run SKIPPED, and run-pipeline only logs a warning for a skipped run, so set max_active high enough that PRs rarely queue, check run-pipeline's status output, or use QUEUE in CI when every PR run must report a real result. May note the 24-hour queue expiry.",
+      "prompt": "We share one pipeline between production and Slim CI with configuration.concurrency.max_active: 1, and PR runs keep coming back SKIPPED when prod is running. Someone suggested setting on_limit: QUEUE_LATEST so the PR run waits instead of being dropped. Is that the right fix? Advise only \u2014 don't change anything.",
+      "expected_output": "Says changing on_limit alone does not fix it while a single max_active: 1 is shared by both environments: the PR run would wait behind the prod run instead of running. The fix is to scope both settings per environment \u2014 max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} and on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} \u2014 with CI = 5 / QUEUE_LATEST and Production = 1 / QUEUE. Raises the QUEUE_LATEST trade-off in CI: the queue is scoped per pipeline and environment, so once CI is at its limit a newer PR's run marks an older PR's still-waiting run SKIPPED, and run-pipeline only logs a warning for a skipped run, so set max_active high enough that PRs rarely queue, check run-pipeline's status output, or use QUEUE in CI when every PR run must report a real result. May note the 24-hour queue expiry.",
       "files": [],
       "assertions": [
         {
-          "text": "Says setting on_limit alone does not fix it while max_active: 1 is shared by both environments — the PR run would wait behind the prod run rather than run"
+          "text": "Says setting on_limit alone does not fix it while max_active: 1 is shared by both environments \u2014 the PR run would wait behind the prod run rather than run"
         },
         {
           "text": "Recommends scoping both max_active and on_limit per Orchestra environment with environment variables",
@@ -258,8 +258,8 @@
     },
     {
       "id": "concurrency-on-limit-production-deploy",
-      "prompt": "Our production dbt pipeline runs on a schedule and the same pipeline is triggered by our deploy-on-merge GitHub Action. configuration.concurrency.max_active is 1 in Production. Twice this week a merge landed while the scheduled run was going and the deployment run came back SKIPPED, so main was never built. What should we set? Advise only — don't change anything.",
-      "expected_output": "Identifies the default on_limit: SKIP as the cause — the deployment run arrives at the limit and is created SKIPPED rather than waiting. Recommends on_limit: QUEUE for Production so the deployment run is held as QUEUED until the scheduled run finishes and then starts, never skipped. Does not recommend QUEUE_LATEST for Production, since a later run would skip the waiting deployment run. Suggests setting it as on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} alongside max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} so CI and Production can differ. May note that a queued run expires as SKIPPED after 24 hours, and that a queued run uses the pipeline version current when it starts.",
+      "prompt": "Our production dbt pipeline runs on a schedule and the same pipeline is triggered by our deploy-on-merge GitHub Action. configuration.concurrency.max_active is 1 in Production. Twice this week a merge landed while the scheduled run was going and the deployment run came back SKIPPED, so main was never built. What should we set? Advise only \u2014 don't change anything.",
+      "expected_output": "Identifies the default on_limit: SKIP as the cause \u2014 the deployment run arrives at the limit and is created SKIPPED rather than waiting. Recommends on_limit: QUEUE for Production so the deployment run is held as QUEUED until the scheduled run finishes and then starts, never skipped. Does not recommend QUEUE_LATEST for Production, since a later run would skip the waiting deployment run. Suggests setting it as on_limit: ${{ ENV.DBT_PIPELINE_ON_LIMIT }} alongside max_active: ${{ ENV.DBT_PIPELINE_CONCURRENCY }} so CI and Production can differ. May note that a queued run expires as SKIPPED after 24 hours, and that a queued run uses the pipeline version current when it starts.",
       "files": [],
       "assertions": [
         {
@@ -276,6 +276,61 @@
         },
         {
           "text": "Suggests setting on_limit through an Orchestra environment variable alongside max_active so CI and Production can differ"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
+    },
+    {
+      "id": "clone-vs-defer-only-choice",
+      "prompt": "We're adding Slim CI and the team is split on whether the PR job should start with `dbt clone` or just use `--defer`. Our project is mostly incremental models on large Snowflake tables, the CI role is allowed to read production, and we also want to point a BI dashboard at the CI schema to eyeball a PR's output. Which should we use and what do we give up either way? Advise only \u2014 don't write any files or call Orchestra.",
+      "expected_output": "Recommends dbt clone for this case, on two of the stated requirements: pointing BI at the CI schema needs ci_<PR number> to hold every relation, which only the clone gives (--defer only creates nothing for unmodified models), and testing incremental merge logic on large tables wants real existing production data rather than a table just built from scratch. Explains the trade-offs given up: the clone is a point-in-time copy that goes stale as production moves, while --defer only always reads current production; unmodified incrementals downstream of a change run incrementally on cloned data under the clone but are rebuilt from scratch under --defer only, which is slow on large tables. Notes the ci target's access differs (create clones or views vs create tables), and that Snowflake supports zero-copy clones so the clone is cheap. Changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Recommends dbt clone rather than --defer only for this case"
+        },
+        {
+          "text": "States that with --defer only, ci_<PR number> holds just the modified models and everything downstream, with nothing created for unmodified models, so a BI tool cannot read the whole project from it"
+        },
+        {
+          "text": "States that dbt clone puts every production relation in ci_<PR number> alongside the modified models"
+        },
+        {
+          "text": "Explains that under --defer only, unmodified incremental models downstream of a change are built from scratch rather than run incrementally, which is slow on large tables"
+        },
+        {
+          "text": "Names the freshness trade-off: the clone is a point-in-time copy that goes stale as production updates, whereas --defer only always reads the latest production tables"
+        },
+        {
+          "text": "Notes that the two strategies need different warehouse access for the ci target \u2014 creating clones or views versus creating tables \u2014 and that Snowflake supports zero-copy clones"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
+    },
+    {
+      "id": "favor-state-stale-ci-relation",
+      "prompt": "On one of our PRs, CI is building a model against data from a model the PR no longer changes. An earlier commit on the branch did change that upstream model and we reverted it two commits later, but ci_123 still has the version the earlier commit built and the build keeps reading it instead of production. Our dbt_command is `build -s state:modified+ --defer --state latest_production --target ci`. What's going on and what do we change? Advise only \u2014 don't write any files or call Orchestra.",
+      "expected_output": "Explains this is --defer's default resolution order: it prefers a relation that already exists in ci_<PR number> over the production one, so the relation the reverted commit built is still picked up on later runs. Fix is to add --favor-state to the build commands, which always resolves unselected models to production. Notes this matters most where the CI schema only holds what previous commits happened to build (the --defer-only strategy, and any long-lived PR schema), and that dropping ci_123 also clears the stale relation but does not stop it recurring. Changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Explains that --defer by default prefers a relation that already exists in ci_<PR number> over the production relation, which is why the reverted commit's model is still being read"
+        },
+        {
+          "text": "Recommends adding --favor-state to the dbt build commands",
+          "check": "regex",
+          "pattern": "--favor-state",
+          "min_count": 1
+        },
+        {
+          "text": "States that --favor-state makes unselected models always resolve to production"
+        },
+        {
+          "text": "Does not attribute the stale read to latest_production being wrong, to production_run_identifier, or to a missing --state flag"
         },
         {
           "text": "Writes no files and makes no Orchestra calls"

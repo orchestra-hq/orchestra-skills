@@ -8,8 +8,10 @@ expose the metadata Orchestra would need to infer freshness.
 
 **You must provide an explicit `loaded_at_field` or `loaded_at_query`.** Omitting both will not
 fall back to metadata — freshness simply won't compute. This is the most common mistake on
-MotherDuck, so make the explicit field non-negotiable in anything you author here. (Databricks is
-the only warehouse where omitting the field works under SAO.)
+MotherDuck, so make the explicit field non-negotiable in anything you author here. (On dbt Core
+1.x, Databricks is the only warehouse where omitting the field works under SAO; on dbt 2.x the
+implicit path is dbt's own metadata freshness instead — but DuckDB exposes no such metadata
+either way, so the explicit field stays required here.)
 
 ## Recommended pattern
 

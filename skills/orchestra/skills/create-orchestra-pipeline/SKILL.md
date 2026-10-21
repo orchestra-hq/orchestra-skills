@@ -118,7 +118,12 @@ Keep the summary concise.
   automatically on `*.yml` / `*.yaml` — still run validation explicitly when unsure. Those hooks
   don't match `.oml`, so always validate OML yourself.
 - For Git-backed pipelines, committing YAML does not deploy until the repo is connected in
-  Orchestra; call out any UI setup the user still needs.
+  Orchestra, and then only once the commit reaches that pipeline's default branch — a push to
+  any other branch leaves the live pipeline on the default branch's definition, though a run
+  triggered against a branch uses that branch's file. Say which branch the change still has to
+  reach, and call out any UI setup the user still needs
+  (`../../references/orchestra/pipeline/yaml-authoring.md` → "Git-backed pipelines: how a
+  change goes live").
 - Task group and task IDs only need to be unique strings, not real UUIDs.
 - Don't add `run_inputs` to a trigger unless asked — that's for setting inputs dynamically per
   trigger, not a default every pipeline needs.

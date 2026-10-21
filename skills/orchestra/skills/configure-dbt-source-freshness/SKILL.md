@@ -59,8 +59,10 @@ Load these before editing — the warehouse file is the part most often wrong if
       where simple: **Snowflake** (`INFORMATION_SCHEMA … LAST_ALTERED`) and **BigQuery**
       (`__TABLES__.last_modified_time`) — see those warehouse files for the exact query. Confirm the
       view/column is reachable; warn the user it reflects *any* change, not just loads.
-   3. **Databricks** → you may omit `loaded_at_field` entirely; Orchestra infers freshness via
-      `DESCRIBE HISTORY`.
+   3. **Databricks on dbt Core 1.x** → you may omit `loaded_at_field` entirely; Orchestra infers
+      freshness via `DESCRIBE HISTORY`. On **dbt 2.x** that Orchestra fallback isn't what runs —
+      implicit freshness comes from dbt's own metadata freshness instead — so don't carry the
+      "Databricks can omit it" shortcut onto a 2.x project without checking (see the README).
    4. **Nothing locatable** (MotherDuck/DuckDB, Redshift, Fabric, Postgres, others with no obvious
       column and no simple metadata) → ask the user which column marks load time. Only leave that
       source's freshness unset if they can't say or explicitly want it skipped — and call it out.
@@ -68,9 +70,18 @@ Load these before editing — the warehouse file is the part most often wrong if
    Net: try to populate freshness for every source you can from warehouse metadata/columns; empty
    is the exception (user opt-out or no signal found), not the default.
 
-3. **Check the dbt version.** From `require-dbt-version` in `dbt_project.yml` or `dbt --version`.
-   1.9+ → put `freshness` under `config:`; 1.10+ → `loaded_at_field` under `config:` too. If the
-   project already uses an older root-level form, stay consistent with it. (See the reference.)
+3. **Check the dbt version — it decides two things.** Read `require-dbt-version` in
+   `dbt_project.yml`, `dbt --version`, or the dbt packages installed for the task.
+   1. **Is it supported?** SAO runs on dbt Core **1.10.x–1.12.x** and **dbt 2.x** (`>=2,<3`).
+      On dbt 2.x the project installs `pip install dbt-orchestra "dbt-oss>=2,<3"` and must not
+      have `dbt-core` or adapter packages alongside it — flag that if you see both. Below 1.10 is
+      outside what Orchestra supports: say so instead of authoring config that may not be consumed.
+   2. **Placement.** 1.9+ → `freshness` under `config:`; 1.10+ and 2.x → `loaded_at_field` under
+      `config:` too. If the project already uses an older root-level form, stay consistent with
+      it. (See the reference.)
+
+   The major version also changes what happens when you omit `loaded_at_field`/`loaded_at_query`
+   (step 2) — so settle the version before choosing the freshness signal, not after.
 
 4. **Find the sources.** Locate existing `sources:` YAML (often `models/**/_sources.yml` or
    `models/**/src_*.yml`). If sources aren't defined yet, that's a prerequisite — define them or
@@ -114,10 +125,13 @@ SAO enabled, models below a stale source are skipped.
 - Write config only for the pipeline/repo — never run `dbt`, never `start_pipeline`, never mutate
   the warehouse. You **may** run **read-only** warehouse inspection (list columns, check a
   last-modified metadata view) to infer the freshness signal — that's expected, not a violation.
-- Under Orchestra SAO, only **Databricks** can omit `loaded_at_field` (metadata inference). On
-  Snowflake, BigQuery, MotherDuck/DuckDB and others, an explicit `loaded_at_field`/`loaded_at_query`
-  is required — don't leave it off. Leave a source's freshness unset only on user opt-out or when no
-  load column / simple metadata can be located.
+- On **dbt Core 1.x**, only **Databricks** can omit `loaded_at_field` under Orchestra SAO
+  (metadata inference). On Snowflake, BigQuery, MotherDuck/DuckDB and others, an explicit
+  `loaded_at_field`/`loaded_at_query` is required — don't leave it off. On **dbt 2.x** the implicit
+  path is dbt's own metadata freshness rather than Orchestra's fallbacks, so the per-warehouse
+  answer is dbt's, not Orchestra's — an explicit field stays the safe default either way. Leave a
+  source's freshness unset only on user opt-out or when no load column / simple metadata can be
+  located.
 - Match the project's existing dbt-version form and file conventions; don't reformat unrelated YAML.
 - Don't commit secrets; warehouse creds stay in the Orchestra dbt connection / env vars.
 - `use_state_orchestration` is SAO — not Slim CI. Don't conflate them.

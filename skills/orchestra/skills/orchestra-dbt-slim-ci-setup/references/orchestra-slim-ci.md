@@ -12,6 +12,8 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | dbt Core execute task parameters | https://docs.getorchestra.io/docs/integrations/dbt_core/dbt_core_execute |
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |
 | dbt Core in Orchestra (Git, profiles) | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup |
+| `dbt clone` vs `--defer` only in CI | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#step-4-choose-what-to-build-in-ci |
+| `--defer` for development workflows | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#use-defer-for-development-workflows |
 | Pipeline YAML schema | https://docs.getorchestra.io/docs/core-concepts/pipelines/schema |
 
 ## Skill files
@@ -20,7 +22,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 |------|---------|
 | [inputs-matrix.md](inputs-matrix.md) | Must-have / discoverable / manual inputs |
 | [audit-existing-setup.md](audit-existing-setup.md) | Find earlier attempts, gap table, consolidation plan |
-| [retrofit-checklist.md](retrofit-checklist.md) | Pipeline inventory and YAML patches |
+| [retrofit-checklist.md](retrofit-checklist.md) | Pipeline inventory, YAML patches, `dbt clone` vs `--defer` only, concurrency |
 | [mcp-playbook.md](../../../references/orchestra/mcp-playbook.md) | Documentation + Orchestra MCP sequence |
 | [completion-report.md](completion-report.md) | Report template and troubleshooting |
 
@@ -30,7 +32,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 |------|---------|
 | [../templates/pipeline-inputs-snippet.yml](../templates/pipeline-inputs-snippet.yml) | Pipeline inputs + dbt task parameters |
 | [../templates/github-dbt-slim-ci.yml](../templates/github-dbt-slim-ci.yml) | GHA workflow: PR Slim CI, deploy on merge, CI schema clean-up |
-| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Incremental variant: `dbt clone` + `modified_incremental` selector; when `--defer` is still needed after the clone |
+| [../templates/github-dbt-slim-ci-incremental.yml](../templates/github-dbt-slim-ci-incremental.yml) | Incremental variant, both strategies: `dbt clone` + `modified_incremental` selector, or `--defer` only; `--favor-state`; when `--defer` is still needed after the clone |
 | [../templates/dbt/generate_schema_name.sql](../templates/dbt/generate_schema_name.sql) | Per-PR `ci_<PR number>` schema routing |
 | [../templates/dbt/drop_ci_schema.sql](../templates/dbt/drop_ci_schema.sql) | Drop the PR's CI schema on close |
 | [../templates/dbt/selectors.yml](../templates/dbt/selectors.yml) | `modified_incremental` selector |

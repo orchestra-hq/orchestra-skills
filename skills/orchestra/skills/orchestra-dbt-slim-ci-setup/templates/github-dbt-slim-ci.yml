@@ -3,6 +3,9 @@
 # Replace placeholders: PIPELINE_ID (or vars.ORCHESTRA_DBT_PIPELINE_ID), TASK_ID, CI_ENV, PROD_ENV, path filters.
 # Splitting into three files (dbt_ci.yml, dbt_deploy.yml, ci_cleanup.yml) works equally well.
 # Incremental-model variant of the dbt_command values: github-dbt-slim-ci-incremental.yml.
+# --favor-state on the PR job: --defer otherwise prefers a relation already in ci_<PR number>
+# over production, so a model built by an earlier commit and reverted by a later one is read stale.
+# The deploy job defers to production state with no per-PR schema in play, so it does not need it.
 
 name: dbt Slim CI
 
@@ -46,7 +49,7 @@ jobs:
           cancel_on_exit: true
           run_inputs: |
             {
-              "dbt_command": "build -s state:modified+ --defer --state latest_production --target ci",
+              "dbt_command": "build -s state:modified+ --defer --favor-state --state latest_production --target ci",
               "dbt_branch": "${{ github.head_ref }}",
               "dbt_ci_schema_suffix": "${{ github.event.pull_request.number }}"
             }
