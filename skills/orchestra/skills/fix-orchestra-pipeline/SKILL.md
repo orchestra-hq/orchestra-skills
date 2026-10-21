@@ -60,7 +60,7 @@ For each failed task run:
    `download_task_run_artifact`.
 
 3. **Operations:** Call `list_operations` filtered by `task_run_id`, with `time_from`/`time_to`
-   spanning the task run's start, to see sub-operations (individual dbt models, Snowflake
+   spanning the task run from its start to its completion, to see sub-operations (individual dbt models, Snowflake
    queries, etc.) and their statuses. Without a window it returns only the last 24 hours, so an
    older task run comes back empty.
 

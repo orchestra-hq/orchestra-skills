@@ -91,7 +91,7 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
    needs it.
 4. **Assets** — `list_assets`. Assets with no Orchestra operation in 7+ days are a governance
    signal that work may be running outside Orchestra; confirm with `list_operations` filtered to
-   the asset's integration before flagging.
+   the asset's integration, with `time_from`/`time_to` covering the last 7 days, before flagging.
 5. **Incident routing (for checks 5.8 and 5.9)** — `list_monitors` for the monitors in order, and
    `get_incident_settings` for whether incidents are on at all and how big the per-incident alert
    budget is. Read each monitor's match (which pipelines, assets, integrations, connections or

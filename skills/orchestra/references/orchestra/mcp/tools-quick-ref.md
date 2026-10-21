@@ -63,7 +63,8 @@ Replaces: `get_pipeline` + `get_pipeline_data` + `list_pipeline_runs`, done by h
 ### `list_pipeline_runs`
 Arguments:
 - `status` (`FAILED`, `RUNNING`, etc.)
-- `time_from`, `time_to` (ISO 8601)
+- `time_from`, `time_to` (ISO 8601) — always pass both, at most 7 days apart; omitted, only the
+  last 24 hours are returned
 - `pipeline_run_ids` (comma-separated IDs)
 
 Use for:
@@ -74,7 +75,9 @@ Use for:
 Arguments:
 - `status` (`FAILED`, `WARNING`, etc.)
 - `pipeline_ids` (comma-separated IDs)
-- `integration`, `task_run_ids`, `time_from`, `time_to`
+- `integration`, `task_run_ids`
+- `time_from`, `time_to` — always pass both, at most 7 days apart; omitted, only the last 24
+  hours are returned, even when filtering by `task_run_ids`
 
 Use for:
 - finding failed tasks inside one or more pipelines
@@ -83,7 +86,10 @@ Use for:
 ### `list_operations`
 Arguments:
 - `task_run_id`
-- optional filters: `status`, `operation_type`, `integration`, `time_from`, `time_to`
+- `time_from`, `time_to` — always pass both, spanning the task run from start to completion (at
+  most 7 days apart); omitted, only the last 24 hours are returned, even when filtering by
+  `task_run_id`
+- optional filters: `status`, `operation_type`, `integration`
 
 Use for:
 - seeing sub-operations (dbt models, SQL statements, sync steps)
