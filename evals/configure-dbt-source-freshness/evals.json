@@ -1,0 +1,55 @@
+{
+  "skill_name": "configure-dbt-source-freshness",
+  "description": "Version-sensitivity of state-aware orchestration. Both cases are free-text (no pipeline YAML is produced): dbt-2x-is-supported checks the skill no longer refuses a dbt 2.x project and gets the install shape right; dbt-2x-databricks-implicit-freshness checks the Databricks 'you may omit loaded_at_field' shortcut is not carried from dbt Core 1.x onto 2.x.",
+  "evals": [
+    {
+      "id": "dbt-2x-is-supported",
+      "prompt": "We want Orchestra state-aware orchestration on our dbt project so unchanged models stop rebuilding every night. The project is on dbt 2.0.3 — our requirements.txt pins dbt-core>=2,<3 and dbt-snowflake. Our sources are in models/staging/_sources.yml and every table has a _loaded_at column. Can we do this, and if so what do we need to change?",
+      "expected_output": "Says yes — state-aware orchestration supports dbt Core 1.10.x–1.12.x and dbt 2.x (>=2,<3), so a 2.0.3 project is in range and it does not refuse or tell the user to downgrade to 1.x. Flags the requirements.txt as the thing to fix: on dbt 2.x the install is dbt-orchestra with dbt-oss>=2,<3, and dbt-core and adapter packages such as dbt-snowflake must not be installed alongside it. Authors freshness in the config: form with loaded_at_field: _loaded_at (the explicit signal is correct on either major version), and enables use_state_orchestration: true on the Orchestra dbt Core task.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Says state-aware orchestration is supported on this project rather than refusing because it is dbt 2.x"
+        },
+        {
+          "text": "States the supported range as dbt Core 1.10.x–1.12.x and dbt 2.x (>=2,<3)"
+        },
+        {
+          "text": "Says the dbt 2.x install is dbt-orchestra with dbt-oss>=2,<3"
+        },
+        {
+          "text": "Flags that dbt-core and the dbt-snowflake adapter package must not be installed alongside dbt-oss, and calls out the current requirements.txt as needing that change"
+        },
+        {
+          "text": "Authors freshness under config: with loaded_at_field: _loaded_at, and enables use_state_orchestration: true on the dbt Core task"
+        },
+        {
+          "text": "Does not tell the user to pin or downgrade the project to dbt Core 1.x"
+        }
+      ]
+    },
+    {
+      "id": "dbt-2x-databricks-implicit-freshness",
+      "prompt": "We're on dbt 2.1 with the Databricks adapter and want state-aware orchestration. Our raw source tables are Delta tables with no load-timestamp column on them. I've read that on Databricks you can just leave loaded_at_field off and Orchestra works it out from DESCRIBE HISTORY — is that what we should do here?",
+      "expected_output": "Does not confirm the DESCRIBE HISTORY shortcut for this project: Orchestra's registered adapter fallback, Databricks included, is the dbt Core 1.x path, and on dbt 2.x implicit freshness comes from dbt's own metadata freshness instead, so DESCRIBE HISTORY is not what computes max_loaded_at. Recommends an explicit loaded_at_field or loaded_at_query, which behaves the same on both major versions, and — with no load column on the Delta tables — points at a metadata loaded_at_query or a Delta commit timestamp rather than leaving freshness unset. Still enables use_state_orchestration: true.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Does not tell the user that omitting loaded_at_field on dbt 2.x gets freshness from Orchestra's DESCRIBE HISTORY fallback"
+        },
+        {
+          "text": "Explains that the Databricks DESCRIBE HISTORY fallback is the dbt Core 1.x behaviour, and that on dbt 2.x implicit freshness comes from dbt's own metadata freshness instead"
+        },
+        {
+          "text": "Recommends an explicit loaded_at_field or loaded_at_query as the option that behaves the same on both major versions"
+        },
+        {
+          "text": "Proposes a concrete signal for Delta tables with no load column (a metadata loaded_at_query or a commit timestamp) rather than leaving the source's freshness unset"
+        },
+        {
+          "text": "Enables use_state_orchestration: true on the Orchestra dbt Core task"
+        }
+      ]
+    }
+  ]
+}

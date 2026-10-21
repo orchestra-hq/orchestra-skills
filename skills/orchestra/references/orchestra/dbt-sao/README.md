@@ -4,9 +4,14 @@ Shared knowledge for the dbt **state-aware orchestration (SAO)** skills. SAO let
 rebuild only the dbt models whose code changed or whose upstream data is actually fresh,
 instead of rebuilding the whole DAG on every run.
 
-> **dbt v2+ is not supported.** State management / state-aware orchestration works with
-> **dbt Core v1.x** only. On a project pinned to dbt v2 or above, stop and say so rather than
-> authoring freshness or `build_after` config — it will not be consumed. See the
+> **Supported dbt versions.** SAO runs on dbt Core **1.10.x–1.12.x** and on **dbt 2.x**
+> (`>=2,<3`). On dbt 2.x the project installs `pip install dbt-orchestra "dbt-oss>=2,<3"`, and
+> must **not** have `dbt-core` or adapter packages installed alongside it — check the task's
+> dependencies before authoring, since a project carrying both is the likely cause of a 2.x setup
+> that never produces freshness results. A project outside that range (dbt Core below 1.10) is
+> outside what Orchestra supports: say so rather than authoring config that may not be consumed.
+> **The major version also changes where implicit freshness comes from** — see
+> [the version split](#the-one-rule-that-decides-everything-per-warehouse) below. See the
 > [state management guide](https://docs.getorchestra.io/docs/guides/dbt-core-state-management/guide).
 
 Two things drive that decision, and each has its own skill:
@@ -59,15 +64,17 @@ Source freshness can be computed two ways:
 1. **Explicit** — you give dbt a `loaded_at_field` (a timestamp column) or a `loaded_at_query`,
    and a query finds the newest row. Works on every warehouse.
 2. **Warehouse-native metadata** — you omit both, and freshness is inferred from the warehouse's
-   own table metadata (no data scan). **Under Orchestra SAO this works on Databricks only.**
+   own table metadata (no data scan). **Which warehouses that covers depends on the dbt major
+   version**, so establish the version before deciding (see below).
 
-This is the trap: dbt *itself* can read metadata freshness on several warehouses (Snowflake
-`LAST_ALTERED`, BigQuery `TABLE_STORAGE`), but **Orchestra state-aware orchestration does not use
-those fallbacks** — it registers an adapter-specific freshness query for only a few warehouses.
-Per Orchestra's state-management guide, when `loaded_at_field` and `loaded_at_query` are both
+This is the trap on **dbt Core 1.x**: dbt *itself* can read metadata freshness on several
+warehouses (Snowflake `LAST_ALTERED`, BigQuery `TABLE_STORAGE`), but **Orchestra state-aware
+orchestration does not use those fallbacks** — it registers its own adapter-specific freshness
+query for only a few warehouses, and Databricks is the only one. Per Orchestra's
+state-management guide, on dbt Core 1.x, when `loaded_at_field` and `loaded_at_query` are both
 omitted:
 
-| Warehouse | Orchestra SAO metadata fallback? | What to author |
+| Warehouse | Orchestra SAO metadata fallback on dbt Core 1.x? | What to author |
 |-----------|----------------------------------|----------------|
 | **Databricks** | **Yes** — Orchestra runs `DESCRIBE HISTORY` on the source relation | May omit `loaded_at_field`; metadata inference works |
 | **Snowflake** | No fallback, but metadata is queryable | Explicit `loaded_at_field`; **or** a metadata `loaded_at_query` on `INFORMATION_SCHEMA … LAST_ALTERED` when no load column exists |
@@ -86,8 +93,24 @@ precise.
 
 > Orchestra's own words: "For adapters without a registered fallback, if both `loaded_at`
 > settings are missing, Orchestra follows dbt's `FreshnessRunner` behaviour (which may surface as
-> warnings or a non-actionable result)." So **for everything except Databricks, give an explicit
-> `loaded_at_field` (or `loaded_at_query`)** — otherwise SAO has no reliable freshness signal.
+> warnings or a non-actionable result)." So **on dbt Core 1.x, for everything except Databricks,
+> give an explicit `loaded_at_field` (or `loaded_at_query`)** — otherwise SAO has no reliable
+> freshness signal.
+
+### On dbt 2.x the implicit path is dbt's own, not Orchestra's
+
+The table above is a dbt Core 1.x rule. On **dbt 2.x**, omitting both `loaded_at_field` and
+`loaded_at_query` falls through to **dbt's own metadata freshness** instead of Orchestra's
+registered adapter fallbacks — so what works implicitly is whatever that dbt version supports for
+the adapter, not Orchestra's one-warehouse list, and the `DESCRIBE HISTORY` path is not what runs
+on Databricks either. Two consequences when authoring:
+
+- Don't carry a 1.x "this warehouse has no fallback, so freshness is impossible without a column"
+  conclusion onto a 2.x project, and don't promise an adapter works implicitly on 2.x without
+  checking dbt's own freshness support for it.
+- An **explicit `loaded_at_field` (or `loaded_at_query`) is still the safe default on both major
+  versions** — it behaves the same way regardless, so prefer it whenever a load column exists and
+  reserve implicit freshness for the cases the version actually supports.
 
 Read the relevant `warehouses/*.md` file before authoring freshness — this is the part most
 likely to be wrong if guessed, because it contradicts dbt's general behaviour.

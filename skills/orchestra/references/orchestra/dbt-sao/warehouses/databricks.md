@@ -1,12 +1,19 @@
 # Source freshness on Databricks (Orchestra SAO)
 
-## The rule: the one warehouse where metadata inference works
+## The rule: the one warehouse where metadata inference works — on dbt Core 1.x
 
-Databricks is the **only** warehouse with a registered Orchestra SAO freshness fallback. When you
-omit both `loaded_at_field` and `loaded_at_query`, Orchestra runs **`DESCRIBE HISTORY`** on the
-source's Delta table to infer `max_loaded_at` — no data scan, no timestamp column required.
+On **dbt Core 1.x**, Databricks is the **only** warehouse with a registered Orchestra SAO
+freshness fallback. When you omit both `loaded_at_field` and `loaded_at_query`, Orchestra runs
+**`DESCRIBE HISTORY`** on the source's Delta table to infer `max_loaded_at` — no data scan, no
+timestamp column required.
 
-So on Databricks you have a genuine choice:
+> **On dbt 2.x this is not the path that runs.** Implicit freshness there comes from dbt's own
+> metadata freshness rather than Orchestra's registered fallbacks, so `DESCRIBE HISTORY` is not
+> what computes `max_loaded_at` and the "Databricks can omit the field" shortcut doesn't transfer
+> unchanged. Establish the dbt major version before relying on it (see
+> [../README.md](../README.md)); an explicit `loaded_at_field` behaves the same on both.
+
+So on Databricks on dbt Core 1.x you have a genuine choice:
 
 - **Metadata inference (omit `loaded_at_field`)** — simplest; relies on Delta commit history.
 - **Explicit `loaded_at_field`** — more precise. `DESCRIBE HISTORY` reflects *any* commit
