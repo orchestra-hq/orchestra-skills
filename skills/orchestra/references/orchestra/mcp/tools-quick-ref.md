@@ -200,7 +200,10 @@ Returns the Orchestra lineage URL for a pipeline run.
 
 ## Constraints and behavior notes
 
-- Time window constraints still apply (typically 7-day metadata windows in practice).
+- `list_pipeline_runs`, `list_task_runs` and `list_operations` return only the **last 24 hours**
+  when called without `time_from`/`time_to`, even when filtered by an ID. Always pass both, at
+  most 7 days apart and covering the run you are after; a task run from three days ago otherwise
+  comes back as an empty list, not an error.
 - Prefer batching calls (`list_*`) before deep downloads.
 - Git-backed pipelines cannot be edited with `update_pipeline`; provide a repo-level fix instead.
 - `list_task_runs` and `list_task_runs_for_pipeline_run` include superseded attempts by
