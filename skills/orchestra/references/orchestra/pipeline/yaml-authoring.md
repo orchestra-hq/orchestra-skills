@@ -15,6 +15,26 @@ Official docs: [docs.getorchestra.io](https://docs.getorchestra.io).
 Before writing, list existing pipeline YAML in the repo and read one or two files that use
 similar integrations (task group IDs, connection naming, schedules).
 
+## Git-backed pipelines: how a change goes live
+
+A committed file is not automatically a deployed pipeline. Orchestra only picks a change up
+when it lands on **that pipeline's default branch**: the provider sends a push webhook,
+Orchestra matches the changed files to pipelines, then fetches, validates and updates the
+pipeline ([GitBridge sync](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github#how-does-gitbridge-sync-pipeline-files-from-github)).
+
+- **A push to any other branch changes nothing.** The live pipeline keeps the default
+  branch's definition until the PR merges — which is what makes a branch run a safe way to
+  prove a change before review.
+- **A run against a branch uses that branch's version of the file**, so `start_pipeline`
+  with `branch=<fix-branch>` exercises the committed-but-unmerged definition.
+- **Saving in the Orchestra editor commits for you**, through the editing user's own Git
+  connection, to the working branch (created from the default branch if it is new), so the
+  commit is attributed to that person. The workspace connection only ever reads
+  ([what happens when you save](https://docs.getorchestra.io/docs/git-control-and-ci-cd#what-happens-when-you-save-a-git-backed-pipeline)).
+- **Deleting a Git-backed pipeline is two steps.** Deleting it in Orchestra leaves the
+  definition file in the repository; removing the file through normal git-flow is a separate
+  action ([Git control](https://docs.getorchestra.io/docs/git-control-and-ci-cd/git-control)).
+
 ## Document structure
 
 ```yaml

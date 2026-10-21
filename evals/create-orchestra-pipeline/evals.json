@@ -374,6 +374,40 @@
           "text": "Does not invent a concurrency field outside configuration.concurrency (no top-level concurrency:, no max_active on a task)"
         }
       ]
+    },
+    {
+      "id": "git-backed-handoff-default-branch",
+      "prompt": "Create an Orchestra pipeline called 'Partner Refresh' with a single Snowflake task running the stored procedure CALL analytics.refresh_partners(), on a cron trigger daily at 5am UTC. It goes in our Git-backed pipelines repo, and I'll be committing it on a branch called feat/partner-refresh. Write the pipeline to pipeline.yml, and tell me what still has to happen before it starts running on schedule.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a SNOWFLAKE task running the stored procedure on a 5am daily cron, written to pipeline.yml. The handoff then says the committed file does not run on schedule from feat/partner-refresh: for a Git-backed pipeline the change only takes effect once it is merged into the pipeline's default branch, which is what Orchestra syncs from. May add that a run triggered against the branch uses the branch's version of the file if they want to try it before the merge, and should still call out the Snowflake connection or any UI setup needed.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the SNOWFLAKE integration for the stored procedure task",
+          "check": "regex",
+          "pattern": "integration:\\s*SNOWFLAKE\\b"
+        },
+        {
+          "text": "Scheduled daily at 5am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+5\\s"
+        },
+        {
+          "text": "The handoff states that the pipeline does not run on schedule until the change is merged into the pipeline's default branch, which is the branch Orchestra syncs the definition from"
+        },
+        {
+          "text": "Does not claim that committing or pushing to feat/partner-refresh deploys the pipeline, and does not offer update_pipeline as a way to deploy a Git-backed pipeline"
+        }
+      ]
     }
   ]
 }
