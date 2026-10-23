@@ -17,7 +17,7 @@ Airflow never puts credentials directly in DAG code. Instead, every operator or 
 connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffix from UI)
 ```
 
-The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never invent it.
+The 5-digit suffix is assigned by Orchestra when the connection is created — never invent it. Read it back rather than asking someone to find it: connections are managed through the [public API and the Orchestra MCP server](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically) as well as the UI, so listing the workspace's connections returns each one's `descriptive_name_NNNNN` id directly. Fall back to copying it from the UI only where neither is available.
 
 **No `conn_id` referenced?** If the task doesn't actually take a `_conn_id=`/`conn_id=` kwarg or call `BaseHook.get_connection(...)` — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field:
 
@@ -182,10 +182,10 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - [ ] For each distinct `conn_id`, identify the operator/hook it's passed to and look up the Orchestra connection type (table above)
 - [ ] Check whether a Secrets Backend is configured (`airflow.cfg` `[secrets] backend`) — if so, note that no further credential detail can be extracted from source, and when that backend is AWS Secrets Manager or Azure Key Vault, propose pointing the Orchestra connection at the same secret via **Credential Store** rather than re-keying it
 - [ ] For a `conn_id` consumed inside Python/dbt code rather than by a dedicated operator, link that credential's own Orchestra connection on the Python/dbt Core connection instead of copying its secrets across
-- [ ] Create the Orchestra connection (Settings → Connections) and record its `name_XXXXX` suffix
+- [ ] Create the Orchestra connection — in the UI (Settings → Connections), or through the public API / Orchestra MCP, which is worth scripting when a DAG estate has more than a handful of distinct `conn_id`s — and read back its `name_XXXXX` id from the response rather than transcribing it
 - [ ] Replace every Airflow `conn_id="..."` reference with the matching Orchestra `connection: name_XXXXX` in the YAML
 - [ ] Route `Variable.get()` / `AIRFLOW_VAR_*` values to `inputs:`, never to a connection
-- [ ] Never write a real credential value (from an `AIRFLOW_CONN_*` URI or anywhere else) into the Orchestra YAML or any file — connections hold secrets in the Orchestra UI only
+- [ ] Never write a real credential value (from an `AIRFLOW_CONN_*` URI or anywhere else) into the Orchestra YAML or any file — connections hold the secrets. Creating a connection programmatically doesn't change that: the values come from the user or their secret store at the moment of creation, never from a file you commit
 
 ---
 
@@ -204,6 +204,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 - Airflow connections concepts: https://airflow.apache.org/docs/apache-airflow/stable/authoring-and-scheduling/connections.html
 - Airflow secrets backends: https://airflow.apache.org/docs/apache-airflow/stable/security/secrets/secrets-backend/index.html
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Managing connections programmatically (public API and MCP): https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
 - Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
