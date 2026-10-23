@@ -39,6 +39,19 @@
         { "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label" },
         { "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check" }
       ]
+    },
+    {
+      "id": "connection-setup-not-ui-only",
+      "prompt": "We have 30-odd Prefect blocks across two workspaces to move. Does every one of them mean a manual Add Connection in the Orchestra UI, and can we automate the whole migration end to end? Don't call any live Orchestra tools \u2014 just tell us how you'd approach it.",
+      "expected_output": "Splits the answer by side. Orchestra side: connections can be created and maintained through the public API and the Orchestra MCP server as well as Settings -> Connections, so creating the connections is scriptable and each descriptive_name_NNNNN id is read back from the create response or by listing connections rather than copied from the UI. Prefect side: there is still no bulk export from Prefect's encrypted block store, so each secret value has to be recovered one at a time and the migration cannot be fully automated end to end \u2014 a script can create each connection as the value is recovered, except for secrets already in AWS Secrets Manager or Azure Key Vault, which can be read in place via Credential Store. Credential values are supplied at creation and never committed. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        { "text": "States that Orchestra connections can be created and managed through the public API and the Orchestra MCP server, not only through the UI" },
+        { "text": "Says the name_NNNNN connection id is read back from the create response or by listing connections, rather than copied from the UI or invented" },
+        { "text": "Does not claim the migration can be fully automated end to end \u2014 Prefect's block store still has no bulk export, so each secret value has to be recovered one at a time and that side stays manual" },
+        { "text": "Keeps the credential rule: values are supplied at connection-creation time from the user or their secret store, never committed to a repo or a migration script" },
+        { "text": "Makes no live Orchestra MCP tool calls and creates nothing in the workspace" }
+      ]
     }
   ]
 }

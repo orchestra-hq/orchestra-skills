@@ -113,6 +113,26 @@
           "text": "Does not assume the Prefect secret's name carries over unchanged — an Azure Key Vault secret name takes only letters, numbers and hyphens, so a block name containing underscores has to be renamed"
         }
       ]
+    },
+    {
+      "id": "checklist-actions-are-not-all-manual-ui-rekeys",
+      "prompt": "Our Prefect deployment holds SnowflakeCredentials 'sf-prod' (account, user, password), Secret.load('stripe-api-token'), and GitHubCredentials 'gh-deploy' (a deploy key). That is three of about thirty blocks. Give me the secrets checklist for these three, with a realistic Action for each row, and tell me how much of this we can automate. Don't ask me for the actual secret values.",
+      "expected_output": "A checklist row per secret \u2014 the Snowflake fields to a Snowflake connection's credential fields, the Stripe token and the deploy key to Python connection environment variables \u2014 with an Action column that does not assume a manual UI re-key is the only option: Orchestra connections can be created and maintained through the public API and the Orchestra MCP server as well as the UI, so the Orchestra side of each row is scriptable and the connection's name_NNNNN id comes back from that call. The limit named is the Prefect side: its block store has no bulk export, so each value is recovered one at a time and the migration is not fully automatic. No secret value is asked for or fabricated.",
+      "files": [],
+      "assertions_ref": [
+        "secrets"
+      ],
+      "assertions": [
+        {
+          "text": "Does not present a manual re-key in the Orchestra UI as the only possible Action \u2014 states that Orchestra connections can be created and maintained through the public API and the Orchestra MCP server too, so the Orchestra side of the checklist is scriptable"
+        },
+        {
+          "text": "Names Prefect's block store as the part with no bulk export, so each value is recovered one at a time and the migration cannot be fully automated end to end"
+        },
+        {
+          "text": "Does not tell the user to collect the thirty values into a file or script first \u2014 each value is supplied at the moment its connection is created, never committed"
+        }
+      ]
     }
   ]
 }

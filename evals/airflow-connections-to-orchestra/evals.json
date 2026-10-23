@@ -140,6 +140,29 @@
           "text": "Does not assume the existing secret can be read as-is — an Airflow connection URI or extra blob is not the shape Orchestra reads, so the secret has to be rewritten as the Orchestra connection's parameters before Credential Store will accept it"
         }
       ]
+    },
+    {
+      "id": "connection-setup-not-ui-only",
+      "prompt": "We're moving about 40 Airflow DAGs over, and between them they reference 23 distinct conn_ids. Before we start: does someone have to sit in the Orchestra UI and hand-create 23 connections, and how do we get the connection ids into the YAML? Don't call any live Orchestra tools \u2014 just tell us how you'd approach it.",
+      "expected_output": "Says connection setup is not UI-only: Orchestra connections can be created and maintained through the public API and the Orchestra MCP server as well as Settings \u2192 Connections, so 23 connections is a scripted loop rather than 23 forms. Says the descriptive_name_NNNNN id is read back from the create response or by listing the workspace's connections and dropped into each task's connection: field, rather than copied out of the UI by hand or invented. Keeps the credential rule intact: the secret values are still supplied by the user or their secret store at creation time, never committed to the repo, the pipeline YAML, or a migration script's source. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that Orchestra connections can be created and managed through the public API and the Orchestra MCP server, not only through the UI"
+        },
+        {
+          "text": "Treats creating one connection per distinct conn_id as scriptable at this volume rather than telling the user to hand-create each one in Settings \u2192 Connections"
+        },
+        {
+          "text": "Says the name_NNNNN connection id is read back programmatically \u2014 from the create response or by listing connections \u2014 rather than copied from the UI or invented"
+        },
+        {
+          "text": "Still requires the credential values to come from the user or their secret store at creation time, and never to be written into the repo, the pipeline YAML, or a migration script"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and creates nothing in the workspace"
+        }
+      ]
     }
   ]
 }

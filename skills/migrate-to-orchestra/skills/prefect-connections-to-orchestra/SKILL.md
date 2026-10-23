@@ -7,7 +7,7 @@ description: "Use this skill when converting Prefect code that references blocks
 
 ## Overview
 
-Prefect stores credentials in **blocks** — typically loaded via `Block.load("block-name")` or a typed subclass like `SnowflakeCredentials`, `AwsCredentials`, or `SlackWebhook` — registered in the Prefect UI or via `.save()`, with secret fields stored as `SecretStr`. Orchestra connections serve the same purpose but are configured in the Orchestra UI (Settings -> Connections) and referenced by name in pipeline YAML. This skill maps common Prefect blocks to their Orchestra equivalents and covers naming, environment patterns, and secrets.
+Prefect stores credentials in **blocks** — typically loaded via `Block.load("block-name")` or a typed subclass like `SnowflakeCredentials`, `AwsCredentials`, or `SlackWebhook` — registered in the Prefect UI or via `.save()`, with secret fields stored as `SecretStr`. Orchestra connections serve the same purpose but live outside the flow code — set up in the Orchestra UI (Settings -> Connections), or through the public API / Orchestra MCP — and are referenced by name in pipeline YAML. This skill maps common Prefect blocks to their Orchestra equivalents and covers naming, environment patterns, and secrets.
 
 ---
 
@@ -17,7 +17,7 @@ Prefect stores credentials in **blocks** — typically loaded via `Block.load("b
 connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffix from UI)
 ```
 
-The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never invent it.
+The 5-digit suffix is assigned by Orchestra when the connection is created — never invent it. Read it back rather than asking someone to find it: connections are managed through the [public API and the Orchestra MCP server](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically) as well as the UI, so listing the workspace's connections returns each one's `descriptive_name_NNNNN` id directly. Fall back to copying it from the UI only where neither is available.
 
 **No block referenced?** If the `@task`/`@flow` doesn't actually load a credentialed block — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field:
 
@@ -175,9 +175,9 @@ pipeline:
 
 - [ ] Identify each Prefect block and the secret(s) it holds
 - [ ] Find the equivalent Orchestra connection type above
-- [ ] Create the connection in Orchestra (Settings -> Connections -> Add Connection)
+- [ ] Create the connection in Orchestra — UI (Settings -> Connections -> Add Connection), or the public API / Orchestra MCP, which is worth scripting when a deployment carries many blocks
 - [ ] If the block's value already lives in AWS Secrets Manager or Azure Key Vault, set **Credential Store** on the connection instead of re-entering the value
-- [ ] Note the full connection name including the 5-digit suffix
+- [ ] Note the full connection name including the 5-digit suffix — read it from the create response or by listing connections, not by hand
 - [ ] Replace placeholder `connection: <name>` with the real name
 - [ ] For environment-specific blocks, set env vars and use `${{ ENV.VAR }}`
 - [ ] Never put credentials/tokens in the YAML
@@ -187,7 +187,7 @@ pipeline:
 ## Gotchas
 
 - **5-digit suffix is required** — `connection: snowflake_prod` fails; use `snowflake_prod_12345`.
-- **Prefect blocks are not the connection** — the block holds config in Prefect's encrypted block store; the Orchestra connection holds the same credentials in the UI. There is no bulk export from Prefect's block store — see `prefect-secrets-to-orchestra`.
+- **Prefect blocks are not the connection** — the block holds config in Prefect's encrypted block store; the Orchestra connection holds the same credentials in Orchestra. There is no bulk export from Prefect's block store, so the Orchestra side being scriptable through the API or MCP doesn't make the migration bulk: each secret still has to be read out of Prefect by hand first — see `prefect-secrets-to-orchestra`.
 - **dbt Core connections are special** — store both Git repo and warehouse credentials. One per repo+warehouse.
 - **GCP service account** — paste the full JSON into the GCP connection key field.
 - **Airbyte Cloud vs Server** — an `AirbyteConnection` block pointed at `api.airbyte.com` -> Cloud connection; pointed at any other host -> Server connection.
@@ -198,6 +198,7 @@ pipeline:
 ## References
 
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Managing connections programmatically (public API and MCP): https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
 - Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments
