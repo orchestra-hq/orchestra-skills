@@ -32,6 +32,35 @@
       ]
     },
     {
+      "id": "asset-runs-deprecation-scoped-to-unorchestrated-assets",
+      "prompt": "Our Orchestra workspace has about 300 Snowflake assets. Most of them are dbt models built by our nightly dbt Core task, and a few dozen are raw landing tables that only Fivetran writes to — nothing in Orchestra runs against those. I've read that Asset runs are being deprecated. Does that mean we lose metadata on all 300, and what are our options for the ones we do lose? Don't call any live Orchestra tools — just tell me what you'd recommend.",
+      "expected_output": "Scopes the deprecation rather than treating it as a blanket loss: the dbt-built assets keep collecting automatically, because every task Orchestra runs creates the assets it touches and keeps their last-updated time, operations, tests and health current, so only the raw landing tables that nothing in Orchestra runs against are affected. Gives two replacements for those, both writing through the same public asset API: the Python asset-collection template where collection should stay scheduled — an ordinary pipeline, so it keeps scheduling, alerting, retries and logs, and the script can be narrowed to chosen databases and schemas or extended with owners and business context — and an Orchestra agent where the metadata is only wanted occasionally, refreshing just the assets involved on demand instead of fetching everything on a schedule. Does not recommend setting up Asset runs. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that the deprecation does not cost them all 300 assets — assets built by a task Orchestra runs keep being collected automatically"
+        },
+        {
+          "text": "Explains that a task Orchestra runs creates the assets it touches and keeps their last-updated time, operations, tests and health current, so automatic collection is unaffected by the deprecation"
+        },
+        {
+          "text": "Scopes the loss to the raw landing tables that nothing in Orchestra runs against, rather than recommending migration for the dbt-built assets too"
+        },
+        {
+          "text": "Offers an Orchestra agent, reading and writing assets through the asset API on demand, as an option where the metadata is only needed occasionally rather than on a schedule"
+        },
+        {
+          "text": "Offers the Python asset-collection template as the option where collection should stay scheduled, and notes it is an ordinary pipeline so it keeps the usual scheduling, alerting, retries and logs"
+        },
+        {
+          "text": "Does not recommend setting up or scheduling Asset runs / scheduled asset collection for the affected tables"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
+        }
+      ]
+    },
+    {
       "id": "concurrency-on-limit-skip-drops-events",
       "prompt": "Health-check this pipeline config for us. 'file_ingest' is triggered by an S3 sensor, one run per file landed, and has configuration.concurrency.max_active: 1 with nothing else set under concurrency. Our data team says files go missing on busy mornings but every pipeline run they can see succeeded. What, if anything, should we change?",
       "expected_output": "Identifies that with max_active: 1 and no on_limit, the pipeline is on the default SKIP, so a file landing while a run is in progress creates a SKIPPED run and that file is never ingested — which matches 'missing files' with no failed runs. Recommends on_limit: QUEUE, because each sensor trigger does distinct work (one file each), and explicitly rules out QUEUE_LATEST, which would discard all but the newest waiting file. Does not recommend removing the limit as the fix.",
