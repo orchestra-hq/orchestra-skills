@@ -59,10 +59,10 @@ For each failed task run:
    `run_results.json` and `manifest.json`. Download relevant artifacts with
    `download_task_run_artifact`.
 
-3. **Operations:** Call `list_operations` filtered by `task_run_id`, with `time_from`/`time_to`
-   spanning the task run from its start to its completion, to see sub-operations (individual dbt models, Snowflake
-   queries, etc.) and their statuses. Without a window it returns only the last 24 hours, so an
-   older task run comes back empty.
+3. **Operations:** Call `list_operations` filtered by `task_run_id` to see
+   sub-operations (individual dbt models, Snowflake queries, etc.) and their statuses. It
+   defaults to the last 24 hours; for an older task run pass `time_from`/`time_to` spanning its
+   start to completion.
 
 **Read `../../references/orchestra/pipeline/diagnosis-patterns.md`** before proceeding to Step 4. It contains
 integration-specific error patterns that will help classify the failure.

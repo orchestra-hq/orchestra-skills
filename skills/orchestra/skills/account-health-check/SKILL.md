@@ -83,9 +83,8 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
    **say what you covered vs skipped**. If the MCP read tool is absent, use the REST fallback
    (Step 1) instead — only skip this step and mark the definition-level checks Not assessed if
    neither the tool nor the REST fallback can reach pipeline definitions.
-3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window), passing
-   `time_from`/`time_to` explicitly on it and on any `list_task_runs`/`list_operations` call,
-   since without them each returns only the last 24 hours. Use this
+3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window; pass
+   `time_from`/`time_to`, since it defaults to 24 hours). Use this
    to spot concurrency skips, over- or under-scheduling, and noisy failure rates. `list_task_runs`
    /`list_operations` add integration-level detail (e.g. source-tool jobs, dbt models) when a check
    needs it.
