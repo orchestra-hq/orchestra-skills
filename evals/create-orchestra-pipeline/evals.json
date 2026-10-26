@@ -408,6 +408,46 @@
           "text": "Does not claim that committing or pushing to feat/partner-refresh deploys the pipeline, and does not offer update_pipeline as a way to deploy a Git-backed pipeline"
         }
       ]
+    },
+    {
+      "id": "git-backed-on-ghe-com-tenant",
+      "prompt": "Create an Orchestra pipeline 'Finance Nightly' with a single dbt Core task running `dbt build`, on a cron trigger at 2am UTC daily. Our pipelines repo isn't on github.com — it lives on our GitHub Enterprise tenant at https://acme.ghe.com. Write it to pipeline.yml and tell me whether we can run this Git-backed at all, and what setup that needs.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a DBT_CORE / DBT_CORE_EXECUTE task running `dbt build` on a 2am daily cron, written to pipeline.yml. The handoff confirms a GHE.com tenant IS a supported home for Git-backed pipelines (GitHub Enterprise Cloud is a supported provider), and names what its setup needs: a GitHub App owned by their own organisation on the tenant, created during the workspace connection, so an owner of that GitHub organisation has to run it — and Orchestra's IPs added to the allow list first if the tenant or enterprise IP-restricts access. Should not confuse this with GitHub Enterprise Server, which is not supported.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the DBT_CORE integration for the dbt build task",
+          "check": "regex",
+          "pattern": "integration:\\s*DBT_CORE\\b"
+        },
+        {
+          "text": "Scheduled daily at 2am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+2\\s"
+        },
+        {
+          "text": "States that a repository on a GHE.com tenant is supported for Git-backed pipelines, because GitHub Enterprise Cloud is one of the supported Git providers"
+        },
+        {
+          "text": "Names the GHE.com setup requirement: the workspace connects through a GitHub App owned by the customer's own GitHub organisation on that tenant, so an owner of that organisation has to do the setup"
+        },
+        {
+          "text": "Does not claim that Git-backed pipelines require github.com, and does not tell the user their only option is an Orchestra-stored pipeline or a mirror of the repo on github.com"
+        },
+        {
+          "text": "Does not treat the GHE.com tenant as GitHub Enterprise Server; if GHES is mentioned at all it is identified as the unsupported one"
+        }
+      ]
     }
   ]
 }

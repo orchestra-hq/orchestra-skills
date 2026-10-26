@@ -34,6 +34,22 @@ pipeline ([GitBridge sync](https://docs.getorchestra.io/docs/git-control-and-ci-
 - **Deleting a Git-backed pipeline is two steps.** Deleting it in Orchestra leaves the
   definition file in the repository; removing the file through normal git-flow is a separate
   action ([Git control](https://docs.getorchestra.io/docs/git-control-and-ci-cd/git-control)).
+- **Which provider the repo is on doesn't change any of the above.** GitBridge works the same
+  across [the supported providers](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers):
+  GitHub, GitHub Enterprise Cloud, GitLab, Azure DevOps and Bitbucket. A repo on a **GHE.com
+  tenant** is a supported home for Git-backed pipelines — the workspace connects through a
+  GitHub App that the customer's own organisation owns on that tenant, one App per GitHub
+  organisation, so setup needs an owner of that organisation rather than only an Orchestra
+  admin ([Connect GitHub Enterprise Cloud](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github-enterprise)).
+  **GitHub Enterprise *Server* is not supported** — don't plan a Git-backed migration around a
+  self-hosted GHES instance. If the tenant IP-restricts access, Orchestra's IPs have to be on
+  the allow list before any of this syncs.
+- **Disconnecting the workspace Git connection is not a local undo.** For GitHub, every
+  workspace shares one App installation, and disconnecting in Orchestra uninstalls that App —
+  the same blast radius as removing it from the GitHub organisation, so it takes Git-backed
+  pipelines offline in **every** workspace on that installation, not just this one. Treat it as
+  an org-wide change and confirm before suggesting it
+  ([Connect GitHub](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github)).
 
 ## Document structure
 
