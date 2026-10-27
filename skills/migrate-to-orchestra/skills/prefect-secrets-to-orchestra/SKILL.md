@@ -52,7 +52,7 @@ response = requests.get("https://api.example.com/data", headers={"Authorization"
 - [ ] For each hit: record the secret name and how it is used (SaaS credential, env var in task, etc.)
 - [ ] Separate Prefect Variables (`Variable.get()`) from Secret blocks — Variables are non-sensitive and go to `inputs:` or `env_vars:`, not Orchestra secrets
 - [ ] Produce the secrets checklist (see template below)
-- [ ] For each row marked "Orchestra connection field": follow `prefect-connections-to-orchestra` to create the connection and enter the value in the credential field
+- [ ] For each row marked "Orchestra connection field": follow `prefect-connections-to-orchestra` to create the connection and enter the value in the credential field — in the UI, or through the [public API / Orchestra MCP](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically), feeding each value straight from wherever you read it out of Prefect rather than staging it in a file
 - [ ] For each row marked "Python connection env var": open the Orchestra Python connection → Advanced → Environment Variables → add the key
 - [ ] For a secret already held in an external store: if that store is AWS Secrets Manager or Azure Key Vault, the value can stay where it is — create the Orchestra connection to the store, then set **Credential Store** on the target connection and identify the secret (Secret ARN for AWS Secrets Manager, secret name for Azure Key Vault) instead of re-entering it. Confirm the secret's JSON keys match the integration's expected field names. Any other store (Hashicorp Vault, GCP Secret Manager) still needs a manual re-entry
 - [ ] After all secrets are entered, verify each pipeline runs successfully in a test environment before promoting to production
@@ -120,7 +120,7 @@ pipeline:
 
 ## Gotchas
 
-- Prefect's encrypted Secret block store has **no bulk export** to Orchestra — every secret Prefect itself holds must be re-entered by hand; plan for this in your migration timeline. Only secrets already sitting in AWS Secrets Manager or Azure Key Vault escape the re-key, by being read in place through the connection's **Credential Store**
+- Prefect's encrypted Secret block store has **no bulk export** to Orchestra — every secret Prefect itself holds must be retrieved one at a time; plan for this in your migration timeline. The bottleneck is the Prefect side, not the Orchestra side: connections can be created through the public API or MCP, so a migration script can create each connection as it recovers the value, and only the recovery stays manual. Secrets already sitting in AWS Secrets Manager or Azure Key Vault escape the re-key entirely, by being read in place through the connection's **Credential Store**
 - Prefect `Variable.get()` values are **not encrypted** — route to `inputs:` or `env_vars:` in the Orchestra pipeline, not to secrets
 - `SecretStr` fields inside credential blocks follow `prefect-connections-to-orchestra`, not this skill — they are stored on the connection, not as standalone secrets
 - **An external credential store holds one JSON object per connection** — in AWS Secrets Manager or Azure Key Vault the secret's value must be a JSON object containing exactly the keys the target integration expects, and every required one rather than only the sensitive fields. The keys are the parameter IDs from that integration's **Authentication parameters** table, not friendly names — a Snowflake connection wants `snowflake_account`, `snowflake_user`, `snowflake_password` and the rest of its required parameters, not `account` / `user` / `password`. In Azure Key Vault, set that whole JSON object as the secret's value rather than splitting it into one secret per field. One Prefect secret rarely maps to one store secret: a flow that loads a password on its own still needs the non-secret parameters gathered into the same JSON object
@@ -134,6 +134,7 @@ pipeline:
 - https://docs.prefect.io/v3/develop/blocks
 - https://docs.getorchestra.io/docs/core-concepts/tasks/connections
 - Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
+- Managing connections programmatically (public API and MCP): https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
 
 ## Adding Alerts
 

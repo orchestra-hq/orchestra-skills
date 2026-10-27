@@ -202,6 +202,28 @@ Filterable by asset type/integration. Useful when diagnosing missing tables or l
 ### `get_pipeline_run_lineage_url`
 Returns the Orchestra lineage URL for a pipeline run.
 
+### Integration connections — `list_integration_connections`, `get_integration_connection`, `create_integration_connection`, `update_integration_connection`, `delete_integration_connection`
+Connections are managed through the API and MCP as well as the Orchestra UI, so a workspace's
+connections can be read, created and maintained from a script, a CI job or an agent rather than
+clicked through Settings → Connections. Three things this changes in practice:
+
+- **Don't ask a user to read a connection id out of the UI.** `list_integration_connections`
+  returns every connection with its `connectionId` — the `descriptive_name_NNNNN` value that
+  pipeline YAML's `connection:` field needs. Look it up rather than asking for it, and never
+  invent the numeric suffix: Orchestra assigns it at creation.
+- **Shape a new connection against the integration's own schema.** `get_integration` returns that
+  integration's `auth_schema`; each item's `name` is the parameter `create_integration_connection`
+  expects, and `format: password` marks the ones that are secret. This is the same parameter list
+  an external credential store's secret JSON has to carry.
+- **Bulk setup is scriptable, the secrets are still the user's to supply.** Creating twenty
+  connections is a loop, not twenty forms, but the credential values must come from the user or
+  their secret store at run time — never from a repo, a pipeline YAML or an eval fixture.
+
+Secret parameters come back obfuscated on every read, so a connection's stored credential can
+never be recovered through these tools — only replaced.
+
+Docs: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
+
 ## Constraints and behavior notes
 
 - `list_pipeline_runs`, `list_task_runs` and `list_operations` return only the **last 24 hours**

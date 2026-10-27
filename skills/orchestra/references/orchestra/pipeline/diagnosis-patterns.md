@@ -76,6 +76,12 @@ separate root causes — diagnose the first failed task in the run.
 **Diagnosis:** Credentials configured in the Orchestra connection have expired, been rotated,
 or lack the required permissions. Check `connectionId` on the task run to identify which connection.
 
+On a **GitHub Actions** task against an organisation that enforces SAML SSO, a 403 can also mean a
+token that is valid and correctly scoped but was never authorised for that organisation — rotating
+it changes nothing. A classic PAT is authorised via **Configure SSO → Authorize** next to the
+token; a fine-grained one has to be created with that organisation as its resource owner
+([GitHub Actions](https://docs.getorchestra.io/docs/integrations/github_actions)).
+
 ### TIMEOUT
 **Log signals:**
 - `timeout`, `timed out`, `deadline exceeded`, `execution time limit`

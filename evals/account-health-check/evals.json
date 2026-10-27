@@ -3,16 +3,16 @@
   "description": "Rubric checks the health check is graded on here: asset governance (5.6, 5.7), pipeline concurrency (1.8), and incident routing (5.8, 5.9). The skill's output is a conversational review, not a pipeline artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file.",
   "evals": [
     {
-      "id": "asset-runs-deprecated-not-recommended",
+      "id": "asset-runs-removed-not-recommended",
       "prompt": "I'm reviewing our Orchestra workspace. `list_assets` shows 60-odd Snowflake tables and views; about 20 of them have had no Orchestra operation against them in the last 30 days, but their metadata still refreshes every morning, so something is collecting them. Nobody here knows what. What should we do about the stale ones, and is there anything we should be fixing about how they're collected? Don't call any live Orchestra tools — just tell me what you'd recommend.",
-      "expected_output": "Flags the stale assets as a governance signal and recommends bringing the work under an Orchestra pipeline. Does not recommend scheduling asset collection (Asset runs) as the fix. Says scheduled asset collection is deprecated and stops working on 23 October 2026, so a workspace relying on it loses asset coverage on that date, and recommends migrating to the Python asset-collection template — a scheduled PYTHON task that reads the warehouse's tables, views and lineage and writes them through the asset API. Notes that it matches on the same externalId, so it updates existing assets rather than duplicating them. Treats the refreshing-with-no-operation pattern as a reason to ask the user whether an asset configuration exists, not as a confirmed finding, because asset configurations are not exposed by the MCP. Makes no live calls.",
+      "expected_output": "Flags the stale assets as a governance signal and recommends bringing the work under an Orchestra pipeline. Does not recommend scheduling asset collection (Asset runs) as the fix. Says scheduled asset collection was removed on 26 October 2026, so a workspace that relied on it has already lost asset coverage, and recommends migrating to the Python asset-collection template — a scheduled PYTHON task that reads the warehouse's tables, views and lineage and writes them through the asset API. Notes that it matches on the same externalId, so it updates existing assets rather than duplicating them. Treats the refreshing-with-no-operation pattern as a reason to ask the user whether an asset configuration exists, not as a confirmed finding, because asset configurations are not exposed by the MCP. Makes no live calls.",
       "files": [],
       "assertions": [
         {
           "text": "Does not recommend setting up or scheduling Asset runs / scheduled asset collection to cover the stale assets"
         },
         {
-          "text": "States that scheduled asset collection (Asset runs) is deprecated, and gives 23 October 2026 as the date it stops working"
+          "text": "States that scheduled asset collection (Asset runs) has been removed, and gives 26 October 2026 as the date it stopped working"
         },
         {
           "text": "Recommends the Python asset-collection template — a scheduled PYTHON task writing warehouse metadata and lineage through the asset API — as the replacement"
@@ -25,6 +25,35 @@
         },
         {
           "text": "Treats the existence of an asset configuration as something to confirm with the user rather than asserting it, noting the MCP does not expose asset configurations"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
+        }
+      ]
+    },
+    {
+      "id": "asset-runs-removal-scoped-to-unorchestrated-assets",
+      "prompt": "Our Orchestra workspace has about 300 Snowflake assets. Most of them are dbt models built by our nightly dbt Core task, and a few dozen are raw landing tables that only Fivetran writes to — nothing in Orchestra runs against those. I've read that Asset runs have been removed. Does that mean we lose metadata on all 300, and what are our options for the ones we do lose? Don't call any live Orchestra tools — just tell me what you'd recommend.",
+      "expected_output": "Scopes the removal rather than treating it as a blanket loss: the dbt-built assets keep collecting automatically, because every task Orchestra runs creates the assets it touches and keeps their last-updated time, operations, tests and health current, so only the raw landing tables that nothing in Orchestra runs against are affected. Gives two replacements for those, both writing through the same public asset API: the Python asset-collection template where collection should stay scheduled — an ordinary pipeline, so it keeps scheduling, alerting, retries and logs, and the script can be narrowed to chosen databases and schemas or extended with owners and business context — and an Orchestra agent where the metadata is only wanted occasionally, refreshing just the assets involved on demand instead of fetching everything on a schedule. Does not recommend setting up Asset runs. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that the removal does not cost them all 300 assets — assets built by a task Orchestra runs keep being collected automatically"
+        },
+        {
+          "text": "Explains that a task Orchestra runs creates the assets it touches and keeps their last-updated time, operations, tests and health current, so automatic collection is unaffected by the removal"
+        },
+        {
+          "text": "Scopes the loss to the raw landing tables that nothing in Orchestra runs against, rather than recommending migration for the dbt-built assets too"
+        },
+        {
+          "text": "Offers an Orchestra agent, reading and writing assets through the asset API on demand, as an option where the metadata is only needed occasionally rather than on a schedule"
+        },
+        {
+          "text": "Offers the Python asset-collection template as the option where collection should stay scheduled, and notes it is an ordinary pipeline so it keeps the usual scheduling, alerting, retries and logs"
+        },
+        {
+          "text": "Does not recommend setting up or scheduling Asset runs / scheduled asset collection for the affected tables"
         },
         {
           "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
