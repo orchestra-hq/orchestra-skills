@@ -7,7 +7,7 @@ description: "Use this skill when converting Dagster code that references resour
 
 ## Overview
 
-Dagster stores credentials in **resources** — typically `ConfigurableResource` subclasses (or built-in integration resources like `SnowflakeResource`, `S3Resource`, `DbtCliResource`) wired into `Definitions(resources={...})`, with secret values supplied via `EnvVar`. Orchestra connections serve the same purpose but are configured in the Orchestra UI (Settings -> Connections) and referenced by name in pipeline YAML. This skill maps common Dagster resources to their Orchestra equivalents and covers naming, environment patterns, and secrets.
+Dagster stores credentials in **resources** — typically `ConfigurableResource` subclasses (or built-in integration resources like `SnowflakeResource`, `S3Resource`, `DbtCliResource`) wired into `Definitions(resources={...})`, with secret values supplied via `EnvVar`. Orchestra connections serve the same purpose but live outside the pipeline code — set up in the Orchestra UI (Settings -> Connections), or through the public API / Orchestra MCP — and are referenced by name in pipeline YAML. This skill maps common Dagster resources to their Orchestra equivalents and covers naming, environment patterns, and secrets.
 
 ---
 
@@ -17,7 +17,7 @@ Dagster stores credentials in **resources** — typically `ConfigurableResource`
 connection: my_snowflake_12345   # format: descriptive-name_XXXXX (5-digit suffix from UI)
 ```
 
-The 5-digit suffix is assigned by Orchestra when the connection is created — copy it from the UI; never invent it.
+The 5-digit suffix is assigned by Orchestra when the connection is created — never invent it. Read it back rather than asking someone to find it: connections are managed through the [public API and the Orchestra MCP server](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically) as well as the UI, so listing the workspace's connections returns each one's `descriptive_name_NNNNN` id directly. Fall back to copying it from the UI only where neither is available.
 
 **No resource referenced?** If the `@op`/`@asset` doesn't actually instantiate a credentialed resource — pure computation, no external client, no secrets — don't invent a connection name or a fake env var placeholder just to fill the field:
 
@@ -183,9 +183,9 @@ pipeline:
 
 - [ ] Identify each Dagster resource and the secret(s) it holds
 - [ ] Find the equivalent Orchestra connection type above
-- [ ] Create the connection in Orchestra (Settings -> Connections -> Add Connection)
+- [ ] Create the connection in Orchestra — UI (Settings -> Connections -> Add Connection), or the public API / Orchestra MCP, which is the faster route when a `Definitions` block wires up many resources at once
 - [ ] If the resource resolves its secret from AWS Secrets Manager or Azure Key Vault, point the connection at that store via **Credential Store** instead of re-keying the value
-- [ ] Note the full connection name including the 5-digit suffix
+- [ ] Note the full connection name including the 5-digit suffix — read it from the create response or by listing connections, not by hand
 - [ ] Replace placeholder `connection: <name>` with the real name
 - [ ] For environment-specific resources, set env vars and use `${{ ENV.VAR }}`
 - [ ] Never put credentials/tokens in the YAML
@@ -195,7 +195,7 @@ pipeline:
 ## Gotchas
 
 - **5-digit suffix is required** — `connection: snowflake_prod` fails; use `snowflake_prod_12345`.
-- **Dagster resources are not the connection** — the resource holds config in code; the Orchestra connection holds the same credentials in the UI.
+- **Dagster resources are not the connection** — the resource holds config in code; the Orchestra connection holds the same credentials in Orchestra. Managing that connection through the API or MCP is not the same as putting it back in code: the secret values are still supplied at creation, never committed.
 - **dbt Core connections are special** — store both Git repo and warehouse credentials. One per repo+warehouse.
 - **Snowflake resource fields** — map directly to Orchestra Snowflake connection fields.
 - **GCP service account** — paste the full JSON into the GCP connection key field.
@@ -207,6 +207,7 @@ pipeline:
 ## References
 
 - Orchestra connections: https://docs.getorchestra.io/docs/core-concepts/tasks/connections
+- Managing connections programmatically (public API and MCP): https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
 - Orchestra external secret storage: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage
 - Orchestra linked connections: https://docs.getorchestra.io/docs/integrations/python#linked-connections
 - Orchestra environments: https://docs.getorchestra.io/docs/core-concepts/environments

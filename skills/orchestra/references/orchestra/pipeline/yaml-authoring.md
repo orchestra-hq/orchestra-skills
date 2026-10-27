@@ -34,6 +34,22 @@ pipeline ([GitBridge sync](https://docs.getorchestra.io/docs/git-control-and-ci-
 - **Deleting a Git-backed pipeline is two steps.** Deleting it in Orchestra leaves the
   definition file in the repository; removing the file through normal git-flow is a separate
   action ([Git control](https://docs.getorchestra.io/docs/git-control-and-ci-cd/git-control)).
+- **Which provider the repo is on doesn't change any of the above.** GitBridge works the same
+  across [the supported providers](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers):
+  GitHub, GitHub Enterprise Cloud, GitLab, Azure DevOps and Bitbucket. A repo on a **GHE.com
+  tenant** is a supported home for Git-backed pipelines — the workspace connects through a
+  GitHub App that the customer's own organisation owns on that tenant, one App per GitHub
+  organisation, so setup needs an owner of that organisation rather than only an Orchestra
+  admin ([Connect GitHub Enterprise Cloud](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github-enterprise)).
+  **GitHub Enterprise *Server* is not supported** — don't plan a Git-backed migration around a
+  self-hosted GHES instance. If the tenant IP-restricts access, Orchestra's IPs have to be on
+  the allow list before any of this syncs.
+- **Disconnecting the workspace Git connection is not a local undo.** For GitHub, every
+  workspace shares one App installation, and disconnecting in Orchestra uninstalls that App —
+  the same blast radius as removing it from the GitHub organisation, so it takes Git-backed
+  pipelines offline in **every** workspace on that installation, not just this one. Treat it as
+  an org-wide change and confirm before suggesting it
+  ([Connect GitHub](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github)).
 
 ## Document structure
 
@@ -140,6 +156,29 @@ The same rule applies to any parameter that duplicates connection-level scope (e
 genuinely needs to override it. If a required value truly can't be determined statically (an ID
 only resolvable by calling a live API), use a placeholder and flag it with a `# MANUAL:` comment
 rather than shipping a fabricated literal or GUID.
+
+### Repo-backed connections: Git connection or token
+
+Python, dbt Core and Bauplan connections point at a Git repository, and now choose **how** they
+reach it: the workspace's **Git connection** (the default) or a **Token**. A personal access token
+is only required on the token path, so a workspace that already connects to that provider needs no
+new secret to add one of these connections — check before asking a user to mint a PAT
+([Python](https://docs.getorchestra.io/docs/integrations/python),
+[dbt Core](https://docs.getorchestra.io/docs/integrations/dbt_core)). Reach for a token only when
+the repo sits outside the connected organisation or App installation, or the provider has no
+workspace Git connection.
+
+- **GitHub Enterprise URL** is the GHE field on these connections (previously labelled "Self hosted
+  URL"). Leave it empty for github.com **and** on the Git-connection path; fill it only for a token
+  against GHE — a GHE.com tenant URL, or a GitHub Enterprise *Server* API URL ending in `/api/v3`.
+  Note the asymmetry with Git-backed pipelines above: GHES is a fine home for a *task's* repo even
+  though Git control itself doesn't support it
+  ([tasks on GHE.com](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github-enterprise)).
+- **GitHub Actions is the exception.** It has no Git-connection option, still requires a personal
+  access token, and has its own GitHub Enterprise URL field (empty for github.com). Where the
+  organisation enforces SAML SSO, that token must be authorised for the organisation or workflow
+  runs fail with 403
+  ([GitHub Actions](https://docs.getorchestra.io/docs/integrations/github_actions)).
 
 ## Optional `configuration:` block (retries/timeout/concurrency)
 

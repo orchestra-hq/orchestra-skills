@@ -122,6 +122,29 @@
           "text": "Does not fabricate a Snowflake account, user, or password — the source contains none"
         }
       ]
+    },
+    {
+      "id": "connection-setup-not-ui-only",
+      "prompt": "Our Definitions block wires up 18 resources \u2014 Snowflake, S3, a couple of dbt CLI resources, Slack, and a pile of ConfigurableResource subclasses. Is the only way to get these into Orchestra for someone to add 18 connections by hand in the UI? And where do the name_XXXXX ids come from? Don't call any live Orchestra tools \u2014 just tell us how you'd approach it.",
+      "expected_output": "Says Orchestra connections can be created and maintained through the public API and the Orchestra MCP server as well as Settings -> Connections, so mapping 18 resources is a scripted loop rather than 18 forms. Says each connection's descriptive_name_NNNNN id comes back from the create response or from listing the workspace's connections, and that is what goes in the YAML connection: field \u2014 not a value transcribed from the UI and not an invented suffix. Notes the credentials themselves are still supplied at creation from the user or their secret store, so managing connections programmatically does not put the Dagster resources' secrets back into code. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that Orchestra connections can be created and managed through the public API and the Orchestra MCP server, not only through the UI"
+        },
+        {
+          "text": "Treats mapping the resources to connections as scriptable at this volume rather than 18 manual Add Connection forms"
+        },
+        {
+          "text": "Says the name_NNNNN connection id is read back from the create response or by listing connections, rather than transcribed from the UI or invented"
+        },
+        {
+          "text": "Keeps the secrets out of code: the credential values are still supplied at creation from the user or their secret store, so a programmatic setup is not the same as putting the resources' secrets back in the repo"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and creates nothing in the workspace"
+        }
+      ]
     }
   ]
 }

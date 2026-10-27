@@ -24,6 +24,32 @@
           "text": "Writes no files, opens no further PR, and makes no Orchestra write calls"
         }
       ]
+    },
+    {
+      "id": "github-actions-403-is-sso-authorisation-not-rotation",
+      "prompt": "A GitHub Actions task in our 'Ingest Hourly' pipeline has started failing. The log shows a 403 Forbidden when Orchestra tries to dispatch the workflow. We already rotated the personal access token on the connection yesterday and the new one has the repo and workflow scopes — it still 403s. The repo belongs to a GitHub organisation that enforces SAML single sign-on. Tell me what's wrong and how to fix it. Don't change the pipeline.",
+      "expected_output": "Identifies that on a SAML SSO organisation a 403 can mean a token that is valid and correctly scoped but was never authorised for that organisation, so rotating it again will not help — the new token needs authorising too. Gives the fix by token type: a classic personal access token is authorised with Configure SSO then Authorize next to the token for that organisation; a fine-grained token must be created with that organisation as its resource owner. Does not diagnose this as expired credentials, missing scopes, or a pipeline YAML problem, and makes no change to the pipeline.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies SAML SSO authorisation of the token for the organisation as the likely cause of the 403"
+        },
+        {
+          "text": "States that the token being valid and correctly scoped is consistent with this failure, so rotating it again does not fix it"
+        },
+        {
+          "text": "Gives the authorisation step for a classic personal access token (Configure SSO / Authorize for that organisation)"
+        },
+        {
+          "text": "States that a fine-grained token must be created with that organisation as its resource owner"
+        },
+        {
+          "text": "Does not conclude the credentials are expired or under-scoped, and does not attribute the 403 to the pipeline YAML"
+        },
+        {
+          "text": "Makes no change to the pipeline and no Orchestra write calls"
+        }
+      ]
     }
   ]
 }
