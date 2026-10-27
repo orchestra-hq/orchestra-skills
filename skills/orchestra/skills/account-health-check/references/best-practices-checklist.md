@@ -226,13 +226,14 @@ references. → Disable where unused. Docs: `/docs/core-concepts/tasks/setting-o
 Good: assets have Orchestra operations within ~7 days. Signal: `list_assets` entries with no
 operation in 7+ days (confirm via `list_operations`). → Bring under a pipeline. Where the work
 genuinely runs outside Orchestra and only the metadata is wanted, recommend a scheduled Python
-collector (see 5.7) — not scheduled asset collection, which is being removed. Docs:
+collector (see 5.7) — not scheduled asset collection, which has been removed. Docs:
 `/docs/core-concepts/assets`.
 
 **5.7 Not relying on scheduled asset collection** — *Medium* `[MANUAL]`
-Scheduled asset collection (Asset runs) is deprecated and stops working on **23 October 2026**, so
-a workspace that leans on it for asset coverage loses that coverage on a fixed date. Scope the
-finding before raising it: automatic collection is unaffected — every task Orchestra runs (a dbt
+Scheduled asset collection (Asset runs) was removed from Orchestra on **26 October 2026**, so a
+workspace that leaned on it for asset coverage has already lost it — this is a gap that is live
+now, not a deadline to plan around, and the assets it covered have been going stale since. Scope
+the finding before raising it: automatic collection is unaffected — every task Orchestra runs (a dbt
 Core or dbt Cloud job, a Snowflake or BigQuery query, a Databricks job) still creates the assets it
 touches and keeps their last-updated time, operations, tests and health current. Only assets that
 nothing in Orchestra runs against lose their collection, so a workspace whose assets all sit behind
