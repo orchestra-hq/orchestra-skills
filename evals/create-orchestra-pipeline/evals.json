@@ -448,6 +448,51 @@
           "text": "Does not treat the GHE.com tenant as GitHub Enterprise Server; if GHES is mentioned at all it is identified as the unsupported one"
         }
       ]
+    },
+    {
+      "id": "repo-connection-defaults-to-git-connection-not-pat",
+      "prompt": "Create an Orchestra pipeline 'Warehouse Nightly' with a single Python task that runs `scripts/load.py` from our repo acme/data-platform, on a cron trigger at 3am UTC daily. Write it to pipeline.yml. Our workspace is already connected to GitHub through Orchestra's Git control, and the repo is on github.com and inside that same organisation. Do I need to mint a personal access token for the Python connection, and what goes in its GitHub Enterprise URL field?",
+      "expected_output": "An Orchestra v1 pipeline YAML with a PYTHON / PYTHON_EXECUTE_SCRIPT task running scripts/load.py from Git (source: GIT) on a 3am daily cron, written to pipeline.yml. The handoff answers both questions: no PAT is needed, because the connection's authentication method offers the workspace's Git connection as well as a token and defaults to the Git connection, and this repo is inside the connected organisation; and the GitHub Enterprise URL field is left empty, both because the repo is on github.com and because it is left empty on the Git-connection path regardless. A token is named only as the fallback for a repo outside the connected organisation or a provider with no workspace Git connection.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the PYTHON integration for the script task",
+          "check": "regex",
+          "pattern": "integration:\\s*PYTHON\\b"
+        },
+        {
+          "text": "Runs the script from Git rather than inline",
+          "check": "regex",
+          "pattern": "source:\\s*GIT\\b"
+        },
+        {
+          "text": "Scheduled daily at 3am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+3\\s"
+        },
+        {
+          "text": "States that no personal access token is needed, because the connection can authenticate with the workspace's Git connection instead of a token"
+        },
+        {
+          "text": "Identifies the Git connection as the default authentication method, rather than presenting a token as the only or the expected route"
+        },
+        {
+          "text": "Says the GitHub Enterprise URL field is left empty here, and does not invent a value for it"
+        },
+        {
+          "text": "If a token is mentioned at all, it is scoped to the fallback case — a repo outside the connected organisation or App installation, or a provider with no workspace Git connection"
+        }
+      ]
     }
   ]
 }

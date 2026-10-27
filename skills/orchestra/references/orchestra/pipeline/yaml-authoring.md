@@ -157,6 +157,29 @@ genuinely needs to override it. If a required value truly can't be determined st
 only resolvable by calling a live API), use a placeholder and flag it with a `# MANUAL:` comment
 rather than shipping a fabricated literal or GUID.
 
+### Repo-backed connections: Git connection or token
+
+Python, dbt Core and Bauplan connections point at a Git repository, and now choose **how** they
+reach it: the workspace's **Git connection** (the default) or a **Token**. A personal access token
+is only required on the token path, so a workspace that already connects to that provider needs no
+new secret to add one of these connections — check before asking a user to mint a PAT
+([Python](https://docs.getorchestra.io/docs/integrations/python),
+[dbt Core](https://docs.getorchestra.io/docs/integrations/dbt_core)). Reach for a token only when
+the repo sits outside the connected organisation or App installation, or the provider has no
+workspace Git connection.
+
+- **GitHub Enterprise URL** is the GHE field on these connections (previously labelled "Self hosted
+  URL"). Leave it empty for github.com **and** on the Git-connection path; fill it only for a token
+  against GHE — a GHE.com tenant URL, or a GitHub Enterprise *Server* API URL ending in `/api/v3`.
+  Note the asymmetry with Git-backed pipelines above: GHES is a fine home for a *task's* repo even
+  though Git control itself doesn't support it
+  ([tasks on GHE.com](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github-enterprise)).
+- **GitHub Actions is the exception.** It has no Git-connection option, still requires a personal
+  access token, and has its own GitHub Enterprise URL field (empty for github.com). Where the
+  organisation enforces SAML SSO, that token must be authorised for the organisation or workflow
+  runs fail with 403
+  ([GitHub Actions](https://docs.getorchestra.io/docs/integrations/github_actions)).
+
 ## Optional `configuration:` block (retries/timeout/concurrency)
 
 ```yaml
