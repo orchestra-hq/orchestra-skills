@@ -54,8 +54,9 @@ backwards through the pipeline until something is wrong.
 #### 0b-1. Map the symptom to a pipeline task
 
 Extract the system keyword from the prompt (e.g. "Lightdash", "dbt", "Fivetran").
-Call `list_pipeline_runs` for the relevant pipeline to get the most recent run.
-Call `list_task_runs` for that run to get all tasks and their execution order.
+Call `list_pipeline_runs` for the relevant pipeline, with `time_from`/`time_to` covering the
+last 7 days, to get the most recent run (without a window only the last 24 hours are searched).
+Call `list_task_runs_for_pipeline_run` for that run to get all tasks and their execution order.
 
 Match the keyword to a task via the `integration` field (e.g. `LIGHTDASH`, `DBT_CORE`,
 `FIVETRAN`). This is the **entry task**. If no pipeline is named, ask the user which

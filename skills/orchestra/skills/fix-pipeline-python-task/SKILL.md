@@ -22,7 +22,7 @@ Base: `https://app.getorchestra.io/api/engine/public` — header `Authorization:
 
 `identify-pipeline-error` hands you: the pipeline run ID (**RID**), pipeline ID (**PID**), the failed Python **task run ID** (TRID), `integration=PYTHON`, the run `branch`/`commit`, the task's `taskParameters`, and the cause classification (a Python **code / dependency / destination-schema** issue). Use them directly — don't re-run the identification.
 
-**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs?pipeline_run_ids=<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50` (filter to this RID client-side; `pipeline_run_ids` does **not** filter `/task_runs`, 7-day window) to find the FAILED Python task.
+**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs/<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50&time_from=<now-7d>&time_to=<now>` (filter to this RID client-side; `pipeline_run_ids` does **not** filter `/task_runs`, defaults to the last 24 hours without the window) to find the FAILED Python task.
 
 **Capture `taskParameters` exactly** — `command`/`entrypoint`, `python_version`, `package_manager`, `requirements`, `branch`, `project_dir`, and any env/run inputs. Preserve them on every retry. The pipeline run's `branch` is where the *Orchestra YAML* lives; the script's source branch (if git-backed) is a separate task param.
 
@@ -86,7 +86,7 @@ Bias **strongly** toward upward-compatible schema changes; never destroy data or
 
 ## 6. Poll, loop, confirm
 
-Poll `GET /pipeline_runs?pipeline_run_ids=<RID>` ~every 20s, one line per check:
+Poll `GET /pipeline_runs/<RID>` (MCP `get_pipeline_run`) ~every 20s, one line per check:
 ```
 ▶ Run e2049b86 — RUNNING (0:42)
 ✅ Run e2049b86 — SUCCEEDED (1:44)
