@@ -110,6 +110,8 @@ def main():
 
     evals = json.loads((EVALS_DIR / args.suite / "evals.json").read_text())
     output_file = evals.get("output_file", "pipeline.yml")
+    if output_file == "transcript.txt":
+        sys.exit(f"{args.suite} grades a prose answer, not pipeline YAML — nothing to validate live.")
     configs = [c.strip() for c in args.configs.split(",") if c.strip()]
 
     if not mcp_config_path:

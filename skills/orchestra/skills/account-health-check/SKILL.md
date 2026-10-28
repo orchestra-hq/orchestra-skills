@@ -127,7 +127,10 @@ Field names also vary between the YAML form and the stored API form (e.g. `max_a
 Work through `references/best-practices-checklist.md` against the data you gathered. For each
 violation, record: the check, the **specific** offending pipeline/task/field (evidence by
 location — pipeline → task → field/key name, not vague claims), the severity, and the recommendation
-with its doc link. A clean check is worth noting too — the report's value is partly the reassurance
+with its doc link. When a checklist item gives caveats or constraints for its recommendation
+(a limit, a dependency on another setting, a "caveat to state", why something looks wrong but
+isn't), carry each into the recommendation as one short line. They're what stop the user acting
+on a half-right fix, so they survive even in a concise report or chat answer. A clean check is worth noting too — the report's value is partly the reassurance
 that the basics are covered.
 
 **Never reproduce a secret value.** For credential findings (e.g. checks 4.3/4.4 — a literal secret
