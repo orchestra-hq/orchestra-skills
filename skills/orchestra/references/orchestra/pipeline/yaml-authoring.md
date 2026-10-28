@@ -84,8 +84,8 @@ pipeline:
 | Integration | integration_job | Key parameters |
 |---|---|---|
 | FIVETRAN | FIVETRAN_SYNC_ALL | `connector_id` |
-| DBT_CORE | DBT_CORE_EXECUTE | `commands`, `package_manager` (PIP\|UV), `python_version`, `project_dir`, `shallow_clone_dirs` |
-| PYTHON | PYTHON_EXECUTE_SCRIPT | `command`, `package_manager`, `python_version`, `build_command`, `source: GIT`, `project_dir`, `environment_variables`, `set_outputs` |
+| DBT_CORE | DBT_CORE_EXECUTE | `commands`, `package_manager` (PIP\|POETRY\|UV), `python_version` (3.11\|3.12\|3.13, default 3.12), `project_dir`, `shallow_clone_dirs` |
+| PYTHON | PYTHON_EXECUTE_SCRIPT | `command`, `package_manager` (PIP\|POETRY\|UV), `python_version` (3.11\|3.12\|3.13\|3.14, default 3.12), `build_command`, `source: GIT`, `project_dir`, `environment_variables`, `set_outputs` |
 | SNOWFLAKE | SNOWFLAKE_RUN_QUERY | `statement`, `role`, `database`, `schema` |
 | SNOWFLAKE | SNOWFLAKE_RUN_TEST | `statement`, `error_threshold_expression`, `warn_threshold_expression` |
 | GCP_BIG_QUERY | GCP_BQ_RUN_QUERY_JOB | `query` |
@@ -130,7 +130,7 @@ account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batc
 `integration_job`: they are credential stores a connection reads its own credentials from, not
 task types. There is no task that fetches a secret mid-run for a later task to consume, so a
 pipeline that needs one is really a connection that should name the store as its **Credential
-Store**. Both are in beta. See [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault)
+Store**. Both are in beta. See [Azure Key Vault](https://docs.getorchestra.io/docs/integrations/azure_key_vault)
 and [AWS Secrets Manager](https://docs.getorchestra.io/docs/integrations/aws_secrets_manager).
 
 `RUN_AGENT` creates an agent session from `prompt` and waits for it. Only `agent_id` and
@@ -322,6 +322,12 @@ alerts:
 `max_live_alerts` (integer 1–50, default 1) on an alert raises how many in-flight dbt Core
 model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or
 pipeline finishes ([alerting](https://docs.getorchestra.io/docs/core-concepts/alerting)).
+
+A live alert carries the level dbt gave that result, so dbt's `warn-error` setting changes both the
+alert and the task outcome: a warning dbt escalates to an error -- a source past its `warn_after`
+threshold, say -- is sent as a failure and fails the dbt Core Task. Don't treat a warn-level
+threshold as non-breaking without checking whether the project runs with `warn-error`
+([live alerts during a dbt Core task run](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#live-alerts-during-a-dbt-core-task-run)).
 
 **Pausing:**
 

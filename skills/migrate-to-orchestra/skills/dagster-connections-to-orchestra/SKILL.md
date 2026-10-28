@@ -113,7 +113,7 @@ A resource that resolves its secret at runtime from a secret store — `SecretsM
 - The secret's value must be a JSON object holding exactly the keys that integration expects — the parameter IDs from its **Authentication parameters** table, and every required one, not only the sensitive fields. In Azure Key Vault, that whole object is the secret's value — don't split it into one vault secret per field.
 - Orchestra reads the secret when the connection is saved and rejects it if it can't be read or its keys don't match, so a wrong key set surfaces there rather than at run time. After that it reads the latest version on each use, so rotating the secret in the store needs no change in Orchestra.
 
-Only those two stores work this way; a resource backed by Hashicorp Vault or GCP Secret Manager still means a manual re-entry. Both store integrations are in beta, so confirm they're enabled on the account before planning the migration around them. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure KeyVault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
+Only those two stores work this way; a resource backed by Hashicorp Vault or GCP Secret Manager still means a manual re-entry. Both store integrations are in beta, so confirm they're enabled on the account before planning the migration around them. See [External secret storage](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#external-secret-storage) and [Azure Key Vault](https://docs.getorchestra.io/docs/integrations/azure_key_vault).
 
 ---
 
