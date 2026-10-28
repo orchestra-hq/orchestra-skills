@@ -1,6 +1,6 @@
 {
   "skill_name": "python-prefect-to-orchestra",
-  "description": "Given a Prefect @task running arbitrary Python (pandas, requests, boto3), author the matching Orchestra PYTHON_EXECUTE_SCRIPT task — defaulting to parameters.source: INLINE with the body copied verbatim into parameters.code since the task already lives in the flow file, and correctly declining to convert a task whose entire body is actually a Slack notification.",
+  "description": "Given a Prefect @task running arbitrary Python (pandas, requests, boto3), author the matching Orchestra PYTHON_EXECUTE_SCRIPT task — defaulting to parameters.source: INLINE with the body copied verbatim into parameters.code since the task already lives in the flow file, correctly declining to convert a task whose entire body is actually a Slack notification, and carrying a pinned Python version over when the Python task supports it.",
   "output_file": "pipeline.yml",
   "evals": [
     {
@@ -59,6 +59,20 @@
         { "text": "The existing Snowflake connection is linked on the Python connection instead of its credentials being copied into that connection's Secrets — the warehouse credential stays in one place" },
         { "text": "Linked-credential environment variables are named <INTEGRATION>__<CONNECTION_ID>__<FIELD>, with a double underscore between parts and the field's ID (e.g. snowflake_password) as the last part — not a single underscore or the field's display label" },
         { "text": "The code tolerates a linked connection being skipped (deleted or undecryptable credentials) rather than assuming os.environ[...] is set — e.g. .get() or an explicit presence check" }
+      ]
+    },
+    {
+      "id": "python-version-314-carried-over",
+      "prompt": "Convert this Prefect task to an Orchestra pipeline task (see files/forecast_refresh_py314_task.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A PYTHON / PYTHON_EXECUTE_SCRIPT task with parameters.source: INLINE and parameters.python_version: '3.14' — carried over from the repo's .python-version pin rather than defaulting to '3.12', since the Python task supports 3.14 and the body's t-string syntax would not parse on an older version — plus build_command installing httpx.",
+      "files": ["forecast_refresh_py314_task.py"],
+      "assertions_ref": ["python"],
+      "assertions": [
+        { "text": "parameters.python_version is '3.14', not defaulted to '3.12'", "check": "regex", "pattern": "python_version:\\s*['\"]?3\\.14['\"]?" },
+        { "text": "parameters.source is INLINE", "check": "some_task", "field": "parameters.source", "equals": "INLINE" },
+        { "text": "build_command installs httpx for the non-stdlib import", "check": "regex", "pattern": "pip install[^\\n]*httpx", "ignore_case": true },
+        { "text": "3.14 is treated as a supported Python task version and carried over, rather than being rejected as unsupported or rewritten to 3.12" },
+        { "text": "The conversion does not rewrite or strip the 3.14-only t-string in the body to make it parse on an older Python — it keeps the code verbatim and selects a Python version that supports it" }
       ]
     }
   ]
