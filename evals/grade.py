@@ -300,12 +300,15 @@ def llm_grade(grading: dict, run_dir: Path, model: str | None = None) -> None:
         cmd += ["--model", model]
     out = subprocess.run(cmd, capture_output=True, text=True, timeout=600).stdout
     match = re.search(r"\[.*\]", out, re.S)
-    if not match:
-        print(f"    LLM grader returned no verdicts for {run_dir} — left as manual")
+    try:
+        verdicts = {v["n"]: v for v in json.loads(match.group(0))}
+    except (AttributeError, json.JSONDecodeError, KeyError, TypeError):
+        print(f"    LLM grader returned no usable verdicts for {run_dir} — left as manual")
         return
-    for v in json.loads(match.group(0)):
-        r = todo[v["n"]]
-        r.update(passed=bool(v["passed"]), graded_by="llm", evidence=v.get("reason", ""))
+    for n, r in enumerate(todo):
+        if n in verdicts:
+            v = verdicts[n]
+            r.update(passed=bool(v.get("passed")), graded_by="llm", evidence=v.get("reason", ""))
 
     results = grading["assertion_results"]
     graded = [r for r in results if r["passed"] is not None]
