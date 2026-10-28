@@ -17,7 +17,7 @@ The `commands` list from Prefect is joined into a single semicolon-delimited str
 | Prefect construct | Orchestra field | Notes |
 |---|---|---|
 | `DbtCoreOperation(commands=[...])` | `parameters.commands` | Join list items with `; ` — e.g. `'dbt seed; dbt build;'` |
-| Python version | `parameters.python_version` | `'3.11'` or `'3.12'` |
+| Python version | `parameters.python_version` | `'3.11'`, `'3.12'` or `'3.13'` — defaults to `'3.12'`. Carry the source project's version over when it's one of these; if it pins something older or newer, flag it rather than silently downgrading |
 | pip / poetry / uv | `parameters.package_manager` | `PIP`, `POETRY`, or `UV` — infer from visible project files (`poetry.lock`/`pyproject.toml` → `POETRY`, `uv.lock` → `UV`, `requirements.txt`/`Pipfile` → `PIP`). If none of that is visible, don't silently guess `PIP` — see Gotchas |
 | Git repo + profiles.yml / warehouse creds | `connection:` | Set up in Connectors → dbt Core |
 | `--select`, `--exclude`, `--target` flags | inline in `parameters.commands` | e.g. `dbt build --select tag:daily --target prod;` |
@@ -75,7 +75,7 @@ pipeline:
 - [ ] Determine dbt variant: `DbtCoreOperation` / `ShellOperation` → DBT_CORE; `DbtCloudJob` → DBT
 - [ ] **dbt Core:** join `commands` list with `'; '` and append trailing `;` into `parameters.commands`
 - [ ] **dbt Core:** choose `parameters.package_manager` (PIP/POETRY/UV) to match project setup — if it can't be inferred, add a `# MANUAL:` comment flagging it for the user to confirm/select when they set up the dbt Core connection, rather than silently defaulting to PIP
-- [ ] **dbt Core:** choose `parameters.python_version` (`'3.11'` or `'3.12'`)
+- [ ] **dbt Core:** choose `parameters.python_version` (`'3.11'`, `'3.12'` or `'3.13'`) — match the source project's Python version where it's supported, rather than defaulting to `'3.12'` regardless
 - [ ] **dbt Core:** carry `project_dir` over to `parameters.project_dir` (a real task parameter — don't drop it); move `profiles.yml` and warehouse credentials to the Orchestra dbt Core connection
 - [ ] **dbt Cloud:** set `parameters.job_id` to the numeric job ID string; set `account_id` on the connection
 - [ ] Set `connection:` to the appropriate Orchestra connection name

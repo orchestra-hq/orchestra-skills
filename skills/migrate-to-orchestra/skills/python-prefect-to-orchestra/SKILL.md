@@ -64,7 +64,7 @@ pipeline:
 - [ ] Copy the `@task` function body verbatim into `parameters.code` — no extraction to a file, no Git commit
 - [ ] List non-stdlib imports and set `parameters.build_command: 'pip install <package> ...'`
 - [ ] Replace any Prefect block loads (`SnowflakeConnector.load(...)`, `S3Bucket.load(...)`, etc.) with `os.getenv()` calls — wire `connection:` only if credentials are genuinely needed
-- [ ] Choose `parameters.python_version` (`'3.11'` or `'3.12'`)
+- [ ] Choose `parameters.python_version` (`'3.11'`, `'3.12'`, `'3.13'` or `'3.14'`) — match the Python version the flow already runs on where it's supported, rather than defaulting to `'3.12'` regardless. The Python task supports a wider range than the dbt Core task, which stops at `'3.13'`
 - [ ] Map `@flow` parameters to pipeline `inputs:` with types and defaults
 - [ ] Map function arguments into `parameters.environment_variables` as a JSON string referencing `${{ inputs.name }}`, or inline them as literals in `code`
 - [ ] Map `retries`, `retry_delay_seconds` (convert to minutes), `timeout_seconds` to `configuration:`
