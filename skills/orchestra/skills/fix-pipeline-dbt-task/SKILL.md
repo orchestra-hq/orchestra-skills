@@ -68,7 +68,7 @@ If branch isn't an input, tell the user it can't be hotfixed until they paramete
 
 ## 5. Poll, loop, confirm
 
-Poll `GET /pipeline_runs?pipeline_run_ids=<RID>` ~every 20s, one line per check:
+Poll `GET /pipeline_runs/<RID>` (MCP `get_pipeline_run`) ~every 20s, one line per check:
 ```
 ▶ Run e2049b86 — RUNNING (0:42)
 ✅ Run e2049b86 — SUCCEEDED (1:44)

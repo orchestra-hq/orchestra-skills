@@ -86,7 +86,7 @@ Bias **strongly** toward upward-compatible schema changes; never destroy data or
 
 ## 6. Poll, loop, confirm
 
-Poll `GET /pipeline_runs?pipeline_run_ids=<RID>` ~every 20s, one line per check:
+Poll `GET /pipeline_runs/<RID>` (MCP `get_pipeline_run`) ~every 20s, one line per check:
 ```
 ▶ Run e2049b86 — RUNNING (0:42)
 ✅ Run e2049b86 — SUCCEEDED (1:44)
