@@ -1,6 +1,6 @@
 {
   "skill_name": "configure-dbt-source-freshness",
-  "description": "Version-sensitivity of state-aware orchestration. Both cases are free-text (no pipeline YAML is produced): dbt-2x-is-supported checks the skill no longer refuses a dbt 2.x project and gets the install shape right; dbt-2x-databricks-implicit-freshness checks the Databricks 'you may omit loaded_at_field' shortcut is not carried from dbt Core 1.x onto 2.x.",
+  "description": "Version-sensitivity of state-aware orchestration, and the cost of a warn-level freshness threshold. All three cases are free-text (no pipeline YAML is produced): dbt-2x-is-supported checks the skill no longer refuses a dbt 2.x project and gets the install shape right; dbt-2x-databricks-implicit-freshness checks the Databricks 'you may omit loaded_at_field' shortcut is not carried from dbt Core 1.x onto 2.x; warn-after-escalates-under-warn-error checks a tight warn_after is not offered as a non-breaking early signal on a project running dbt with warn-error, which escalates it to a task failure.",
   "evals": [
     {
       "id": "dbt-2x-is-supported",
@@ -48,6 +48,26 @@
         },
         {
           "text": "Enables use_state_orchestration: true on the Orchestra dbt Core task"
+        }
+      ]
+    },
+    {
+      "id": "warn-after-escalates-under-warn-error",
+      "prompt": "We're setting up Orchestra state-aware orchestration on our dbt 1.11 Snowflake project. Our dbt_project.yml sets flags: warn_error: true. The sources are in models/staging/_sources.yml and every table has a loaded_at column. The tables load hourly. I'd like warn_after set tight — say 90 minutes — so the team gets an early Slack heads-up before anything is really wrong, and error_after at 6 hours for the genuine problem. Does that work?",
+      "expected_output": "Does not author the tight warn_after as a harmless early signal. Flags that this project runs dbt with warn-error, which escalates a warning into an error, so a source past warn_after is no longer advisory: the live alert is sent as a failure and the dbt Core Task fails. Tells the user the proposed 90-minute warn_after would stop the run 90 minutes after the last load rather than warn about it, and offers a way forward — relax warn_after to a delay they are willing to fail the run on, or drop warn-error if they want a genuine warning tier — before writing the thresholds.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Flags that with warn-error set, dbt escalates a source past warn_after into an error instead of leaving it a warning"
+        },
+        {
+          "text": "States the consequence on the Orchestra side: the live alert is sent as a failure and the dbt Core Task fails"
+        },
+        {
+          "text": "Corrects the user's assumption that a tight warn_after is a non-breaking early heads-up on this project"
+        },
+        {
+          "text": "Offers a concrete way forward (relax warn_after to a threshold worth failing on, or stop running dbt with warn-error) rather than silently authoring the 90-minute value"
         }
       ]
     }

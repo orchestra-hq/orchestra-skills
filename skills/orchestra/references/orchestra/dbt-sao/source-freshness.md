@@ -114,6 +114,13 @@ loaded hourly might `warn_after: 2 hours`, `error_after: 6 hours`. When you don'
 cadence, ask or leave a clearly-marked placeholder rather than guessing tight values that will
 false-alarm. Explain the reasoning in your handoff so the user can tune it.
 
+`warn_after` is only advisory while dbt treats a warning as a warning. If the project runs dbt with
+`warn-error`, a source past `warn_after` is escalated to an error: the live alert is sent as a
+failure and the dbt Core Task fails. Check for `warn-error` before setting a deliberately tight
+`warn_after` as an early signal, and tell the user when the threshold you author is one that will
+stop the run rather than just flag it
+([live alerts during a dbt Core task run](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#live-alerts-during-a-dbt-core-task-run)).
+
 ## Verifying (without running it for them)
 
 The user can confirm config with:
