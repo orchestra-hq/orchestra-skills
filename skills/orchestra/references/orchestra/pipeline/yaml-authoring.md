@@ -323,6 +323,12 @@ alerts:
 model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or
 pipeline finishes ([alerting](https://docs.getorchestra.io/docs/core-concepts/alerting)).
 
+A live alert carries the level dbt gave that result, so dbt's `warn-error` setting changes both the
+alert and the task outcome: a warning dbt escalates to an error -- a source past its `warn_after`
+threshold, say -- is sent as a failure and fails the dbt Core Task. Don't treat a warn-level
+threshold as non-breaking without checking whether the project runs with `warn-error`
+([live alerts during a dbt Core task run](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#live-alerts-during-a-dbt-core-task-run)).
+
 **Pausing:**
 
 `paused: true` on a task or task group keeps it in the pipeline without running it. Downstream tasks
