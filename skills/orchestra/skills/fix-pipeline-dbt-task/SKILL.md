@@ -22,7 +22,7 @@ Base: `https://app.getorchestra.io/api/engine/public` — header `Authorization:
 
 `identify-pipeline-error` hands you: the pipeline run ID (**RID**), pipeline ID (**PID**), the failed dbt **task run ID** (TRID), `integration=DBT_CORE`, the run `branch`/`commit`, the task's `taskParameters`, and the cause classification (a dbt **code/config** issue). Use them directly — don't re-run the identification.
 
-**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs?pipeline_run_ids=<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50` (filter to this RID client-side; the `pipeline_run_ids` filter does **not** work on `/task_runs`, 7-day window) to find the FAILED dbt task.
+**If invoked standalone** (no handoff): run `identify-pipeline-error` first, or do its minimum yourself — `GET /pipeline_runs/<RID>` then `GET /task_runs?pipeline_ids=<PID>&page_size=50&time_from=<now-7d>&time_to=<now>` (filter to this RID client-side; the `pipeline_run_ids` filter does **not** work on `/task_runs`, defaults to the last 24 hours without the window) to find the FAILED dbt task.
 
 **Capture `taskParameters` exactly** — especially `branch`, `commands`, `project_dir`, `use_state_orchestration`. These are run inputs you must preserve on retry. The pipeline run's `branch` is where the *Orchestra YAML* lives; the dbt clone branch is a separate task param (commonly an input like `dbt_branch`).
 

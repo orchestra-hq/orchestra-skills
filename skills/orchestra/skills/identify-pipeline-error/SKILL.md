@@ -72,10 +72,10 @@ The user may give you several forms. Extract the IDs before doing anything else.
   https://app.getorchestra.io/pipelines/{pipeline_id}
   ```
   Self-hosted instances use the same path structure on a different domain.
-- **Bare UUID** — try it as a pipeline run ID first (`list_pipeline_runs` /
-  `GET /pipeline_runs?pipeline_run_ids=<id>`, with `time_from`/`time_to` covering the last 7 days —
-  without them only the last 24 hours are searched). If nothing comes back, treat it as a pipeline ID and
-  look up its recent runs.
+- **Bare UUID** — try it as a pipeline run ID first (`get_pipeline_run` /
+  `GET /pipeline_runs/<id>`), then as a task run ID (`get_task_run` / `GET /task_runs/<id>`, whose
+  `pipelineRunId` gives you the run). Both find a run however old it is. If neither matches, treat
+  it as a pipeline ID and look up its recent runs.
 - **Pipeline name / alias** — match with `list_pipelines`, then find its latest FAILED run.
 - **"What's broken" with no ID** — `whats_broken()`, or `list_pipeline_runs` with
   `status=FAILED` as the fallback. If several pipelines failed, present a
@@ -86,10 +86,13 @@ The user may give you several forms. Extract the IDs before doing anything else.
 ## 2. GET the pipeline run
 
 ```
-list_pipeline_runs(pipeline_run_ids=<RID>, time_from=<now-7d>, time_to=<now>)   # MCP
-GET /pipeline_runs?pipeline_run_ids=<RID>&time_from=<now-7d>&time_to=<now>       # REST
+get_pipeline_run(pipeline_run_id=<RID>)   # MCP
+GET /pipeline_runs/<RID>                   # REST
 ```
-Capture: `id` (RID), `pipelineId` (PID), `pipelineName`, `status`, `message`, `branch`, `commit`,
+Unlike `list_pipeline_runs`, this needs no `time_from`/`time_to`: it finds the run however long ago
+it ran.
+
+Capture: `id` (RID), `pipelineId` (PID), `pipelineName`, `runStatus`, `message`, `branch`, `commit`,
 `envName`, `triggeredBy`. The run's `branch` is where the **Orchestra YAML** lives (not necessarily
 the code branch).
 
