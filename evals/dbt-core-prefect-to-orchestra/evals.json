@@ -1,6 +1,6 @@
 {
   "skill_name": "dbt-core-prefect-to-orchestra",
-  "description": "Given a Prefect dbt integration (DbtCoreOperation, ShellOperation running dbt CLI, or DbtCloudJob), author the matching Orchestra pipeline YAML — DBT_CORE/DBT_CORE_EXECUTE for dbt Core, DBT/DBT_RUNJOB for dbt Cloud — consolidating a commands list into a semicolon-joined string and carrying project_dir/package_manager over as real task parameters.",
+  "description": "Given a Prefect dbt integration (DbtCoreOperation, ShellOperation running dbt CLI, or DbtCloudJob), author the matching Orchestra pipeline YAML — DBT_CORE/DBT_CORE_EXECUTE for dbt Core, DBT/DBT_RUNJOB for dbt Cloud — consolidating a commands list into a semicolon-joined string and carrying project_dir/package_manager over as real task parameters, including a project pinned to a Python version other than the default.",
   "output_file": "pipeline.yml",
   "evals": [
     {
@@ -57,6 +57,19 @@
         { "text": "Linked credentials are read in profiles.yml through dbt's env_var() using the <INTEGRATION>__<CONNECTION_ID>__<FIELD> naming (parts joined by a double underscore, <FIELD> being the field ID from the integration's Authentication parameters table), e.g. SNOWFLAKE__PROD_12345__SNOWFLAKE_PASSWORD", "check": "regex", "pattern": "env_var|SNOWFLAKE__[A-Z0-9_]+__SNOWFLAKE_", "min_count": 1 },
         { "text": "No Snowflake account, user or password value is written into the YAML", "check": "no_hardcoded_secret" },
         { "text": "The conversion does not assume a linked credential's environment variable is present — a linked connection that has been deleted, or whose credentials cannot be decrypted, is skipped silently, so its variables are simply absent" }
+      ]
+    },
+    {
+      "id": "python-version-313-carried-over",
+      "prompt": "Convert this Prefect dbt flow to an Orchestra pipeline task (see files/dbt_core_operation_py313.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task with parameters.python_version: '3.13' — carried over from the project's .python-version / requires-python pin rather than downgraded to the '3.12' default, since 3.13 is a supported dbt Core Task version — plus package_manager: UV from the uv.lock signal, project_dir: analytics, and commands: 'dbt build --select tag:nightly;'.",
+      "files": ["dbt_core_operation_py313.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "parameters.python_version is '3.13', not silently downgraded to the '3.12' default", "check": "regex", "pattern": "python_version:\\s*['\"]?3\\.13['\"]?" },
+        { "text": "package_manager is UV, inferred from the uv.lock signal", "check": "regex", "pattern": "package_manager:\\s*UV" },
+        { "text": "project_dir is carried over as 'analytics'", "check": "regex", "pattern": "project_dir:\\s*['\"]?analytics['\"]?" },
+        { "text": "The project's pinned 3.13 is treated as a supported dbt Core Task Python version and carried over, rather than being flagged as unsupported or rewritten to 3.12" }
       ]
     }
   ]
