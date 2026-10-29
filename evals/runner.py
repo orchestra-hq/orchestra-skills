@@ -14,7 +14,7 @@ iteration is graded on completion (see grade.py).
 Usage:
     python3 evals/runner.py <suite> [--only ID] [--configs with_skill,without_skill]
                                     [--iteration N] [--model NAME] [--max-turns N]
-                                    [--no-grade] [--plugin NAME] [--skills-root PATH]
+                                    [--no-grade] [--llm] [--plugin NAME] [--skills-root PATH]
 
 A suite's SKILL.md is resolved against every known plugin root (see PLUGIN_ROOTS) and
 must match exactly one; pass --plugin to disambiguate a name collision, or --skills-root
@@ -45,8 +45,8 @@ PLUGIN_ROOTS = {
 CONFIGS = ("with_skill", "without_skill")
 
 REFERENCE_LINK_RE = re.compile(r"`(\.\./\.\./references/[^`]+\.md)`")
-# Skill-local files linked as markdown, e.g. [x](references/x.md) or [y](templates/y.yml)
-LOCAL_LINK_RE = re.compile(r"\]\(((?:references|templates)/[^)#\s]+)\)")
+# Skill-local files linked as markdown, e.g. [x](references/x.md), or named in backticks
+LOCAL_LINK_RE = re.compile(r"(?:\]\(|`)((?:references|templates)/[^)`#\s]+)[)`]")
 
 WITH_SKILL_PREAMBLE = (
     "You have been given a Skill below. Follow its instructions to complete the user's "
@@ -92,6 +92,8 @@ def skill_body(suite: str, plugin: str | None = None, skills_root: str | None = 
 
     seen = set()
     for rel in REFERENCE_LINK_RE.findall(text) + LOCAL_LINK_RE.findall(text):
+        if "<" in rel:  # a placeholder path like warehouses/<warehouse>.md, not a real file
+            continue
         ref_path = (skill_dir / rel).resolve()
         if ref_path in seen:
             continue
@@ -179,6 +181,8 @@ def main():
     ap.add_argument("--model", help="pin a model, e.g. claude-opus-4-8")
     ap.add_argument("--max-turns", type=int, default=30)
     ap.add_argument("--no-grade", action="store_true", help="skip grading after runs")
+    ap.add_argument("--llm", action="store_true",
+                    help="also grade free-text assertions with `claude -p` (spends tokens)")
     ap.add_argument("--plugin", choices=sorted(PLUGIN_ROOTS),
                     help="disambiguate which plugin's skill tree to resolve the suite against "
                          "(only needed if the suite name exists under more than one)")
@@ -220,7 +224,7 @@ def main():
 
     print("\nGrading…")
     import grade
-    grade.grade_iteration(args.suite, iteration_dir, configs)
+    grade.grade_iteration(args.suite, iteration_dir, configs, llm=args.llm)
     print(f"\nDone. Outputs under {iteration_dir}")
 
 

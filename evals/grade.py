@@ -2,12 +2,16 @@
 """Grade generated pipeline YAML against the assertions in a suite's evals.json.
 
 Coded assertions (those carrying a `check`) are graded mechanically and reliably.
-Free-text assertions (only `text`) are recorded as `manual` (passed=null) for human
-or LLM review. Writes a grading.json next to each run's output and an aggregated
+Free-text assertions (only `text`) are recorded as `manual` (passed=null), or graded by
+`claude -p` with --llm. Writes a grading.json next to each run's output and an aggregated
 benchmark.json for the iteration.
 
+A suite whose skill answers in prose rather than writing a file sets
+`"output_file": "transcript.txt"` (the agent's final answer, which runner.py always
+saves); text checks (`regex`, `no_hardcoded_secret`) then run against that answer.
+
 Usage:
-    python3 evals/grade.py <suite> [--iteration N] [--configs with_skill,without_skill]
+    python3 evals/grade.py <suite> [--iteration N] [--configs with_skill,without_skill] [--llm]
 """
 from __future__ import annotations
 
@@ -15,6 +19,7 @@ import argparse
 import json
 import re
 import statistics
+import subprocess
 import sys
 from pathlib import Path
 
@@ -26,6 +31,8 @@ except ModuleNotFoundError:
 EVALS_DIR = Path(__file__).resolve().parent
 CONFIGS = ("with_skill", "without_skill")
 SHARED_ASSERTIONS_DIR = EVALS_DIR / "_shared_assertions"
+# Checks that read the raw text only, so they still run when the output isn't YAML.
+TEXT_CHECKS = {"regex", "no_hardcoded_secret"}
 
 
 # --- helpers ---------------------------------------------------------------
@@ -207,34 +214,26 @@ CHECKS = {
 
 def grade_output(assertions, output_path: Path) -> dict:
     raw = output_path.read_text() if output_path.exists() else ""
-    doc = None
+    doc, raw_err = None, "output file not found"
     if raw:
         try:
-            doc = yaml.safe_load(raw)
+            doc, raw_err = yaml.safe_load(raw), None
         except yaml.YAMLError as e:
-            doc = None
             raw_err = str(e)
-        else:
-            raw_err = None
-    else:
-        raw_err = "output file not found"
 
     results = []
-    coded_pass = coded_total = manual = 0
     for a in assertions:
         check = a.get("check")
         if not check:
             results.append({"text": a["text"], "passed": None, "graded_by": "manual",
                             "evidence": "free-text assertion — review by hand or LLM"})
-            manual += 1
             continue
         fn = CHECKS.get(check)
         if fn is None:
             results.append({"text": a["text"], "passed": False, "graded_by": "code",
                             "evidence": f"unknown check type '{check}'"})
-            coded_total += 1
             continue
-        if doc is None and check != "valid_yaml":
+        if doc is None and check != "valid_yaml" and not (raw and check in TEXT_CHECKS):
             passed, evidence = False, f"YAML unavailable ({raw_err})"
         else:
             try:
@@ -243,19 +242,68 @@ def grade_output(assertions, output_path: Path) -> dict:
                 passed, evidence = False, f"check raised: {e}"
         results.append({"text": a["text"], "passed": bool(passed), "graded_by": "code",
                         "evidence": evidence})
-        coded_total += 1
-        coded_pass += int(bool(passed))
+    return {"assertion_results": results, "summary": summarize(results)}
 
+
+def summarize(results: list[dict]) -> dict:
+    graded = [r["passed"] for r in results if r["passed"] is not None]
+    passed = sum(graded)
     return {
-        "assertion_results": results,
-        "summary": {
-            "passed": coded_pass,
-            "failed": coded_total - coded_pass,
-            "coded_total": coded_total,
-            "manual": manual,
-            "pass_rate": round(coded_pass / coded_total, 4) if coded_total else None,
-        },
+        "passed": passed,
+        "failed": len(graded) - passed,
+        "coded_total": len(graded),
+        "manual": len(results) - len(graded),
+        "pass_rate": round(passed / len(graded), 4) if graded else None,
     }
+
+
+LLM_GRADER_PROMPT = """You are grading an AI agent's response against assertions. Judge only from the evidence below.
+An assertion passes only if the final answer or the files clearly satisfy it.
+
+FINAL ANSWER:
+{answer}
+
+FILES (agent outputs at top level; files/ holds input fixtures):
+{files}
+
+ASSERTIONS:
+{items}
+
+Reply with only a JSON array, one object per assertion in order: {{"n": <number>, "passed": true|false, "reason": "<short>"}}"""
+
+
+def llm_grade(grading: dict, run_dir: Path) -> None:
+    """Grade manual assertions in place; marked graded_by "llm" as it's looser than a coded check."""
+    todo = [r for r in grading["assertion_results"] if r["passed"] is None]
+    if not todo:
+        return
+    skip = {"grading.json", "timing.json", "transcript.txt", "validate_live.json"}
+    files = "\n\n".join(
+        f"--- {f.relative_to(run_dir)} ---\n{f.read_text(errors='replace')}"
+        for f in sorted(run_dir.rglob("*"))
+        if f.is_file() and f.name not in skip and f.stat().st_size < 20000
+    )[:30000]
+    transcript = run_dir / "transcript.txt"
+    prompt = LLM_GRADER_PROMPT.format(
+        answer=transcript.read_text() if transcript.exists() else "",
+        files=files,
+        items="\n".join(f"{n}. {r['text']}" for n, r in enumerate(todo)),
+    )
+    out = subprocess.run(
+        ["claude", "-p", prompt, "--allowedTools", "",
+         "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}'],
+        capture_output=True, text=True, timeout=600,
+    ).stdout
+    match = re.search(r"\[.*\]", out, re.S)
+    try:
+        verdicts = {v["n"]: v for v in json.loads(match.group(0))}
+    except (AttributeError, json.JSONDecodeError, KeyError, TypeError):
+        print(f"    LLM grader returned no usable verdicts for {run_dir} — left as manual")
+        return
+    for n, r in enumerate(todo):
+        if v := verdicts.get(n):
+            r.update(passed=bool(v.get("passed")), graded_by="llm", evidence=v.get("reason", ""))
+    grading["summary"] = summarize(grading["assertion_results"])
 
 
 def resolve_assertions(case: dict) -> list[dict]:
@@ -276,7 +324,7 @@ def resolve_assertions(case: dict) -> list[dict]:
     return assertions + list(case.get("assertions", []))
 
 
-def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
+def grade_iteration(suite: str, iteration_dir: Path, configs, llm: bool = False) -> dict:
     evals = json.loads((EVALS_DIR / suite / "evals.json").read_text())
     output_file = evals.get("output_file", "pipeline.yml")
     by_config = {c: [] for c in configs}
@@ -288,6 +336,8 @@ def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
             if not run_dir.exists():
                 continue
             grading = grade_output(resolve_assertions(case), run_dir / output_file)
+            if llm:
+                llm_grade(grading, run_dir)
             (run_dir / "grading.json").write_text(json.dumps(grading, indent=2) + "\n")
             timing = {}
             tpath = run_dir / "timing.json"
@@ -303,7 +353,7 @@ def grade_iteration(suite: str, iteration_dir: Path, configs) -> dict:
                 "duration_ms": timing.get("duration_ms"),
             })
             print(f"  {case['id']:<28} {config:<14} "
-                  f"{grading['summary']['passed']}/{grading['summary']['coded_total']} coded "
+                  f"{grading['summary']['passed']}/{grading['summary']['coded_total']} graded "
                   f"(+{grading['summary']['manual']} manual)")
 
     def agg(rows, key):
@@ -352,6 +402,8 @@ def main():
     ap.add_argument("--iteration", type=int, help="iteration number (default: latest)")
     ap.add_argument("--configs", default=",".join(CONFIGS),
                     help="comma-separated configs to grade")
+    ap.add_argument("--llm", action="store_true",
+                    help="grade free-text assertions with `claude -p` (spends tokens)")
     args = ap.parse_args()
 
     workspace = EVALS_DIR / ".workspace" / args.suite
@@ -364,7 +416,7 @@ def main():
 
     configs = [c.strip() for c in args.configs.split(",") if c.strip()]
     print(f"Grading {args.suite} / {iteration_dir.name}")
-    benchmark = grade_iteration(args.suite, iteration_dir, configs)
+    benchmark = grade_iteration(args.suite, iteration_dir, configs, llm=args.llm)
 
     print("\nbenchmark.json:")
     print(json.dumps(benchmark.get("run_summary", {}), indent=2, default=str))

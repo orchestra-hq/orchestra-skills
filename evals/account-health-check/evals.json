@@ -1,6 +1,7 @@
 {
   "skill_name": "account-health-check",
-  "description": "Rubric checks the health check is graded on here: asset governance (5.6, 5.7), pipeline concurrency (1.8), and incident routing (5.8, 5.9). The skill's output is a conversational review, not a pipeline artifact, so all assertions here are free-text (manual/LLM-graded) rather than coded checks against a parsed file.",
+  "output_file": "transcript.txt",
+  "description": "Rubric checks the health check is graded on here: asset governance (5.6, 5.7), pipeline concurrency (1.8), and incident routing (5.8, 5.9). The skill's output is a conversational review, not a pipeline artifact, so assertions are graded against the agent's final answer (output_file transcript.txt): regex checks run on that text, the rest are free-text (manual, or LLM-graded with --llm).",
   "evals": [
     {
       "id": "asset-runs-removed-not-recommended",

@@ -60,7 +60,11 @@ the pattern and a worked example.
 
 ### Step 1 — Scope the comparison
 
-Nail down, by asking rather than assuming whatever is ambiguous:
+Nail down, by asking rather than assuming whatever is ambiguous. Ask *alongside* a draft, not
+instead of one: if the user asked for pipeline YAML and the only gaps are inputs like the table
+list or connection names, still write the pipeline, with every unconfirmed value marked as a
+placeholder, and list the questions after it. Stop without a draft only when a gap changes the
+pipeline's shape, such as an engine outside `SNOWFLAKE`/`SQL_SERVER`/`DATABRICKS`.
 
 - **Source and destination**: integration (must each be `SNOWFLAKE`/`SQL_SERVER`/
   `DATABRICKS`), connection, and database/schema for each side.
@@ -82,8 +86,10 @@ gave you specific tables, use them; ask which columns matter for the aggregate c
 than enumerating every column of a wide table. If they only named a schema/database, ask
 whether to (a) get the table/column list pasted in, and build a static pipeline from it, or
 (b) build a self-discovering pipeline that queries `information_schema` at runtime — worth
-the extra complexity only when the table set will keep changing. Never invent a table or
-column name.
+the extra complexity only when the table set will keep changing. Draft while you wait: an
+ongoing cursor-field monitor can be written now with a clearly marked placeholder table
+entry, so the user gets the requested YAML and only has to fill in names. Never invent a
+table or column name and present it as real.
 
 ### Step 3 — Build the migration-validation pipeline (manual query)
 

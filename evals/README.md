@@ -96,6 +96,9 @@ python3 evals/runner.py write-snowflake-dq-tests --model claude-opus-4-8 --itera
 # Grade the latest iteration (or a specific one) and write benchmark.json
 python3 evals/grade.py write-snowflake-dq-tests
 python3 evals/grade.py write-snowflake-dq-tests --iteration 1
+
+# Also grade free-text assertions with `claude -p` (works on runner.py too)
+python3 evals/grade.py write-snowflake-dq-tests --llm
 ```
 
 `runner.py` auto-grades each iteration when it finishes, so the usual loop is just the
@@ -123,7 +126,13 @@ Each eval lists `assertions`. Two kinds:
   `every_task`) and are graded mechanically by `grade.py` — reliable and reusable across
   iterations.
 - **Free-text** assertions have only `text` and are recorded as `manual` (passed: null)
-  for human or LLM review — use these for qualities that don't reduce to a code check.
+  for human review — use these for qualities that don't reduce to a code check. With
+  `--llm`, `claude -p` grades them from the final answer and the run's files, marked
+  `graded_by: "llm"`; looser than a coded check, so read the evidence when a score moves.
+
+A suite whose skill answers in prose rather than writing a file (e.g.
+`account-health-check`) sets `"output_file": "transcript.txt"`, the agent's final answer.
+`regex` and `no_hardcoded_secret` then run against that text; YAML checks don't apply.
 
 Coded `check` types (see [`grade.py`](grade.py) for arguments):
 

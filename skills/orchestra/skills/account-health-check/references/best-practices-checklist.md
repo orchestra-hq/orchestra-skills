@@ -265,7 +265,9 @@ Good: workspaces running dbt have a monitor matching the dbt Core / dbt Cloud in
 **Operation failures only** on and **Group by** set to downstream dbt models — one incident per
 broken model plus failures up to two levels downstream of it, instead of one incident for
 everything a dbt task broke. The dbt job's own task-level failures (parse errors) are deliberately
-left out of that monitor and fall through to Orchestra's own grouping. Signal: `list_monitors`
+left out of that monitor and fall through to Orchestra's own grouping. **Operation failures only**
+can't be used on its own: it narrows the other Events fields, so the monitor still needs at least
+one pipeline, asset, integration, connection or external-event label (here, the dbt integration). Signal: `list_monitors`
 shows dbt integrations claimed only by a monitor grouping by task or pipeline, or no monitor
 claiming them at all, while `list_task_runs` shows dbt tasks running. → Add the recommended dbt
 monitor. Caveat to state when recommending it: lineage comes from previous runs, so newly added
