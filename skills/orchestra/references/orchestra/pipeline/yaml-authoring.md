@@ -84,7 +84,7 @@ pipeline:
 | Integration | integration_job | Key parameters |
 |---|---|---|
 | FIVETRAN | FIVETRAN_SYNC_ALL | `connector_id` |
-| DBT_CORE | DBT_CORE_EXECUTE | `commands`, `package_manager` (PIP\|POETRY\|UV), `python_version` (3.11\|3.12\|3.13, default 3.12), `project_dir`, `shallow_clone_dirs` |
+| DBT_CORE | DBT_CORE_EXECUTE | `commands`, `package_manager` (PIP\|POETRY\|UV), `python_version` (3.11\|3.12\|3.13\|3.14, default 3.12), `project_dir`, `shallow_clone_dirs` |
 | PYTHON | PYTHON_EXECUTE_SCRIPT | `command`, `package_manager` (PIP\|POETRY\|UV), `python_version` (3.11\|3.12\|3.13\|3.14, default 3.12), `build_command`, `source: GIT`, `project_dir`, `environment_variables`, `set_outputs` |
 | SNOWFLAKE | SNOWFLAKE_RUN_QUERY | `statement`, `role`, `database`, `schema` |
 | SNOWFLAKE | SNOWFLAKE_RUN_TEST | `statement`, `error_threshold_expression`, `warn_threshold_expression` |

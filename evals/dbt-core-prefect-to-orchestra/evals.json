@@ -71,6 +71,19 @@
         { "text": "project_dir is carried over as 'analytics'", "check": "regex", "pattern": "project_dir:\\s*['\"]?analytics['\"]?" },
         { "text": "The project's pinned 3.13 is treated as a supported dbt Core Task Python version and carried over, rather than being flagged as unsupported or rewritten to 3.12" }
       ]
+    },
+    {
+      "id": "python-version-314-carried-over",
+      "prompt": "Convert this Prefect dbt flow to an Orchestra pipeline task (see files/dbt_core_operation_py314.py). Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task with parameters.python_version: '3.14' — carried over from the project's .python-version / requires-python pin rather than downgraded to the '3.12' default, since 3.14 is a supported dbt Core Task version — plus package_manager: PIP from the requirements.txt signal, project_dir: warehouse, and commands: 'dbt build --select tag:hourly;'.",
+      "files": ["dbt_core_operation_py314.py"],
+      "assertions_ref": ["dbt_core", "connections"],
+      "assertions": [
+        { "text": "parameters.python_version is '3.14', not silently downgraded to the '3.12' default", "check": "regex", "pattern": "python_version:\\s*['\"]?3\\.14['\"]?" },
+        { "text": "package_manager is PIP, inferred from the requirements.txt signal", "check": "regex", "pattern": "package_manager:\\s*PIP" },
+        { "text": "project_dir is carried over as 'warehouse'", "check": "regex", "pattern": "project_dir:\\s*['\"]?warehouse['\"]?" },
+        { "text": "3.14 is treated as a supported dbt Core Task Python version and carried over, rather than being flagged as unsupported or rewritten to 3.12 as the newest supported version" }
+      ]
     }
   ]
 }

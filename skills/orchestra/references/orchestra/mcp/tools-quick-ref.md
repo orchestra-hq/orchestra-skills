@@ -63,18 +63,30 @@ Replaces: `get_pipeline` + `get_pipeline_data` + `list_pipeline_runs`, done by h
 ### `list_pipeline_runs`
 Arguments:
 - `status` (`FAILED`, `RUNNING`, etc.)
-- `time_from`, `time_to` (ISO 8601)
+- `time_from`, `time_to` (ISO 8601) — defaults to the last 24 hours; pass both (at most 7 days
+  apart) for anything older
 - `pipeline_run_ids` (comma-separated IDs)
 
 Use for:
 - finding recent failed runs
-- validating whether a UUID is a pipeline run ID
+
+### `get_pipeline_run` / `get_task_run`
+Required arguments:
+- `pipeline_run_id` / `task_run_id`
+
+Fetch one run by ID, however long ago it ran — no time window applies. `get_task_run` returns
+the task run's `pipelineRunId`, so a task run ID alone is enough to start.
+
+Use for:
+- looking up a run from a URL, alert or bare UUID (prefer these over a `list_*` call filtered by ID)
+- validating whether a UUID is a pipeline run or task run ID
 
 ### `list_task_runs`
 Arguments:
 - `status` (`FAILED`, `WARNING`, etc.)
 - `pipeline_ids` (comma-separated IDs)
-- `integration`, `task_run_ids`, `time_from`, `time_to`
+- `integration`, `task_run_ids`, `time_from`, `time_to` (window defaults to the last 24 hours,
+  even when filtering by ID; pass both, at most 7 days apart, for anything older)
 
 Use for:
 - finding failed tasks inside one or more pipelines
@@ -83,7 +95,9 @@ Use for:
 ### `list_operations`
 Arguments:
 - `task_run_id`
-- optional filters: `status`, `operation_type`, `integration`, `time_from`, `time_to`
+- optional filters: `status`, `operation_type`, `integration`, `time_from`, `time_to` (window
+  defaults to the last 24 hours, even with `task_run_id`; for an older task run pass both,
+  spanning its start to completion)
 
 Use for:
 - seeing sub-operations (dbt models, SQL statements, sync steps)
@@ -222,7 +236,11 @@ Docs: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-ma
 
 ## Constraints and behavior notes
 
-- Time window constraints still apply (typically 7-day metadata windows in practice).
+- `list_pipeline_runs`, `list_task_runs` and `list_operations` return only the **last 24 hours**
+  when called without `time_from`/`time_to`, even when filtered by an ID. To fetch one run by ID,
+  use `get_pipeline_run` / `get_task_run`, which have no window. Otherwise pass both (at most 7
+  days apart) for anything older — an out-of-window run comes back as an empty list, not an
+  error, so an empty result is not proof that nothing ran or failed.
 - Prefer batching calls (`list_*`) before deep downloads.
 - Git-backed pipelines cannot be edited with `update_pipeline`; provide a repo-level fix instead.
 - `list_task_runs` and `list_task_runs_for_pipeline_run` include superseded attempts by

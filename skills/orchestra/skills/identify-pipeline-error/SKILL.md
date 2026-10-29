@@ -72,9 +72,10 @@ The user may give you several forms. Extract the IDs before doing anything else.
   https://app.getorchestra.io/pipelines/{pipeline_id}
   ```
   Self-hosted instances use the same path structure on a different domain.
-- **Bare UUID** — try it as a pipeline run ID first (`list_pipeline_runs` /
-  `GET /pipeline_runs?pipeline_run_ids=<id>`). If nothing comes back, treat it as a pipeline ID and
-  look up its recent runs.
+- **Bare UUID** — try it as a pipeline run ID first (`get_pipeline_run` /
+  `GET /pipeline_runs/<id>`), then as a task run ID (`get_task_run` / `GET /task_runs/<id>`, whose
+  `pipelineRunId` gives you the run). Both find a run however old it is. If neither matches, treat
+  it as a pipeline ID and look up its recent runs.
 - **Pipeline name / alias** — match with `list_pipelines`, then find its latest FAILED run.
 - **"What's broken" with no ID** — `whats_broken()`, or `list_pipeline_runs` with
   `status=FAILED` as the fallback. If several pipelines failed, present a
@@ -85,10 +86,13 @@ The user may give you several forms. Extract the IDs before doing anything else.
 ## 2. GET the pipeline run
 
 ```
-list_pipeline_runs(pipeline_run_ids=<RID>)        # MCP
-GET /pipeline_runs?pipeline_run_ids=<RID>          # REST
+get_pipeline_run(pipeline_run_id=<RID>)   # MCP
+GET /pipeline_runs/<RID>                   # REST
 ```
-Capture: `id` (RID), `pipelineId` (PID), `pipelineName`, `status`, `message`, `branch`, `commit`,
+Unlike `list_pipeline_runs`, this needs no `time_from`/`time_to`: it finds the run however long ago
+it ran.
+
+Capture: `id` (RID), `pipelineId` (PID), `pipelineName`, `runStatus`, `message`, `branch`, `commit`,
 `envName`, `triggeredBy`. The run's `branch` is where the **Orchestra YAML** lives (not necessarily
 the code branch).
 
@@ -100,11 +104,12 @@ FEATURE_BRANCH_RUN).
 ## 3. GET the task runs → find the one that broke
 
 ```
-list_task_runs(pipeline_ids=<PID>, status=FAILED)   # also pull status=WARNING for context
-GET /task_runs?pipeline_ids=<PID>&page_size=50       # REST: filter to this RID client-side
+list_task_runs(pipeline_ids=<PID>, status=FAILED, time_from=<now-7d>, time_to=<now>)   # also pull status=WARNING for context
+GET /task_runs?pipeline_ids=<PID>&page_size=50&time_from=<now-7d>&time_to=<now>       # REST: filter to this RID client-side
 ```
 Gotcha: `pipeline_run_ids` does **not** filter `/task_runs` over REST — filter by `pipelineRunId`
-yourself. `/task_runs` returns a 7-day window, and includes superseded attempts unless you
+yourself. `/task_runs` returns only the last 24 hours unless you pass `time_from`/`time_to` (at
+most 7 days apart), and includes superseded attempts unless you
 pass `include_superseded=false`, so a retried task shows up twice.
 
 Identify the **first** FAILED task (downstream FAILED/SKIPPED tasks are usually symptoms of it).

@@ -83,13 +83,14 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
    **say what you covered vs skipped**. If the MCP read tool is absent, use the REST fallback
    (Step 1) instead — only skip this step and mark the definition-level checks Not assessed if
    neither the tool nor the REST fallback can reach pipeline definitions.
-3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window). Use this
+3. **Runtime signals** — `list_pipeline_runs` over the last 7 days (the metadata window; pass
+   `time_from`/`time_to`, since it defaults to 24 hours). Use this
    to spot concurrency skips, over- or under-scheduling, and noisy failure rates. `list_task_runs`
    /`list_operations` add integration-level detail (e.g. source-tool jobs, dbt models) when a check
    needs it.
 4. **Assets** — `list_assets`. Assets with no Orchestra operation in 7+ days are a governance
    signal that work may be running outside Orchestra; confirm with `list_operations` filtered to
-   the asset's integration before flagging.
+   the asset's integration, with `time_from`/`time_to` covering the last 7 days, before flagging.
 5. **Incident routing (for checks 5.8 and 5.9)** — `list_monitors` for the monitors in order, and
    `get_incident_settings` for whether incidents are on at all and how big the per-incident alert
    budget is. Read each monitor's match (which pipelines, assets, integrations, connections or
