@@ -1,11 +1,11 @@
 {
   "skill_name": "configure-dbt-source-freshness",
-  "description": "Version-sensitivity of state-aware orchestration, and the cost of a warn-level freshness threshold. All three cases are free-text (no pipeline YAML is produced): dbt-2x-is-supported checks the skill no longer refuses a dbt 2.x project and gets the install shape right; dbt-2x-databricks-implicit-freshness checks the Databricks 'you may omit loaded_at_field' shortcut is not carried from dbt Core 1.x onto 2.x; warn-after-escalates-under-warn-error checks a tight warn_after is not offered as a non-breaking early signal on a project running dbt with warn-error, which escalates it to a task failure.",
+  "description": "Version-sensitivity of state-aware orchestration, and the cost of a warn-level freshness threshold. All three cases are free-text (no pipeline YAML is produced): dbt-2x-is-supported checks the skill no longer refuses a dbt 2.x project, asks only for dbt-oss>=2,<3 in the project's requirements, and does not tell the user to install dbt-orchestra themselves; dbt-2x-databricks-implicit-freshness checks the Databricks 'you may omit loaded_at_field' shortcut is not carried from dbt Core 1.x onto 2.x; warn-after-escalates-under-warn-error checks a tight warn_after is not offered as a non-breaking early signal on a project running dbt with warn-error, which escalates it to a task failure.",
   "evals": [
     {
       "id": "dbt-2x-is-supported",
       "prompt": "We want Orchestra state-aware orchestration on our dbt project so unchanged models stop rebuilding every night. The project is on dbt 2.0.3 — our requirements.txt pins dbt-core>=2,<3 and dbt-snowflake. Our sources are in models/staging/_sources.yml and every table has a _loaded_at column. Can we do this, and if so what do we need to change?",
-      "expected_output": "Says yes — state-aware orchestration supports dbt Core 1.10.x–1.12.x and dbt 2.x (>=2,<3), so a 2.0.3 project is in range and it does not refuse or tell the user to downgrade to 1.x. Flags the requirements.txt as the thing to fix: on dbt 2.x the install is dbt-orchestra with dbt-oss>=2,<3, and dbt-core and adapter packages such as dbt-snowflake must not be installed alongside it. Authors freshness in the config: form with loaded_at_field: _loaded_at (the explicit signal is correct on either major version), and enables use_state_orchestration: true on the Orchestra dbt Core task.",
+      "expected_output": "Says yes — state-aware orchestration supports dbt Core 1.10.x–1.12.x and dbt 2.x (>=2,<3), so a 2.0.3 project is in range and it does not refuse or tell the user to downgrade to 1.x. Flags the requirements.txt as the thing to fix: on dbt 2.x the project declares dbt-oss>=2,<3 and nothing else dbt-related, and dbt-core and adapter packages such as dbt-snowflake must not be installed alongside it. Does not tell the user to add dbt-orchestra — Orchestra installs that itself when state orchestration is enabled on the task. Authors freshness in the config: form with loaded_at_field: _loaded_at (the explicit signal is correct on either major version), and enables use_state_orchestration: true on the Orchestra dbt Core task.",
       "files": [],
       "assertions": [
         {
@@ -15,7 +15,10 @@
           "text": "States the supported range as dbt Core 1.10.x–1.12.x and dbt 2.x (>=2,<3)"
         },
         {
-          "text": "Says the dbt 2.x install is dbt-orchestra with dbt-oss>=2,<3"
+          "text": "Says the dbt 2.x requirements should declare dbt-oss>=2,<3"
+        },
+        {
+          "text": "Does not tell the user to pip install dbt-orchestra themselves — states that Orchestra installs it when state orchestration is enabled on the task"
         },
         {
           "text": "Flags that dbt-core and the dbt-snowflake adapter package must not be installed alongside dbt-oss, and calls out the current requirements.txt as needing that change"

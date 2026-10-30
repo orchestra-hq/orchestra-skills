@@ -39,6 +39,8 @@ After setup, failed PR checks or pipeline runs: start with **identify-pipeline-e
 
 - Slim CI runs the **same dbt Core task** as production. Artifact history is scoped per dbt Core task, not per pipeline: a CI-only pipeline *or* a second CI task in the same pipeline starts with its own empty `latest_production` and never inherits production's. Split only if the user accepts separate artifact history and seeding it with a successful default-branch run of that task.
 - Never pause, delete, or repoint an existing pipeline or workflow without a per-item yes. Multi-pipeline consolidation goes to **merge-duplicate-pipelines**.
+- Check the project's dbt major version before writing `dbt_command`. On dbt v2 (`dbt-oss>=2,<3` in `requirements.txt` / `pyproject.toml`) the command must use `--select` / `-s` — `--models`, `--model` and `-m` error out — and must not carry `--partial-parse`. The template default already uses `-s`; the risk is copying the project's existing prod command forward unchanged.
+- A mid-migration split is fine: a dbt v2 manifest is readable by dbt Core 1.x, so `--defer --state latest_production` keeps working while prod and CI sit on different majors. Don't make the user finish a v2 upgrade before retrofitting Slim CI.
 - Do not implement manual S3 manifest export unless user rejects Orchestra `latest_production`.
 - Do not commit API keys or connection secrets.
 - Never point CI at the `prod` target or prod schemas; CI writes only to `ci_<PR number>`.
@@ -61,5 +63,6 @@ Non-GitHub CI (document `start_pipeline` MCP tool / CLI as follow-up), new wareh
 | dbt Core execute | https://docs.getorchestra.io/docs/integrations/dbt_core/dbt_core_execute |
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |
 | dbt Core in Orchestra | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup |
+| Running dbt v2 in Orchestra | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra |
 
 Full input matrix and MCP steps: [references/orchestra-slim-ci.md](references/orchestra-slim-ci.md).

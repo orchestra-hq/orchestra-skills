@@ -5,14 +5,19 @@ rebuild only the dbt models whose code changed or whose upstream data is actuall
 instead of rebuilding the whole DAG on every run.
 
 > **Supported dbt versions.** SAO runs on dbt Core **1.10.x–1.12.x** and on **dbt 2.x**
-> (`>=2,<3`). On dbt 2.x the project installs `pip install dbt-orchestra "dbt-oss>=2,<3"`, and
-> must **not** have `dbt-core` or adapter packages installed alongside it — check the task's
-> dependencies before authoring, since a project carrying both is the likely cause of a 2.x setup
-> that never produces freshness results. A project outside that range (dbt Core below 1.10) is
-> outside what Orchestra supports: say so rather than authoring config that may not be consumed.
+> (`>=2,<3`). On dbt 2.x the project's own requirements declare `dbt-oss>=2,<3` and nothing else
+> dbt-related — **don't tell the user to install `dbt-orchestra`**: Orchestra installs it for them
+> when state orchestration is enabled on the task. The project must **not** have `dbt-core`, `dbt`
+> or any `dbt-<adapter>` package alongside `dbt-oss` — they share the `dbt` entry point and
+> conflict, and an adapter package is redundant since 2.x fetches the driver for the profile's
+> target at run time. Check the task's dependencies before authoring, since a project carrying
+> both is the likely cause of a 2.x setup that never produces freshness results. A project outside
+> that range (dbt Core below 1.10) is outside what Orchestra supports: say so rather than
+> authoring config that may not be consumed.
 > **The major version also changes where implicit freshness comes from** — see
 > [the version split](#the-one-rule-that-decides-everything-per-warehouse) below. See the
-> [state management guide](https://docs.getorchestra.io/docs/guides/dbt-core-state-management/guide).
+> [state management guide](https://docs.getorchestra.io/docs/guides/dbt-core-state-management/guide)
+> and [Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra).
 
 Two things drive that decision, and each has its own skill:
 

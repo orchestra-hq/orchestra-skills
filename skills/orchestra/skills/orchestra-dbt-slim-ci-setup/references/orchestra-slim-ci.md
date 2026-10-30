@@ -12,6 +12,7 @@ Consolidated pointers for **orchestra-dbt-slim-ci-setup**. Detail lives in sibli
 | dbt Core execute task parameters | https://docs.getorchestra.io/docs/integrations/dbt_core/dbt_core_execute |
 | Pipeline inputs | https://docs.getorchestra.io/docs/core-concepts/variables/inputs |
 | dbt Core in Orchestra (Git, profiles) | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup |
+| Running dbt v2 in Orchestra (`dbt-oss`, command flags) | https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra |
 | `dbt clone` vs `--defer` only in CI | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#step-4-choose-what-to-build-in-ci |
 | `--defer` for development workflows | https://docs.getorchestra.io/docs/git-control-and-ci-cd/ci-cd/dbt_ci_cd#use-defer-for-development-workflows |
 | Pipeline YAML schema | https://docs.getorchestra.io/docs/core-concepts/pipelines/schema |
