@@ -50,6 +50,35 @@
           "text": "Makes no change to the pipeline and no Orchestra write calls"
         }
       ]
+    },
+    {
+      "id": "aca-start-authorization-is-jobs-write-rbac-not-rotation",
+      "prompt": "An Azure Container Apps task in our 'Daily Enrich' pipeline fails the moment it tries to start the Job, with an authorization error. The service principal has the Container Apps Jobs Operator role on the resource group, the client secret was reissued this morning, and the same Job starts fine when we run it by hand from the Azure portal. Tell me what's wrong and how to fix it. Don't change the pipeline.",
+      "expected_output": "Identifies this as a missing role assignment rather than a credential problem: Orchestra always starts an ACA Job with container overrides, and Azure requires both Microsoft.App/jobs/start/action and Microsoft.App/jobs/write to start a job that way. Container Apps Jobs Operator grants only the start action, so every start from Orchestra fails even though the secret is current and a manual start without overrides succeeds. Gives the fix as a role change — Container Apps Jobs Contributor, or a custom role carrying the Jobs Operator permissions plus Microsoft.App/jobs/write where job deletion should not be granted — and notes that Container Apps Contributor does not cover jobs. Does not recommend rotating or re-entering the client secret, and makes no change to the pipeline.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies the cause as missing RBAC on the service principal, not an expired or wrong client secret"
+        },
+        {
+          "text": "States that Orchestra always starts the ACA Job with container overrides, which is why Azure requires both permissions"
+        },
+        {
+          "text": "Names both Microsoft.App/jobs/start/action and Microsoft.App/jobs/write as required at the job's scope"
+        },
+        {
+          "text": "States that Container Apps Jobs Operator alone is not sufficient because it does not include Microsoft.App/jobs/write"
+        },
+        {
+          "text": "Recommends Container Apps Jobs Contributor, or a custom role adding Microsoft.App/jobs/write to the Jobs Operator permissions"
+        },
+        {
+          "text": "Does not recommend rotating or re-entering the client secret as the fix, and does not point at Container Apps Contributor as a working alternative"
+        },
+        {
+          "text": "Makes no change to the pipeline and no Orchestra write calls"
+        }
+      ]
     }
   ]
 }
