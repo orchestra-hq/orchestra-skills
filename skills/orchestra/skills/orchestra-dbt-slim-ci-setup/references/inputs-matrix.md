@@ -22,6 +22,7 @@ Collect before retrofit. Group: **must-have** (ask if missing), **discoverable**
 
 | Source | What to infer |
 |--------|----------------|
+| `requirements.txt` / `pyproject.toml` | dbt major version. `dbt-oss>=2,<3` means dbt v2, so the Slim CI command must use `--select` / `-s` and drop `--partial-parse` |
 | `dbt_project.yml` | Profile name, tags to exclude, incremental patterns |
 | `profiles.yml` | Targets; flag mismatch if workflow uses `ci`/`prod` but file only has `dev` |
 | `macros/**` | Existing `generate_schema_name` override to merge the `ci` branch into; existing `drop_ci_schema` |

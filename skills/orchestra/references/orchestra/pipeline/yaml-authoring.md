@@ -103,6 +103,25 @@ pipeline:
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 
+### dbt major version is a repository fact, not a task parameter
+
+`DBT_CORE_EXECUTE` has no dbt-version field. The task runs whichever dbt the project's
+`requirements.txt` / `pyproject.toml` installs, so moving between dbt Core 1.x and dbt v2
+(`dbt-oss>=2,<3`) is a change to the repo, never to the pipeline YAML. Don't offer a task
+parameter for it, and don't assume 1.x when writing `commands`.
+
+What that changes in `commands` when the project is on v2:
+
+- `--select` / `-s` only. dbt v2 **errors** on `--models`, `--model` and `-m`, so a command
+  carried over from a 1.x project (or converted from another orchestrator) fails the task.
+- Drop `--partial-parse` and `--no-partial-parse`; v2 does not accept them.
+- `threads` in the profile is a cap on Snowflake and Databricks, where v2 manages parallelism
+  itself — so lowering it is no longer a reliable way to throttle a run.
+
+`--defer --state latest_production` is unaffected: a v2 manifest is readable by dbt Core 1.x, so
+Slim CI keeps working while production and CI sit on different majors
+([Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra)).
+
 Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
 Glue, `environment_variables` on Python and dbt Core — are **strings**, not YAML mappings.
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested

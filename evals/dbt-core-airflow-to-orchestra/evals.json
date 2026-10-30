@@ -56,6 +56,22 @@
         { "text": "No Snowflake account, user or password value is written into the YAML", "check": "no_hardcoded_secret" },
         { "text": "The conversion does not assume a linked credential's environment variable is present — a linked connection that has been deleted, or whose credentials cannot be decrypted, is skipped silently, so its variables are simply absent" }
       ]
+    },
+    {
+      "id": "dbt-v2-legacy-selection-flags",
+      "prompt": "Convert this Airflow DAG to an Orchestra pipeline task (see files/dbt_build_dbt_oss_legacy_flags.py). Write the pipeline YAML to pipeline.yml in the current directory \u2014 no live access, no deploy.",
+      "expected_output": "A single DBT_CORE_EXECUTE task whose commands consolidate both BashOperator steps, with the dbt Core 1.x selection flags translated for dbt v2: -m and --models both become --select (or -s) and --partial-parse is dropped, because the repo's requirements.txt pins dbt-oss>=2,<3 and dbt v2 errors on those flags. package_manager: PIP from the requirements.txt signal. The dbt major version comes from the repository, so no dbt-version task parameter is invented.",
+      "files": ["dbt_build_dbt_oss_legacy_flags.py"],
+      "assertions_ref": ["dbt_core"],
+      "assertions": [
+        { "text": "The run step selects with --select or -s rather than the source's -m", "check": "regex", "pattern": "dbt run (--select|-s) tag:marts" },
+        { "text": "The test step selects with --select or -s rather than the source's --models", "check": "regex", "pattern": "dbt test (--select|-s) tag:marts" },
+        { "text": "No legacy selection flag (--models, --model, -m) survives into the emitted commands string" },
+        { "text": "--partial-parse is dropped from the converted command, since dbt v2 does not accept it" },
+        { "text": "Explains the flag translation by the project being on dbt v2 (dbt-oss>=2,<3 in requirements.txt), not as a stylistic preference" },
+        { "text": "Emits no dbt-version parameter on the DBT_CORE_EXECUTE task \u2014 the dbt major version comes from the repository's requirements.txt and there is no such task parameter" },
+        { "text": "The two chained BashOperator tasks are consolidated into a single DBT_CORE_EXECUTE task's commands string rather than emitted as two separate tasks" }
+      ]
     }
   ]
 }

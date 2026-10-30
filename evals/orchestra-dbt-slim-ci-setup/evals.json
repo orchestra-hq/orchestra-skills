@@ -1,6 +1,6 @@
 {
   "skill_name": "orchestra-dbt-slim-ci-setup",
-  "description": "Two halves of the skill. prior-attempts-audit: an account export with a broken CI-only pipeline, a manual manifest export and a PreProd environment; the output is a conversational audit report (free-text assertions, graded from transcript.txt, with expected/example_audit_report.md as the reference). clean-retrofit: a single production pipeline to patch; coded checks run against the generated pipeline.yml, and free-text ones cover the workflow file.",
+  "description": "Two halves of the skill. prior-attempts-audit: an account export with a broken CI-only pipeline, a manual manifest export and a PreProd environment; the output is a conversational audit report (free-text assertions, graded from transcript.txt, with expected/example_audit_report.md as the reference). clean-retrofit: a single production pipeline to patch; coded checks run against the generated pipeline.yml, and free-text ones cover the workflow file. dbt-v2-command-flags: a project already on dbt-oss whose production command still carries the dbt Core 1.x selection flags; free-text, checks the flags are translated and that deferring across major versions is not treated as a blocker.",
   "evals": [
     {
       "id": "prior-attempts-audit",
@@ -331,6 +331,38 @@
         },
         {
           "text": "Does not attribute the stale read to latest_production being wrong, to production_run_identifier, or to a missing --state flag"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
+    },
+    {
+      "id": "dbt-v2-command-flags",
+      "prompt": "We're adding Slim CI. Our dbt repo's requirements.txt has `dbt-oss>=2,<3` (we moved off dbt-core last month) and our production dbt task's command is `dbt build -m tag:daily --partial-parse --target prod`. The pipeline we defer against is still running dbt Core 1.x. Tell me what the Slim CI dbt_command should be and whether the cross-version defer is a problem \u2014 don't write any files or call Orchestra.",
+      "expected_output": "Says the production command cannot be carried over as-is because the project is on dbt v2: -m must become --select (or -s) and --partial-parse must be removed, since dbt v2 errors on both. Gives a Slim CI command in the documented shape, e.g. build -s state:modified+ --defer --state latest_production --target ci. Says the cross-major defer is fine \u2014 a dbt v2 manifest is readable by dbt Core 1.x, so --defer --state latest_production keeps working while production and CI sit on different majors \u2014 and does not make the user finish a v2 upgrade first. Changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that dbt v2 errors on -m / --models / --model, so the production command's -m must become --select or -s"
+        },
+        {
+          "text": "States that --partial-parse must be dropped because dbt v2 does not accept it"
+        },
+        {
+          "text": "Identifies the project as dbt v2 from dbt-oss>=2,<3 in requirements.txt, rather than looking for a task parameter or pipeline setting that selects the dbt version"
+        },
+        {
+          "text": "Gives a Slim CI command built on state:modified+ with --defer and --state latest_production",
+          "check": "regex",
+          "pattern": "state:modified\\+",
+          "min_count": 1
+        },
+        {
+          "text": "Says the cross-major defer works because a dbt v2 manifest is readable by dbt Core 1.x, so Slim CI keeps working while production and CI run different majors"
+        },
+        {
+          "text": "Does not tell the user to finish migrating production to dbt v2, or to downgrade the CI project to 1.x, before setting up Slim CI"
         },
         {
           "text": "Writes no files and makes no Orchestra calls"
