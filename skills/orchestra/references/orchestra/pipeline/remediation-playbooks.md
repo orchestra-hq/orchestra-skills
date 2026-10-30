@@ -35,6 +35,11 @@ Each playbook specifies whether Claude can fix it directly or needs user action.
    - **AWS:** "The IAM role trust relationship may need updating. Ensure Orchestra's role ARN
      is in the trust policy. If using access keys, rotate them in IAM and update the connection."
    - **HTTP:** "Update the API key or bearer token in the HTTP connection settings."
+   - **Azure Container Apps:** rotating the client secret will not clear an authorization
+     failure on start — it is an RBAC gap. "Give the service principal both
+     `Microsoft.App/jobs/start/action` and `Microsoft.App/jobs/write` at the job's scope,
+     via Container Apps Jobs Contributor or a custom role, because Orchestra always starts
+     the job with container overrides."
 4. After user confirms the credential is updated, retry the pipeline
 
 **Prevention tip:** Suggest setting up credential expiry alerts or using service accounts

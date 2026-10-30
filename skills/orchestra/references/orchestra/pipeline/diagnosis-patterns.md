@@ -344,6 +344,14 @@ credential expiry) or destination side (warehouse permissions, schema drift).
 ### Container Apps — ACA_RUN_JOB
 - `ContainerAppJobExecutionFailed` — application error, check container logs
 - `ProvisioningFailed` — infrastructure issue
+- Authorization failure when starting the job — read this as a missing role assignment,
+  not an expired secret. Orchestra always starts an ACA Job with container overrides, and
+  Azure requires both `Microsoft.App/jobs/start/action` and `Microsoft.App/jobs/write` to
+  do that. Container Apps Jobs Operator grants only the first and Container Apps
+  Contributor does not cover jobs, so a task on either role fails every start — if it has
+  never succeeded, treat it as setup rather than a credential that has gone stale
+  ([Azure Container Apps](https://docs.getorchestra.io/docs/integrations/azure_container_apps),
+  [Run Job](https://docs.getorchestra.io/docs/integrations/azure_container_apps/aca_run_job))
 
 ---
 
