@@ -100,8 +100,10 @@ pipeline:
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
 | AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
+| AWS_SES | AWS_SES_SEND_EMAIL | `from_address`, `to`, `subject`, `body_text`; optional `cc`, `bcc`, `reply_to`, `body_html`, `attachments`, `attachment_encoding` (utf-8\|base64), `aws_region` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
+| LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
 
 ### dbt major version is a repository fact, not a task parameter
 
@@ -144,6 +146,23 @@ and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_over
 adds to that rather than replacing it. The integration is in beta and may not be enabled on an
 account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
 [Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
+
+`AWS_SES_SEND_EMAIL` takes its recipients as YAML arrays: `to`, `cc` and `bcc` are each a
+list of address strings, not a newline-separated block of text, so an upstream task's output
+that is already a list of addresses can be passed straight in. One task run sends **one**
+email to everyone across the three fields combined, up to SES's limit of 50 recipients — it
+is not a per-address fan-out, so a failure fails the whole send rather than one recipient.
+`from_address` must be an identity verified in the sending region. The body fields are
+`body_text` (required) and `body_html` (optional alternative part), not a single `message`.
+See [Send Email](https://docs.getorchestra.io/docs/integrations/aws_ses/aws_ses_send_email).
+
+`LIGHTDASH_CLEAR_RESULTS_CACHE` marks cached query results stale for **every** viewer of the
+project, dashboard or chart named by `scope`, including embedded ones. `content_uuid` is the
+UUID from the Lightdash URL and is required for `DASHBOARD` and `CHART` scope — a dashboard
+slug is rejected. Reach for it after the models behind a chart have loaded. It is not the same
+as `invalidate_cache` on `LIGHTDASH_REFRESH_DASHBOARD`, which only bypasses the cache for the
+queries that one task runs. The job is in beta and may not be enabled on an account. See
+[Clear Results Cache](https://docs.getorchestra.io/docs/integrations/lightdash/lightdash_clear_results_cache).
 
 `AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
 `integration_job`: they are credential stores a connection reads its own credentials from, not

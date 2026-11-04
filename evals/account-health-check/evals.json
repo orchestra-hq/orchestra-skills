@@ -162,6 +162,32 @@
           "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
         }
       ]
+    },
+    {
+      "id": "auto-resolve-timing-and-scope-not-a-fault",
+      "prompt": "Two questions on our incidents. We have about thirty open incidents whose pipelines have all been green for days, and nobody closes them by hand. Separately, one of our engineers says auto-resolve is broken: our asset-grouped dbt incident was still open twenty minutes after the rerun went green, and she also thinks it doesn't apply to incidents our monitors raise. Is she right? Don't call any live Orchestra tools.",
+      "expected_output": "Recommends turning on 'Auto-resolve incidents on success' in incident settings for the backlog of open-but-recovered incidents. Corrects both halves of the second question: auto-resolve applies to every incident, including ones raised by monitors; and the twenty-minute delay is expected because Orchestra checks for auto-resolution periodically rather than immediately after a successful run. Also notes that every operation and asset on the incident must have recovered, so an incident grouped across several assets stays open until the last one does. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Recommends enabling auto-resolve on success in incident settings for the open-but-recovered backlog",
+          "check": "regex",
+          "pattern": "(?i)auto-?resolve",
+          "min_count": 1
+        },
+        {
+          "text": "States that auto-resolve applies to every incident, including ones raised by monitors -- the engineer is wrong on that point"
+        },
+        {
+          "text": "Explains the delay as expected: Orchestra checks for auto-resolution periodically, not immediately after the successful run, so an incident still open shortly afterwards is not a broken setting"
+        },
+        {
+          "text": "Notes that every operation and asset associated with the incident has to have recovered, so an asset-grouped incident stays open until the last one does"
+        },
+        {
+          "text": "Does not call any live Orchestra tools"
+        }
+      ]
     }
   ]
 }

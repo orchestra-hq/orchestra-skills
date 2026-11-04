@@ -493,6 +493,93 @@
           "text": "If a token is mentioned at all, it is scoped to the fallback case — a repo outside the connected organisation or App installation, or a provider with no workspace Git connection"
         }
       ]
+    },
+    {
+      "id": "ses-send-email-recipients-are-arrays",
+      "prompt": "Add a task to pipeline.yml that emails our finance distribution list once the nightly load finishes. It should come from reports@acme.com (verified in SES), go to finance-leads@acme.com and cfo@acme.com, copy data-eng@acme.com, subject 'Nightly load complete', and the body should be the summary text our upstream Summarise task sets as an output. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_SES / AWS_SES_SEND_EMAIL task whose `to` and `cc` are YAML arrays of address strings (not a single newline-separated string), `from_address: reports@acme.com`, and the plain-text body in `body_text` referencing the upstream task's output. One email goes to everyone across to/cc/bcc, so the task is not repeated or fanned out per recipient.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_SES integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_SES"
+        },
+        {
+          "text": "Uses the AWS_SES_SEND_EMAIL job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_SES_SEND_EMAIL"
+        },
+        {
+          "text": "The plain-text body is set with `body_text`, not a `message` field",
+          "check": "regex",
+          "pattern": "body_text:"
+        },
+        {
+          "text": "`to` is a YAML array of address strings holding both finance-leads@acme.com and cfo@acme.com -- not one string with the addresses separated by newlines or commas"
+        },
+        {
+          "text": "`cc` is also a YAML array, with data-eng@acme.com as its own list entry"
+        },
+        {
+          "text": "A single AWS_SES_SEND_EMAIL task covers all three recipients, rather than one task per address -- one run sends one email to everyone across to/cc/bcc"
+        },
+        {
+          "text": "`from_address` is reports@acme.com, the verified identity, rather than a recipient address"
+        }
+      ]
+    },
+    {
+      "id": "lightdash-clear-results-cache-scope-and-uuid",
+      "prompt": "Our Lightdash 'Revenue Overview' dashboard keeps showing yesterday's numbers to everyone after the models reload. Add a task to pipeline.yml that runs after our dbt build and clears the cached results for that dashboard -- its URL is https://lightdash.acme.com/projects/9a1/dashboards/4c2f0b7e-5d31-4a7b-9d55-2f1c8e6a0b33/view. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a LIGHTDASH / LIGHTDASH_CLEAR_RESULTS_CACHE task depending on the dbt task, `scope: DASHBOARD`, and `content_uuid` set to the UUID taken from the dashboard URL. Not LIGHTDASH_REFRESH_DASHBOARD with `invalidate_cache`, which only bypasses the cache for that task's own queries rather than clearing it for every viewer.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the LIGHTDASH_CLEAR_RESULTS_CACHE job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "LIGHTDASH_CLEAR_RESULTS_CACHE"
+        },
+        {
+          "text": "Scope is DASHBOARD, since one dashboard was named rather than the whole project",
+          "check": "regex",
+          "pattern": "scope:\\s*[\"']?DASHBOARD"
+        },
+        {
+          "text": "`content_uuid` is the UUID from the dashboard URL",
+          "check": "regex",
+          "pattern": "content_uuid:\\s*[\"']?4c2f0b7e-5d31-4a7b-9d55-2f1c8e6a0b33"
+        },
+        {
+          "text": "Does not solve this with LIGHTDASH_REFRESH_DASHBOARD plus `invalidate_cache`, which only skips the cache for that task's own queries instead of clearing it for every viewer"
+        },
+        {
+          "text": "The clear-cache task depends on the dbt build, so the cache is cleared after the models have reloaded rather than before"
+        }
+      ]
     }
   ]
 }
