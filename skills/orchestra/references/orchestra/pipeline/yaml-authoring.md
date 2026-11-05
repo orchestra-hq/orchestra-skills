@@ -376,6 +376,20 @@ threshold, say -- is sent as a failure and fails the dbt Core Task. Don't treat 
 threshold as non-breaking without checking whether the project runs with `warn-error`
 ([live alerts during a dbt Core task run](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#live-alerts-during-a-dbt-core-task-run)).
 
+On a `WEBHOOK` destination, `destination` is a **path appended to the connection's base URL**, not a
+URL in its own right -- `connection_id` names the connection holding the base URL and the auth.
+Leave `destination` out entirely when the base URL is already the endpoint to call; putting the full
+URL there appends it to the base URL instead of replacing it. The UI prints the resolved address
+under the field, which is the quickest way to check a path templated from an env var or input.
+
+Two things let a broken webhook destination stay quiet. Saving a webhook connection **doesn't call
+the endpoint** -- Orchestra requests the URL only when an alert fires -- so a connection that saved
+without a `Failed` status is no evidence the address resolves or accepts a `POST`. And the base URL
+has to be `https://`: Orchestra won't redirect an `https://` request down to `http://`, so an
+endpoint served only over plain HTTP is never reached. Prove a new destination with a real alert
+rather than reading the saved connection as confirmation
+([webhook alerts](https://docs.getorchestra.io/docs/core-concepts/alerting/webhook)).
+
 **Pausing:**
 
 `paused: true` on a task or task group keeps it in the pipeline without running it. Downstream tasks

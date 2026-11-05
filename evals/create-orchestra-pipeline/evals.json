@@ -624,6 +624,44 @@
           "text": "Does not suggest Orchestra's Move action, a folder picker, or the pipeline storage dialog's Folder field as the way to move this pipeline — those are for Orchestra-backed pipelines"
         }
       ]
+    },
+    {
+      "id": "webhook-alert-path-is-a-suffix-of-the-base-url",
+      "prompt": "Add a pipeline-level failure alert to pipeline.yml that POSTs to our on-call service. We already have an Orchestra webhook connection called webhook_oncall whose base URL is https://hooks.acme.com/orchestra/alerts — that URL is the endpoint itself, there's no extra path to call. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a pipeline-level alert on FAILED whose destination is `integration: WEBHOOK` with `connection_id: webhook_oncall` and no `destination` field — the base URL is already the full endpoint, and `destination` is a path appended to it rather than a replacement for it, so pasting https://hooks.acme.com/orchestra/alerts into `destination` would post to the base URL twice over. May note that saving the connection does not call the endpoint, so delivery is only proven once a real alert fires.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "The alert fires on FAILED",
+          "check": "alerts_status",
+          "status": "FAILED"
+        },
+        {
+          "text": "The WEBHOOK destination sets connection_id (SLACK/EMAIL require destination; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)",
+          "check": "alert_destination_requires",
+          "integration": "WEBHOOK",
+          "field": "connection_id"
+        },
+        {
+          "text": "The connection's base URL (hooks.acme.com/orchestra/alerts) does not appear anywhere in the YAML — `destination` is a path appended to that base URL, so repeating the full URL there would post to the base URL twice over"
+        },
+        {
+          "text": "The WEBHOOK destination omits `destination` entirely (or leaves it empty) rather than inventing a path such as `/alerts` or `/`, because the connection's base URL is already the endpoint to call"
+        },
+        {
+          "text": "Does not treat `destination` as a full-URL field, and does not move the endpoint URL off the connection into the pipeline YAML"
+        }
+      ]
     }
   ]
 }
