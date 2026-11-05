@@ -624,6 +624,106 @@
           "text": "Does not suggest Orchestra's Move action, a folder picker, or the pipeline storage dialog's Folder field as the way to move this pipeline — those are for Orchestra-backed pipelines"
         }
       ]
+    },
+    {
+      "id": "webhook-alert-path-is-a-suffix-of-the-base-url",
+      "prompt": "Add a pipeline-level failure alert to pipeline.yml that POSTs to our on-call service. We already have an Orchestra webhook connection called webhook_oncall whose base URL is https://hooks.acme.com/orchestra/alerts — that URL is the endpoint itself, there's no extra path to call. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a pipeline-level alert on FAILED whose destination is `integration: WEBHOOK` with `connection_id: webhook_oncall` and no `destination` field — the base URL is already the full endpoint, and `destination` is a path appended to it rather than a replacement for it, so pasting https://hooks.acme.com/orchestra/alerts into `destination` would post to the base URL twice over. May note that saving the connection does not call the endpoint, so delivery is only proven once a real alert fires.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "The alert fires on FAILED",
+          "check": "alerts_status",
+          "status": "FAILED"
+        },
+        {
+          "text": "The WEBHOOK destination sets connection_id (SLACK/EMAIL require destination; PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require connection_id)",
+          "check": "alert_destination_requires",
+          "integration": "WEBHOOK",
+          "field": "connection_id"
+        },
+        {
+          "text": "The connection's base URL (hooks.acme.com/orchestra/alerts) does not appear anywhere in the YAML — `destination` is a path appended to that base URL, so repeating the full URL there would post to the base URL twice over"
+        },
+        {
+          "text": "The WEBHOOK destination omits `destination` entirely (or leaves it empty) rather than inventing a path such as `/alerts` or `/`, because the connection's base URL is already the endpoint to call"
+        },
+        {
+          "text": "Does not treat `destination` as a full-URL field, and does not move the endpoint URL off the connection into the pipeline YAML"
+        }
+      ]
+    },
+    {
+      "id": "gitlab-run-pipeline-variables-versus-inputs",
+      "prompt": "After our dbt build finishes, trigger the GitLab CI/CD pipeline on the main branch of data-platform/etl/exporter so the export job runs. It needs ENVIRONMENT set to production, and the pipeline's .gitlab-ci.yml declares `retries` and `dry_run` under spec:inputs -- pass retries as 3 and dry_run as false. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a GITLAB / GITLAB_RUN_PIPELINE task depending on the dbt task, `project: data-platform/etl/exporter` and `ref: main`. ENVIRONMENT goes in `variables` as a string; retries and dry_run go in `inputs`, which keeps their JSON types (3 as a number, false as a boolean) rather than stringifying them -- Orchestra rejects non-string `variables` values when the pipeline is saved. Both parameters are quoted JSON strings, not nested YAML mappings. May note that `variables` needs the GitLab project's 'Minimum role to use pipeline variables' setting to allow the token's user, which new gitlab.com projects do not.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the GITLAB integration",
+          "check": "regex",
+          "pattern": "integration:\\s*GITLAB\\b"
+        },
+        {
+          "text": "Uses the GITLAB_RUN_PIPELINE job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "GITLAB_RUN_PIPELINE"
+        },
+        {
+          "text": "`project` is the full project path given, not a guessed numeric ID",
+          "check": "regex",
+          "pattern": "project:\\s*[\"']?data-platform/etl/exporter"
+        },
+        {
+          "text": "`ref` is the branch to run on",
+          "check": "regex",
+          "pattern": "ref:\\s*[\"']?main\\b"
+        },
+        {
+          "text": "ENVIRONMENT=production is passed in `variables`, whose values must all be strings",
+          "check": "regex",
+          "pattern": "variables:[^\\n]*ENVIRONMENT"
+        },
+        {
+          "text": "retries and dry_run go in `inputs`, not in `variables` — they are declared under spec:inputs, and `inputs` is the only one of the two that preserves JSON types"
+        },
+        {
+          "text": "Inside `inputs`, retries stays the number 3 and dry_run stays the boolean false, rather than being quoted into the strings \"3\" and \"false\""
+        },
+        {
+          "text": "`variables` and `inputs` are each a quoted JSON string, not a nested YAML mapping — both parameters are typed as string in the schema"
+        },
+        {
+          "text": "Does not put a non-string value in `variables`, which Orchestra rejects when the pipeline is saved rather than at run time"
+        },
+        {
+          "text": "The GitLab task depends on the dbt build, so the export is triggered after the models have loaded"
+        },
+        {
+          "text": "Does not reach for an HTTP / HTTP_REQUEST task against GitLab's API, or a GitLab pipeline trigger token, instead of the GITLAB integration"
+        }
+      ]
     }
   ]
 }
