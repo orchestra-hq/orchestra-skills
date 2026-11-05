@@ -214,8 +214,15 @@ routed per environment via `${{ ENV.<var> }}`. Signal: all alerts to one channel
 channels instead of `${{ ENV.* }}`. → Split routing. Docs: `/docs/core-concepts/alerting`.
 
 **5.4 Secure webhook alert endpoints** — *Medium*
-Good: webhook destinations use Basic/Bearer/Custom Header auth. Signal: webhook alert destination
-with `No Authentication`. → Add auth. Docs: `/docs/core-concepts/alerting`.
+Good: webhook destinations use Basic/Bearer/Custom Header auth, over an `https://` base URL.
+Signal: webhook alert destination with `No Authentication`, or a base URL on `http://` — Orchestra
+won't redirect an `https://` request down to `http://`, so that endpoint never receives the alert.
+→ Add auth, move the endpoint to HTTPS. A saved webhook connection is **not** evidence the endpoint
+works: Orchestra saves these without calling the URL and only requests it when an alert fires, so
+don't read a connection that isn't `Failed` as a reachable destination — an account can hold a
+webhook destination that has never successfully delivered anything. Where it matters, ask whether a
+real alert has ever landed there. Docs: `/docs/core-concepts/alerting`,
+`/docs/core-concepts/alerting/webhook`.
 
 **5.5 Enable `set_outputs` only when needed** — *Low*
 Good: `set_outputs` off unless an output is consumed downstream (off by default to avoid storing

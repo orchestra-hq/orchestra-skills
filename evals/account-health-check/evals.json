@@ -188,6 +188,29 @@
           "text": "Does not call any live Orchestra tools"
         }
       ]
+    },
+    {
+      "id": "saved-webhook-connection-is-not-a-working-destination",
+      "prompt": "Reviewing our alerting before an audit. We have three webhook alert destinations. All three connections saved without error and none of them show a Failed status in Orchestra, so the team is treating them as verified and working. One of the three points at an http:// endpoint. Should any of this be on the health-check report? Don't call any live Orchestra tools.",
+      "expected_output": "Corrects the assumption that a saved, non-Failed webhook connection is a working destination: Orchestra saves webhook connections without calling the URL and only requests it when an alert fires, so the saved state is no evidence of reachability — an account can hold a webhook destination that has never delivered anything. Flags the http:// endpoint, since Orchestra will not redirect an https:// request down to http://, so that destination is never reached. Recommends confirming delivery from whether a real alert has landed, and still raises webhook destination authentication (5.4) as the standing check. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that saving a webhook connection does not call the endpoint — Orchestra only requests the URL when an alert fires — so a connection that is not Failed is not evidence the destination works"
+        },
+        {
+          "text": "Flags the http:// endpoint, explaining that Orchestra will not redirect an https:// request down to http://, so alerts sent there are never received"
+        },
+        {
+          "text": "Recommends confirming delivery another way, such as whether a real alert has ever landed at the endpoint, rather than reading the connection's saved status as confirmation"
+        },
+        {
+          "text": "Still raises authentication on webhook destinations (Basic/Bearer/Custom Header rather than No Authentication) as part of the review"
+        },
+        {
+          "text": "Does not call any live Orchestra tools"
+        }
+      ]
     }
   ]
 }
