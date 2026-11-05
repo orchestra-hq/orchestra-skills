@@ -662,6 +662,68 @@
           "text": "Does not treat `destination` as a full-URL field, and does not move the endpoint URL off the connection into the pipeline YAML"
         }
       ]
+    },
+    {
+      "id": "gitlab-run-pipeline-variables-versus-inputs",
+      "prompt": "After our dbt build finishes, trigger the GitLab CI/CD pipeline on the main branch of data-platform/etl/exporter so the export job runs. It needs ENVIRONMENT set to production, and the pipeline's .gitlab-ci.yml declares `retries` and `dry_run` under spec:inputs -- pass retries as 3 and dry_run as false. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a GITLAB / GITLAB_RUN_PIPELINE task depending on the dbt task, `project: data-platform/etl/exporter` and `ref: main`. ENVIRONMENT goes in `variables` as a string; retries and dry_run go in `inputs`, which keeps their JSON types (3 as a number, false as a boolean) rather than stringifying them -- Orchestra rejects non-string `variables` values when the pipeline is saved. Both parameters are quoted JSON strings, not nested YAML mappings. May note that `variables` needs the GitLab project's 'Minimum role to use pipeline variables' setting to allow the token's user, which new gitlab.com projects do not.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the GITLAB integration",
+          "check": "regex",
+          "pattern": "integration:\\s*GITLAB\\b"
+        },
+        {
+          "text": "Uses the GITLAB_RUN_PIPELINE job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "GITLAB_RUN_PIPELINE"
+        },
+        {
+          "text": "`project` is the full project path given, not a guessed numeric ID",
+          "check": "regex",
+          "pattern": "project:\\s*[\"']?data-platform/etl/exporter"
+        },
+        {
+          "text": "`ref` is the branch to run on",
+          "check": "regex",
+          "pattern": "ref:\\s*[\"']?main\\b"
+        },
+        {
+          "text": "ENVIRONMENT=production is passed in `variables`, whose values must all be strings",
+          "check": "regex",
+          "pattern": "variables:[^\\n]*ENVIRONMENT"
+        },
+        {
+          "text": "retries and dry_run go in `inputs`, not in `variables` — they are declared under spec:inputs, and `inputs` is the only one of the two that preserves JSON types"
+        },
+        {
+          "text": "Inside `inputs`, retries stays the number 3 and dry_run stays the boolean false, rather than being quoted into the strings \"3\" and \"false\""
+        },
+        {
+          "text": "`variables` and `inputs` are each a quoted JSON string, not a nested YAML mapping — both parameters are typed as string in the schema"
+        },
+        {
+          "text": "Does not put a non-string value in `variables`, which Orchestra rejects when the pipeline is saved rather than at run time"
+        },
+        {
+          "text": "The GitLab task depends on the dbt build, so the export is triggered after the models have loaded"
+        },
+        {
+          "text": "Does not reach for an HTTP / HTTP_REQUEST task against GitLab's API, or a GitLab pipeline trigger token, instead of the GITLAB integration"
+        }
+      ]
     }
   ]
 }

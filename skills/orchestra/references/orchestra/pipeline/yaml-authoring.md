@@ -113,6 +113,7 @@ pipeline:
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 | LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
+| GITLAB | GITLAB_RUN_PIPELINE | `project`, `ref`, `variables`, `inputs` |
 
 ### dbt major version is a repository fact, not a task parameter
 
@@ -134,7 +135,8 @@ Slim CI keeps working while production and CI sit on different majors
 ([Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra)).
 
 Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
-Glue, `environment_variables` on Python and dbt Core — are **strings**, not YAML mappings.
+Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab — are
+**strings**, not YAML mappings.
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
@@ -172,6 +174,31 @@ slug is rejected. Reach for it after the models behind a chart have loaded. It i
 as `invalidate_cache` on `LIGHTDASH_REFRESH_DASHBOARD`, which only bypasses the cache for the
 queries that one task runs. The job is in beta and may not be enabled on an account. See
 [Clear Results Cache](https://docs.getorchestra.io/docs/integrations/lightdash/lightdash_clear_results_cache).
+
+`GITLAB_RUN_PIPELINE` starts a **new** GitLab CI/CD pipeline on `ref` each time the task runs and
+polls it to completion, so it is a trigger, not a "make sure this pipeline has run" check. Its two
+JSON-string parameters are not interchangeable: `variables` values must all be strings and arrive as
+environment variables, while `inputs` keep their JSON types (numbers, booleans, arrays) and must
+already be declared under `spec:inputs` in `.gitlab-ci.yml`, which needs GitLab 17.11 or later.
+Orchestra rejects invalid JSON, and non-string `variables` values, when the pipeline is saved — so a
+number passed as a variable fails at save time, not at run time. `variables` also depends on the
+project's **Minimum role to use pipeline variables** setting, which allows no one on new gitlab.com
+projects; when it is too strict the task fails with "Insufficient permissions to set pipeline
+variables", and the fix is in GitLab's project settings rather than the YAML. `inputs` are not
+subject to it, which makes them the better choice where the GitLab project can take either.
+
+Read the task's status mapping before treating a result as a failure: a GitLab pipeline left
+`manual` (blocked on a manual job) and a `success` whose allowed-to-fail jobs failed both surface as
+**Warning**, and `skipped` surfaces as Succeeded. A `configuration.timeout` fails the task but
+leaves the GitLab pipeline running, whereas cancelling the task does cancel it. The connection takes
+a personal, project or group access token — **pipeline trigger tokens are not supported**, because
+they can start a pipeline but not poll or cancel it, so the obvious GitLab credential for this job
+is the wrong one. Its `self_hosted_url` is the self-managed **API** URL ending in `/api/v4`, which
+is a different field from the `gitlab_self_hosted_url` on a repo-backed connection below. GitLab's
+API rate limit is shared across all of a user's tokens, so give Orchestra its own GitLab user where
+polling has to compete. The integration and the job are both in beta and may not be enabled on an
+account. See [GitLab](https://docs.getorchestra.io/docs/integrations/gitlab) and
+[Run CI/CD Pipeline](https://docs.getorchestra.io/docs/integrations/gitlab/gitlab_run_pipeline).
 
 `AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
 `integration_job`: they are credential stores a connection reads its own credentials from, not
@@ -221,6 +248,13 @@ workspace Git connection.
   Note the asymmetry with Git-backed pipelines above: GHES is a fine home for a *task's* repo even
   though Git control itself doesn't support it
   ([tasks on GHE.com](https://docs.getorchestra.io/docs/git-control-and-ci-cd/supported-git-providers/github-enterprise)).
+- **Self hosted URL** is the equivalent field when `repo_source` is `GITLAB`, and follows the same
+  rule: leave it empty for gitlab.com **and** on the Git-connection path, fill it only for a token
+  against a self-managed instance. Don't confuse it with the GitLab *integration*'s own
+  `self_hosted_url`, which is an API URL ending in `/api/v4`; this one is the instance URL
+  ([Python](https://docs.getorchestra.io/docs/integrations/python),
+  [dbt Core](https://docs.getorchestra.io/docs/integrations/dbt_core),
+  [Bauplan](https://docs.getorchestra.io/docs/integrations/bauplan)).
 - **GitHub Actions is the exception.** It has no Git-connection option, still requires a personal
   access token, and has its own GitHub Enterprise URL field (empty for github.com). Where the
   organisation enforces SAML SSO, that token must be authorised for the organisation or workflow
