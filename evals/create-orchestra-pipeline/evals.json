@@ -493,6 +493,137 @@
           "text": "If a token is mentioned at all, it is scoped to the fallback case — a repo outside the connected organisation or App installation, or a provider with no workspace Git connection"
         }
       ]
+    },
+    {
+      "id": "ses-send-email-recipients-are-arrays",
+      "prompt": "Add a task to pipeline.yml that emails our finance distribution list once the nightly load finishes. It should come from reports@acme.com (verified in SES), go to finance-leads@acme.com and cfo@acme.com, copy data-eng@acme.com, subject 'Nightly load complete', and the body should be the summary text our upstream Summarise task sets as an output. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_SES / AWS_SES_SEND_EMAIL task whose `to` and `cc` are YAML arrays of address strings (not a single newline-separated string), `from_address: reports@acme.com`, and the plain-text body in `body_text` referencing the upstream task's output. One email goes to everyone across to/cc/bcc, so the task is not repeated or fanned out per recipient.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_SES integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_SES"
+        },
+        {
+          "text": "Uses the AWS_SES_SEND_EMAIL job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_SES_SEND_EMAIL"
+        },
+        {
+          "text": "The plain-text body is set with `body_text`, not a `message` field",
+          "check": "regex",
+          "pattern": "body_text:"
+        },
+        {
+          "text": "`to` is a YAML array of address strings holding both finance-leads@acme.com and cfo@acme.com -- not one string with the addresses separated by newlines or commas"
+        },
+        {
+          "text": "`cc` is also a YAML array, with data-eng@acme.com as its own list entry"
+        },
+        {
+          "text": "A single AWS_SES_SEND_EMAIL task covers all three recipients, rather than one task per address -- one run sends one email to everyone across to/cc/bcc"
+        },
+        {
+          "text": "`from_address` is reports@acme.com, the verified identity, rather than a recipient address"
+        }
+      ]
+    },
+    {
+      "id": "lightdash-clear-results-cache-scope-and-uuid",
+      "prompt": "Our Lightdash 'Revenue Overview' dashboard keeps showing yesterday's numbers to everyone after the models reload. Add a task to pipeline.yml that runs after our dbt build and clears the cached results for that dashboard -- its URL is https://lightdash.acme.com/projects/9a1/dashboards/4c2f0b7e-5d31-4a7b-9d55-2f1c8e6a0b33/view. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a LIGHTDASH / LIGHTDASH_CLEAR_RESULTS_CACHE task depending on the dbt task, `scope: DASHBOARD`, and `content_uuid` set to the UUID taken from the dashboard URL. Not LIGHTDASH_REFRESH_DASHBOARD with `invalidate_cache`, which only bypasses the cache for that task's own queries rather than clearing it for every viewer.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the LIGHTDASH_CLEAR_RESULTS_CACHE job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "LIGHTDASH_CLEAR_RESULTS_CACHE"
+        },
+        {
+          "text": "Scope is DASHBOARD, since one dashboard was named rather than the whole project",
+          "check": "regex",
+          "pattern": "scope:\\s*[\"']?DASHBOARD"
+        },
+        {
+          "text": "`content_uuid` is the UUID from the dashboard URL",
+          "check": "regex",
+          "pattern": "content_uuid:\\s*[\"']?4c2f0b7e-5d31-4a7b-9d55-2f1c8e6a0b33"
+        },
+        {
+          "text": "Does not solve this with LIGHTDASH_REFRESH_DASHBOARD plus `invalidate_cache`, which only skips the cache for that task's own queries instead of clearing it for every viewer"
+        },
+        {
+          "text": "The clear-cache task depends on the dbt build, so the cache is cleared after the models have reloaded rather than before"
+        }
+      ]
+    },
+    {
+      "id": "git-backed-folder-follows-yaml-path",
+      "prompt": "Create an Orchestra pipeline called 'Revenue Daily' with a single dbt Core task running 'dbt build --select tag:revenue;', on a cron trigger daily at 6am UTC. It goes in our Git-backed pipelines repo. We want it grouped under the 'finance' folder on the pipelines page like the rest of the finance work -- write the pipeline to pipeline.yml and tell me how it ends up in that folder.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a DBT_CORE / DBT_CORE_EXECUTE task running the build command on a 6am daily cron, written to pipeline.yml. The handoff then says a Git-backed pipeline's folder is not set in Orchestra: it comes from the repository plus the directory holding the YAML file on the pipeline's default branch, so the file belongs under finance/ in the repo, and the folder only appears once that location lands on the default branch. Does not tell the user to add a folder field to the YAML, or to use Orchestra's Move action, which is disabled for Git-backed pipelines.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the DBT_CORE integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "DBT_CORE"
+        },
+        {
+          "text": "Scheduled daily at 6am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+6\\s"
+        },
+        {
+          "text": "Does not invent a `folder` key in the pipeline YAML — folder is not a field in the pipeline schema"
+        },
+        {
+          "text": "States that the folder comes from where the YAML file sits in the repository — the repository plus the file's directory — rather than from anything set in Orchestra or in the YAML"
+        },
+        {
+          "text": "Tells the user to put or move the file under a `finance/` directory in the repo to get the pipeline into that folder"
+        },
+        {
+          "text": "Says the folder only takes effect once the file's location lands on the pipeline's default branch, not on a feature branch"
+        },
+        {
+          "text": "Does not suggest Orchestra's Move action, a folder picker, or the pipeline storage dialog's Folder field as the way to move this pipeline — those are for Orchestra-backed pipelines"
+        }
+      ]
     }
   ]
 }

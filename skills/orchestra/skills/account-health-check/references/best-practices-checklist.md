@@ -287,6 +287,17 @@ incident alerts separately, so check the alert budget in `get_incident_settings`
 rather than reading the extra alerts as misconfiguration. Docs:
 `/docs/core-concepts/incidents/monitors`, `/docs/core-concepts/incidents/alerts`.
 
+**5.10 Auto-resolve on success is on, and read with its timing in mind** — *Low*
+Good: **Auto-resolve incidents on success** enabled in incident settings, so an incident closes
+itself once what failed has recovered instead of being closed by hand. It applies to every
+incident, including ones a monitor raised. Signal: `get_incident_settings` shows it off while
+`list_incidents` shows a backlog of open incidents whose resources are succeeding again. →
+Turn it on. Two things to hold while reviewing, so neither reads as a fault: **every** operation
+and asset on the incident has to have recovered, so an incident grouped across many assets (5.8,
+5.9) stays open until the last one does; and Orchestra checks for auto-resolution periodically
+rather than after each successful run, so an incident still open shortly after the recovering run
+is expected, not a broken setting. Docs: `/docs/core-concepts/incidents`.
+
 ## 6. Security and access control
 
 All `[MANUAL]` — RBAC, workspace, API-key, IP, and deployment settings aren't exposed by the MCP.
