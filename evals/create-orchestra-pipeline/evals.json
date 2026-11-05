@@ -580,6 +580,50 @@
           "text": "The clear-cache task depends on the dbt build, so the cache is cleared after the models have reloaded rather than before"
         }
       ]
+    },
+    {
+      "id": "git-backed-folder-follows-yaml-path",
+      "prompt": "Create an Orchestra pipeline called 'Revenue Daily' with a single dbt Core task running 'dbt build --select tag:revenue;', on a cron trigger daily at 6am UTC. It goes in our Git-backed pipelines repo. We want it grouped under the 'finance' folder on the pipelines page like the rest of the finance work -- write the pipeline to pipeline.yml and tell me how it ends up in that folder.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a DBT_CORE / DBT_CORE_EXECUTE task running the build command on a 6am daily cron, written to pipeline.yml. The handoff then says a Git-backed pipeline's folder is not set in Orchestra: it comes from the repository plus the directory holding the YAML file on the pipeline's default branch, so the file belongs under finance/ in the repo, and the folder only appears once that location lands on the default branch. Does not tell the user to add a folder field to the YAML, or to use Orchestra's Move action, which is disabled for Git-backed pipelines.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the DBT_CORE integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "DBT_CORE"
+        },
+        {
+          "text": "Scheduled daily at 6am UTC",
+          "check": "regex",
+          "pattern": "cron:\\s*0\\s+6\\s"
+        },
+        {
+          "text": "Does not invent a `folder` key in the pipeline YAML — folder is not a field in the pipeline schema"
+        },
+        {
+          "text": "States that the folder comes from where the YAML file sits in the repository — the repository plus the file's directory — rather than from anything set in Orchestra or in the YAML"
+        },
+        {
+          "text": "Tells the user to put or move the file under a `finance/` directory in the repo to get the pipeline into that folder"
+        },
+        {
+          "text": "Says the folder only takes effect once the file's location lands on the pipeline's default branch, not on a feature branch"
+        },
+        {
+          "text": "Does not suggest Orchestra's Move action, a folder picker, or the pipeline storage dialog's Folder field as the way to move this pipeline — those are for Orchestra-backed pipelines"
+        }
+      ]
     }
   ]
 }

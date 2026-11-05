@@ -31,6 +31,15 @@ pipeline ([GitBridge sync](https://docs.getorchestra.io/docs/git-control-and-ci-
   connection, to the working branch (created from the default branch if it is new), so the
   commit is attributed to that person. The workspace connection only ever reads
   ([what happens when you save](https://docs.getorchestra.io/docs/git-control-and-ci-cd#what-happens-when-you-save-a-git-backed-pipeline)).
+- **The pipeline's folder follows the YAML file, so a move in Git is the move.** A Git-backed
+  pipeline has no folder of its own to set: Orchestra derives it from the repository and the
+  directory holding the YAML file on that pipeline's default branch. The default-branch rule
+  above applies here too — moving the file on a feature branch changes nothing on the pipelines
+  page until it merges — and Orchestra's own **Move** action is disabled for these pipelines, so
+  reorganising directories is how you reorganise them. Going the other way, migrating an
+  Orchestra-backed pipeline to Git **clears** any folder someone set by hand, because the path
+  decides it from then on
+  ([Folders](https://docs.getorchestra.io/docs/core-concepts/pipelines/folders)).
 - **Deleting a Git-backed pipeline is two steps.** Deleting it in Orchestra leaves the
   definition file in the repository; removing the file through normal git-flow is a separate
   action ([Git control](https://docs.getorchestra.io/docs/git-control-and-ci-cd/git-control)).
