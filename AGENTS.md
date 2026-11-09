@@ -47,7 +47,7 @@ Skill `SKILL.md` files reference shared docs with paths relative to the skill fo
 
 1. **MCP** — Use Orchestra MCP for all operations: listing runs, task runs, logs, artifacts, operations, retries, and reading a pipeline's full definition. Reach for the composite tools (`whats_broken`, `diagnose`, `pipeline_context`) before assembling the same answer from the granular ones — they pre-join the endpoints and page internally, so a triage question costs one call instead of five or six. The Orchestra MCP server is assumed connected.
 2. **Parse input early** — Orchestra UI URLs, bare UUIDs, pipeline aliases, pasted errors, and alert text are all valid entry points; the fix skill documents extraction rules.
-3. **Evidence before theory** — Prefer `list_task_run_logs`, `download_task_run_log`, artifacts, and `list_operations` over guessing from status fields alone.
+3. **Evidence before theory** — Start from `diagnose`, then `download_task_run_log`, artifacts and `list_operations` for what it leaves out, over guessing from status fields alone.
 4. **Learning is optional** — Recording fixes is deferred to the calling client's persistent memory; never commit workspace-specific fix history. Add only generic, reusable patterns to `pipeline/diagnosis-patterns.md`.
 5. **Triage gate** — The triage skill must not merge to the default branch without explicit user approval (`merge`, `yes`, `approve`, and similar).
 
