@@ -211,6 +211,38 @@
           "text": "Does not call any live Orchestra tools"
         }
       ]
+    },
+    {
+      "id": "multi-workspace-credential-confirms-scope",
+      "prompt": "Can you run the account health check on our Orchestra workspace? Heads up, I'm in three workspaces — Analytics Prod, Analytics Staging and a sandbox — and the key I've connected the MCP server with is a personal one I made under Settings → Security that covers all three. Don't call any live Orchestra tools; just tell me how you'd start and what you need from me.",
+      "expected_output": "Does not assume the credential resolves to a single workspace. Says a personal user API key can cover several workspaces, unlike a workspace API key which targets exactly one, and that a multi-workspace credential has no default workspace — so calls are refused until the workspace is named rather than quietly defaulting to one. Says it would call list_accounts first and then ask which of the three to review, passing that workspace's id as account_id on every subsequent call. Treats the refusal of an unscoped call as 'say which workspace' rather than as a broken or expired credential. States each workspace needs its own separate review because there are no cross-workspace resources, and offers to review the others afterwards rather than merging all three into one report. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Does not assume the connected credential targets a single workspace, and does not start the review against an unconfirmed one"
+        },
+        {
+          "text": "States that a personal user API key can cover several workspaces while a workspace API key covers exactly one"
+        },
+        {
+          "text": "Says it would call list_accounts first to list the workspaces the credential can act on"
+        },
+        {
+          "text": "Asks the user which of the three workspaces to review before gathering any data"
+        },
+        {
+          "text": "Says the chosen workspace id must be passed as account_id on the calls that take it, because a multi-workspace credential has no default to fall back on"
+        },
+        {
+          "text": "Treats a call refused for naming no workspace as a scoping problem to fix by supplying the id, not as a broken, expired or unauthorised credential"
+        },
+        {
+          "text": "States each workspace needs its own review (no cross-workspace resources) and offers the remaining ones separately rather than combining them into a single report"
+        },
+        {
+          "text": "Makes no live Orchestra tool calls"
+        }
+      ]
     }
   ]
 }

@@ -201,10 +201,18 @@ Use for updating Orchestra-backed pipelines only.
 ## Useful supporting tools
 
 ### `list_accounts`
-Lists the workspaces the current credential can act on. An API key is issued to one workspace
-and lists only that one; an OAuth connection can span several. Call it first whenever the user
-mentions more than one workspace, then pass the chosen id as `account_id` on the tools that
-take it — otherwise a call silently targets whichever workspace the credential defaults to.
+Lists the workspaces the current credential can act on. A workspace API key is issued to one
+workspace and lists only that one; an OAuth connection, or a personal **user API key** whose
+owner chose more than one workspace when creating it, can span several. Call it first whenever
+the user mentions more than one workspace, then pass the chosen id as `account_id` on the tools
+that take it.
+
+Passing it stops being optional once the credential spans several workspaces. A
+single-workspace credential silently targets its own workspace, but a multi-workspace one has
+no default and refuses the call until it is told which workspace to act in. Read that refusal
+as "say which workspace", not as a broken credential — and prefer a credential scoped to one
+workspace per connection, which removes the question entirely. See
+[User API Keys](https://docs.getorchestra.io/docs/organisation-settings/user-api-keys).
 
 ### `list_assets`
 Filterable by asset type/integration. Useful when diagnosing missing tables or lineage gaps.
@@ -255,3 +263,11 @@ Docs: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-ma
   key) rejects anything that changes state: `start_pipeline`, `pause_pipeline`,
   `cancel_pipeline_run`, `create_pipeline`, `update_pipeline`. Prepare the change and hand it
   to the user rather than retrying. See [Orchestra MCP](https://docs.getorchestra.io/docs/mcp).
+- A **user API key** behaves like an OAuth sign-in for permissions — it acts as the person who
+  created it and can never exceed what that person can do in the app — and a read-only one
+  refuses the same state-changing tools as above. Unlike a workspace key it also expires, and
+  it is revoked when its owner loses access to the workspace or leaves the organisation. So a
+  credential that worked yesterday can start failing authentication with nothing else changed:
+  don't read that as an Orchestra outage and don't retry it. Say the key needs replacing, and
+  that its owner manages it under Settings → Security. See
+  [User API Keys](https://docs.getorchestra.io/docs/organisation-settings/user-api-keys).

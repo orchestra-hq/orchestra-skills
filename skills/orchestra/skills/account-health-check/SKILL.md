@@ -22,9 +22,14 @@ a **read-only** review: it inspects pipelines, runs, and assets through the Orch
 writes a report file — it never mutates pipelines, settings, or runs. If the user wants
 something fixed, hand off to `create-orchestra-pipeline` or `fix-orchestra-pipeline`.
 
-The workspace is determined by the API key behind the connected Orchestra MCP server, so the
-review covers whatever workspace that key targets. If the user has multiple workspaces, remind
-them each one needs its own review (there are no cross-workspace resources).
+The workspace is determined by the credential behind the connected Orchestra MCP server. Don't
+assume that is a single workspace: a workspace API key targets exactly one, but an OAuth
+sign-in or a personal user API key can cover several, in which case nothing is reviewed until
+you say which. Call `list_accounts` first, and if it returns more than one workspace, confirm
+which one the user means and pass its id as `account_id` on every call — a review silently
+assembled from the wrong workspace is worse than one that paused to ask. Each workspace needs
+its own review either way (there are no cross-workspace resources), so offer the others once
+the first is done rather than merging them into one report.
 
 ## References
 
@@ -45,11 +50,13 @@ user at the Orchestra MCP setup docs (https://docs.getorchestra.io/docs/mcp) or 
 then stop — recommend connecting the MCP regardless, since it also powers the fix/triage skills.
 
 REST base: `https://app.getorchestra.io/api/engine/public` — header
-`Authorization: Bearer $ORCHESTRA_API_KEY`.
+`Authorization: Bearer $ORCHESTRA_API_KEY`. If that key covers several workspaces, send
+`X-Orchestra-Account-Id: <workspace id>` alongside it on every request, or the API refuses the
+call rather than picking one.
 
 ### Step 1 — Confirm scope and probe capabilities
 
-Tell the user which workspace you'll review (the one the MCP key targets) and ask if they want
+Tell the user which workspace you'll review (the one `list_accounts` settled) and ask if they want
 the **full** review or a subset of areas (e.g. "just alerting and cost"). Default to full. For
 large workspaces (many pipelines), it's fine to offer to sample or focus on production pipelines
 first — reading every pipeline definition has a cost, so say so rather than silently truncating.
