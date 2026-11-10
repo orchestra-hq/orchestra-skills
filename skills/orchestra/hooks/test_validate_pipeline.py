@@ -15,7 +15,7 @@ import sys
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from validate_pipeline import _summarise, is_pipeline
+from validate_pipeline import _rejects_document, _summarise, is_pipeline
 
 PIPELINE = """
 version: v1
@@ -90,10 +90,30 @@ def check_summarise() -> None:
     assert len(_summarise(long_message)) < 250
 
 
+def check_rejects_document() -> None:
+    # A per-field list is the document's problem, so the hook may block on it.
+    assert _rejects_document(SCHEMA_REJECTION) is True
+
+    # A bare-string `detail` is the credential's problem, not the document's:
+    # the key expired, or it covers several workspaces and named none. Blocking
+    # an edit on either would fail it for something the pipeline cannot fix.
+    assert _rejects_document(json.dumps({"detail": "Not authenticated"})) is False
+    assert _rejects_document(
+        json.dumps({"detail": "X-Orchestra-Account-Id header is required"})
+    ) is False
+
+    # Anything unparseable stays blockable -- _summarise still decides whether
+    # there is something actionable to show.
+    assert _rejects_document("<html>502 Bad Gateway</html>") is True
+    assert _rejects_document("") is True
+    assert _rejects_document(json.dumps({"message": "no detail key"})) is True
+
+
 def main() -> None:
     check_detection()
     check_summarise()
-    print(f"ok: {len(CASES)} detection cases + summarise")
+    check_rejects_document()
+    print(f"ok: {len(CASES)} detection cases + summarise + rejection routing")
 
 
 if __name__ == "__main__":

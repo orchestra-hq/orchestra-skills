@@ -53,6 +53,11 @@ def validate(document) -> str | None:
     api_key = os.environ.get("ORCHESTRA_API_KEY")
     if api_key:
         request.add_header("Authorization", f"Bearer {api_key}")
+        # A workspace key belongs to one workspace, but a user key can cover
+        # several, and then every request has to name the one it is for.
+        account_id = os.environ.get("ORCHESTRA_ACCOUNT_ID")
+        if account_id:
+            request.add_header("X-Orchestra-Account-Id", account_id)
 
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS):
@@ -60,9 +65,28 @@ def validate(document) -> str | None:
     except urllib.error.HTTPError as error:
         if error.code not in REJECTION_STATUSES:
             return None
-        return _summarise(error.read().decode(errors="replace"))
+        body = error.read().decode(errors="replace")
+        if not _rejects_document(body):
+            return None
+        return _summarise(body)
     except OSError:
         return None
+
+
+def _rejects_document(body: str) -> bool:
+    """Is this rejection about the document, rather than about the credential?
+
+    The schema endpoint answers 400 for a credential it cannot scope as well as
+    for a document it cannot parse -- an expired key, or a user key spanning
+    several workspaces with none named. Those arrive as a bare-string `detail`,
+    where a document rejection is always a list of per-field errors. Blocking an
+    edit on one would fail the edit for a reason the pipeline cannot fix, so the
+    shape of `detail` is what decides, not the status code.
+    """
+    try:
+        return not isinstance(json.loads(body)["detail"], str)
+    except (ValueError, KeyError, TypeError):
+        return True
 
 
 def _summarise(body: str) -> str | None:

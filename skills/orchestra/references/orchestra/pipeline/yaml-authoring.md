@@ -554,6 +554,15 @@ existing scripts keep running — but write the noun/verb form in anything new, 
 "fix" a legacy name you find in a working CI config. See the
 [Orchestra CLI](https://docs.getorchestra.io/docs/git-control-and-ci-cd/orchestra-cli).
 
+CLI commands that call the API need to know which workspace to act in. A workspace API key
+belongs to one, so it needs nothing else; a personal
+[user API key](https://docs.getorchestra.io/docs/organisation-settings/user-api-keys) can cover
+several, and those commands fail up front unless the workspace is named with `--account-id` or
+the `ORCHESTRA_ACCOUNT_ID` environment variable. The flag wins over the variable, and both win
+over the workspace saved by `orchestra accounts use`. Signing in with `orchestra login` takes
+precedence over any key, so a key is only used when nobody is signed in. `pipeline validate`
+itself needs no credential at all — reach for a key only for the commands that talk to the API.
+
 Prefer MCP `validate_pipeline` when the Orchestra MCP server is connected and you need to
 validate without a local CLI install. It takes the definition as JSON, so convert an `.oml` file
 with `oml_lang.to_json` first.
@@ -561,8 +570,9 @@ with `oml_lang.to_json` first.
 With the `orchestra` plugin installed, YAML validation happens on its own: a `PostToolUse` hook
 validates any `.yml` / `.yaml` pipeline you write against `/pipelines/schema` and reports the
 errors back immediately. Neither an API key nor a CLI install is required. Set `ORCHESTRA_API_KEY`
-to also have integration connection references checked. The hook doesn't cover `.oml`, so
-validate those yourself with `orchestra-lang`.
+to also have integration connection references checked — and `ORCHESTRA_ACCOUNT_ID` as well if
+that key covers several workspaces, so the check knows which one to look the connections up in.
+The hook doesn't cover `.oml`, so validate those yourself with `orchestra-lang`.
 
 ### Common validation errors
 
