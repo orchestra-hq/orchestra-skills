@@ -45,9 +45,9 @@ Alerts live in the `alerts` key at the top level of the pipeline YAML. Orchestra
 
 | Field | Value / notes |
 |---|---|
-| `integration` | `SLACK`, `EMAIL`, `PAGER_DUTY`, `WEBHOOK`, or `MICROSOFT_TEAMS` |
+| `integration` | `SLACK`, `EMAIL`, `PAGER_DUTY`, `WEBHOOK`, `MICROSOFT_TEAMS`, `GOOGLE_CHAT`, or `DATADOG` |
 | `destination` | Channel name (e.g. `#data-alerts`) — **required for Slack** |
-| `connection_id` | Orchestra connection name — required for PagerDuty, Teams, Webhook |
+| `connection_id` | Orchestra connection name — required for PagerDuty, Teams, Google Chat, Webhook, Datadog |
 
 ### Orchestra YAML — alerts block
 

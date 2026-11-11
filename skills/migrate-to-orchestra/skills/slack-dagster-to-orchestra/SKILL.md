@@ -45,9 +45,9 @@ In Orchestra these map to:
 
 | Field | Value / notes |
 |---|---|
-| `integration` | `SLACK`, `EMAIL`, `PAGER_DUTY`, `WEBHOOK`, `MICROSOFT_TEAMS` |
+| `integration` | `SLACK`, `EMAIL`, `PAGER_DUTY`, `WEBHOOK`, `MICROSOFT_TEAMS`, `GOOGLE_CHAT`, `DATADOG` |
 | `destination` | Channel name (e.g. `#data-alerts`) — **required for Slack** |
-| `connection_id` | Required for PagerDuty, Teams, Webhook |
+| `connection_id` | Required for PagerDuty, Teams, Google Chat, Webhook, Datadog |
 
 ```yaml
 version: v1

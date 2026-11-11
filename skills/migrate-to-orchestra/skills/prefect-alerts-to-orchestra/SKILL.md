@@ -1,11 +1,11 @@
 ---
 name: prefect-alerts-to-orchestra
-description: "Use this skill when a Prefect project sends notifications: @flow(on_failure=...) or @flow(on_completion=...) hooks, Prefect Automation notification actions (Slack, email, Teams, PagerDuty), SlackWebhook block notifications, or MicrosoftTeamsWebhook block notifications. Covers all six Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, WEBHOOK, and DATADOG. Read alongside prefect-automations-to-orchestra for complete notification coverage."
+description: "Use this skill when a Prefect project sends notifications: @flow(on_failure=...) or @flow(on_completion=...) hooks, Prefect Automation notification actions (Slack, email, Teams, PagerDuty), SlackWebhook block notifications, or MicrosoftTeamsWebhook block notifications. Covers all seven Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, GOOGLE_CHAT, WEBHOOK, and DATADOG. Read alongside prefect-automations-to-orchestra for complete notification coverage."
 ---
 
 ## Overview
 
-Prefect notifications live in three places: `@flow(on_failure=...)` / `@flow(on_completion=...)` hooks, `@task(on_failure=...)` hooks, and Prefect Automation notification actions. All three map to Orchestra's `alerts:` block, placed at pipeline level (for flow-level hooks) or task level (for task-level hooks). Orchestra supports six destination integrations: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, WEBHOOK, and DATADOG.
+Prefect notifications live in three places: `@flow(on_failure=...)` / `@flow(on_completion=...)` hooks, `@task(on_failure=...)` hooks, and Prefect Automation notification actions. All three map to Orchestra's `alerts:` block, placed at pipeline level (for flow-level hooks) or task level (for task-level hooks). Orchestra supports seven destination integrations: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, GOOGLE_CHAT, WEBHOOK, and DATADOG.
 
 ## Parameter Mapping
 
@@ -20,6 +20,7 @@ Prefect notifications live in three places: `@flow(on_failure=...)` / `@flow(on_
 | Prefect Automation → email notification | `statuses: [...]` + EMAIL | |
 | Prefect Automation → PagerDuty action | `statuses: [...]` + PAGER_DUTY | requires `connection_id` |
 | Prefect Automation → Teams notification | `statuses: [...]` + MICROSOFT_TEAMS | requires `connection_id` |
+| Prefect Automation → Google Chat notification | `statuses: [...]` + GOOGLE_CHAT | requires `connection_id`; one connection per space |
 | `SlackWebhook.load("x").notify(...)` | SLACK destination with `destination` field | channel from `notify(channel=...)` |
 | `MicrosoftTeamsWebhook.load("x").notify(...)` | MICROSOFT_TEAMS with `connection_id` | |
 
@@ -27,7 +28,7 @@ Valid `statuses` values: `FAILED`, `SUCCEEDED`, `CANCELLED`, `WARNING`, `SKIPPED
 
 Destination rules:
 - `SLACK` and `EMAIL` → require `destination` field (channel or address)
-- `PAGER_DUTY`, `MICROSOFT_TEAMS`, `WEBHOOK`, `DATADOG` → require `connection_id` (Orchestra connection name with 5-digit suffix)
+- `PAGER_DUTY`, `MICROSOFT_TEAMS`, `GOOGLE_CHAT`, `WEBHOOK`, `DATADOG` → require `connection_id` (Orchestra connection name with 5-digit suffix)
 
 ## Orchestra YAML Structure
 
@@ -38,9 +39,9 @@ alerts:
     statuses:
       - FAILED        # FAILED | SUCCEEDED | CANCELLED | WARNING | SKIPPED
     destinations:
-      - integration: SLACK           # SLACK | EMAIL | PAGER_DUTY | MICROSOFT_TEAMS | WEBHOOK | DATADOG
+      - integration: SLACK           # SLACK | EMAIL | PAGER_DUTY | MICROSOFT_TEAMS | GOOGLE_CHAT | WEBHOOK | DATADOG
         destination: '#channel'      # required for SLACK and EMAIL only
-        connection_id: null          # required for PAGER_DUTY, MICROSOFT_TEAMS, WEBHOOK, DATADOG
+        connection_id: null          # required for PAGER_DUTY, MICROSOFT_TEAMS, GOOGLE_CHAT, WEBHOOK, DATADOG
     custom_message: null             # optional, max ~200 chars
 ```
 
@@ -74,7 +75,7 @@ pipeline:
 - [ ] Map `on_cancellation` → `CANCELLED` status
 - [ ] For SLACK: extract channel from `notify(channel=...)` or Prefect block config → `destination`
 - [ ] For EMAIL: extract address → `destination`
-- [ ] For PAGER_DUTY / MICROSOFT_TEAMS / WEBHOOK / DATADOG: find or create Orchestra connection → `connection_id`
+- [ ] For PAGER_DUTY / MICROSOFT_TEAMS / GOOGLE_CHAT / WEBHOOK / DATADOG: find or create Orchestra connection → `connection_id`
 - [ ] Ensure `connection_id` values include the 5-digit Orchestra suffix
 - [ ] Ensure all alert names are unique within their scope
 - [ ] Keep `custom_message` under ~200 chars
@@ -163,7 +164,8 @@ pipeline:
 - `on_crashed` maps to `FAILED` — Orchestra has no CRASHED status; add a comment so reviewers know
 - `on_cancellation` maps to `CANCELLED`
 - Task-level `on_failure` → task-level `alerts:` block, not pipeline-level
-- `SLACK` and `EMAIL` require `destination` field; `PAGER_DUTY`, `MICROSOFT_TEAMS`, `WEBHOOK`, `DATADOG` require `connection_id`
+- `SLACK` and `EMAIL` require `destination` field; `PAGER_DUTY`, `MICROSOFT_TEAMS`, `GOOGLE_CHAT`, `WEBHOOK`, `DATADOG` require `connection_id`
+- A `GOOGLE_CHAT` connection posts through one space's incoming webhook, so several spaces means several connections, each listed as its own destination
 - `connection_id` must include the 5-digit Orchestra suffix (e.g. `pagerduty_prod_12345`)
 - `custom_message` max ~200 characters — truncate verbose Prefect message templates
 - Alert names must be unique within their scope (pipeline or task)

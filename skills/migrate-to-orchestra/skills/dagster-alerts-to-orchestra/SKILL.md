@@ -1,6 +1,6 @@
 ---
 name: dagster-alerts-to-orchestra
-description: "Use this skill when a Dagster project sends notifications: @run_failure_sensor, @run_status_sensor, make_email_on_run_failure_sensor, make_slack_on_run_failure_sensor, PagerDuty/Teams/Datadog resources used in hooks or sensors, or @failure_hook/@success_hook. Covers all six Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, WEBHOOK, and DATADOG. Read alongside slack-dagster-to-orchestra for complete notification coverage."
+description: "Use this skill when a Dagster project sends notifications: @run_failure_sensor, @run_status_sensor, make_email_on_run_failure_sensor, make_slack_on_run_failure_sensor, PagerDuty/Teams/Datadog resources used in hooks or sensors, or @failure_hook/@success_hook. Covers all seven Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, GOOGLE_CHAT, WEBHOOK, and DATADOG. Read alongside slack-dagster-to-orchestra for complete notification coverage."
 ---
 
 # Dagster Alerts -> Orchestra Alerts (All Destinations)
@@ -21,7 +21,7 @@ alerts:
     destinations:                 # required, at least one
       - integration: SLACK        # NotificationTypesEnum
         destination: '#channel'   # required for SLACK and EMAIL
-        connection_id: null       # required for PAGER_DUTY, TEAMS, WEBHOOK, DATADOG
+        connection_id: null       # required for PAGER_DUTY, TEAMS, GOOGLE_CHAT, WEBHOOK, DATADOG
         parameters: null          # optional — DATADOG priority, WEBHOOK body
     custom_message: null          # optional string, max 200 chars
 ```
@@ -76,6 +76,14 @@ destinations:
     connection_id: datadog_conn_12345      # required
     parameters:
       priority: 3                         # 1 (highest) to 5 (lowest)
+```
+
+### GOOGLE_CHAT
+```yaml
+destinations:
+  - integration: GOOGLE_CHAT
+    connection_id: google_chat_alerts_12345   # Orchestra Google Chat connection - required
+    # destination not used - the connection's incoming webhook fixes the space
 ```
 
 ---
@@ -196,7 +204,8 @@ alerts:
 - **op-scoped `@failure_hook`/`@success_hook` -> task-level alert**.
 - **`make_*_on_run_failure_sensor` factories -> alerts block** with the matching destination.
 - **`connection_id` format** — full name with 5-digit suffix (e.g. `pagerduty_prod_12345`).
-- **SLACK/EMAIL require `destination`**; **PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require `connection_id`**.
+- **SLACK/EMAIL require `destination`**; **PAGER_DUTY/TEAMS/GOOGLE_CHAT/WEBHOOK/DATADOG require `connection_id`**.
+- **One Google Chat connection per space** — a Google Chat connection posts through one space's incoming webhook, so a sensor that notified several spaces becomes several `GOOGLE_CHAT` destinations, one connection each.
 - **`custom_message` max 200 chars**.
 - **Freshness/SLA sensors** — `build_sensor_for_freshness_checks` / `FreshnessPolicy` have no direct alert mapping; use external monitoring or model as an Orchestra test/sensor.
 - **Alert names unique within scope**.

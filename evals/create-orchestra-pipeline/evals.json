@@ -724,6 +724,53 @@
           "text": "Does not reach for an HTTP / HTTP_REQUEST task against GitLab's API, or a GitLab pipeline trigger token, instead of the GITLAB integration"
         }
       ]
+    },
+    {
+      "id": "trigger-pipeline-input-set-fills-remaining-inputs",
+      "prompt": "After the nightly dbt build succeeds, kick off our downstream `customer-exports` Orchestra pipeline (id 7c9a1f2e-4b3d-4a8e-9f10-2c5d6e7a8b90). It should run with run_date set to ${{ START_DATE }}, and take everything else -- region, warehouse_size and the rest -- from that pipeline's `eu-nightly` input set rather than us restating each one here. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an ORCHESTRA / TRIGGER_PIPELINE task depending on the dbt build. `pipeline_id` is the target pipeline's UUID, `run_inputs` carries only run_date, and `input_set: eu-nightly` names the target pipeline's input set to fill every input run_inputs leaves out. Does not restate region or warehouse_size in run_inputs, and does not invent a separate task or HTTP call to apply the input set. May note that the target pipeline must be published, and that a name no input set on the target matches fails the child run as soon as it starts.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the ORCHESTRA integration",
+          "check": "regex",
+          "pattern": "integration:\\s*ORCHESTRA\\b"
+        },
+        {
+          "text": "Uses the TRIGGER_PIPELINE job",
+          "check": "regex",
+          "pattern": "integration_job:\\s*TRIGGER_PIPELINE\\b"
+        },
+        {
+          "text": "Sets pipeline_id to the target pipeline's UUID",
+          "check": "regex",
+          "pattern": "7c9a1f2e-4b3d-4a8e-9f10-2c5d6e7a8b90"
+        },
+        {
+          "text": "Names the input set with the `input_set` parameter",
+          "check": "regex",
+          "pattern": "input_set:\\s*['\\\"]?eu-nightly"
+        },
+        {
+          "text": "`run_inputs` carries run_date only — region and warehouse_size are left to the input set rather than restated, since input_set fills every input run_inputs does not give"
+        },
+        {
+          "text": "Does not model the input set as a run_inputs key, a pipeline-level `inputs` block, or a second task — `input_set` is a parameter of the TRIGGER_PIPELINE task itself"
+        },
+        {
+          "text": "The TRIGGER_PIPELINE task depends on the dbt build, so the export pipeline starts after the models have loaded"
+        }
+      ]
     }
   ]
 }
