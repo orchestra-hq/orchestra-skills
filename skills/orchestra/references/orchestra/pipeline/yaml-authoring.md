@@ -401,6 +401,48 @@ including task conditions. `${{ outputs.payload }}` is **only** valid in that tr
 input mapping — there is no way to read the payload from a task parameter directly. See
 [webhook triggers](https://docs.getorchestra.io/docs/core-concepts/triggers/webhook#mapping-the-payload-to-run-inputs).
 
+**Sensors -- waiting on one task rather than a whole pipeline:**
+
+`ORCHESTRA_TASK_STATUS` (integration `ORCHESTRA`) waits for a single task in another pipeline,
+where `ORCHESTRA_PIPELINE_STATUS` waits for that pipeline's whole run. Reach for it when the
+downstream work needs one upstream task and shouldn't sit behind the rest of its pipeline.
+
+```yaml
+sensors:
+  orders_loaded:
+    name: Orders loaded
+    cron: 0 6 ? * * *
+    timezone: UTC
+    timeout_mins: 180
+    checks:
+      load_orders_succeeded:
+        integration: ORCHESTRA
+        sensor_type: ORCHESTRA_TASK_STATUS
+        parameters:
+          pipeline_id: <uuid of the pipeline holding the task>
+          task_id: load_orders
+          statuses: [SUCCEEDED, WARNING]   # SUCCEEDED|WARNING|FAILED|CANCELLED|SKIPPED
+          check_latest_run: false          # default
+        map_outputs:
+          upstream_status: "${{ outputs.task_run.status }}"
+```
+
+Three behaviours decide whether a check fires when an author expects it to:
+
+- `check_latest_run: false` (the default) only counts runs of that task which **finished after the
+  sensor started**. `true` reads the task's most recent run even if it finished beforehand, and
+  keeps polling an unfinished one until it completes or the sensor times out.
+- **Only the final attempt counts.** A failure that a later retry recovers from never satisfies a
+  check waiting on `FAILED`, so don't build failure-handling on the assumption that it will.
+- **A matrix task is read as one status** across the whole Task Group rather than per iteration, so
+  the check passes only once every iteration has finished.
+
+The matched run is output as `task_run`, and `map_outputs` is the only way to read it -- map the
+fields into pipeline `inputs` (`${{ outputs.task_run.<field> }}`), then use them as
+`${{ inputs.<name> }}`. Required inputs with no default have to be supplied this way, or a run the
+sensor triggers has nothing to fill them with
+([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
+
 **Alerts:**
 
 ```yaml

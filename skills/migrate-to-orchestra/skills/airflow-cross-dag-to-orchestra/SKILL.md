@@ -108,6 +108,55 @@ trigger_events:
   # fires when EITHER pipeline-a OR pipeline-b completes
 ```
 
+### `external_task_id` set → `ORCHESTRA_TASK_STATUS` sensor
+
+`trigger_events:` fires on the upstream *pipeline* finishing, so it has no answer for an
+`ExternalTaskSensor` that names one task. For that, use a sensor check of type
+`ORCHESTRA_TASK_STATUS` — downstream work then starts as soon as that task is done instead of
+waiting out the rest of the upstream DAG:
+
+```python
+# Airflow
+wait_for_load = ExternalTaskSensor(
+    task_id="wait_for_orders_loaded",
+    external_dag_id="nightly_elt",
+    external_task_id="load_orders",   # one task, not the whole DAG
+    allowed_states=["success"],
+)
+```
+
+```yaml
+# Orchestra
+sensors:
+  orders_loaded:
+    name: Orders loaded
+    cron: '0 5 * * ? *'
+    timezone: UTC
+    timeout_mins: 180
+    checks:
+      load-orders-check:
+        integration: ORCHESTRA
+        sensor_type: ORCHESTRA_TASK_STATUS
+        parameters:
+          pipeline_id: "uuid-of-nightly-elt-pipeline"
+          task_id: load_orders
+          statuses: [SUCCEEDED]
+          check_latest_run: false
+```
+
+Choosing between the two: `trigger_events:` whenever the dependency really is the whole upstream
+run (cheaper, no polling window to size), `ORCHESTRA_TASK_STATUS` only when `external_task_id`
+pointed at a specific task.
+
+Carry two Orchestra behaviours into the conversion. Only the task's **final** attempt counts, so an
+`allowed_states=['failed']` sensor does not convert faithfully when the upstream task retries — a
+failure a retry recovers from won't fire the check. And a task in a matrix Task Group reports one
+status for the whole matrix rather than per iteration, so the check waits for every iteration.
+Map what the downstream pipeline needs out of the matched run with `map_outputs`
+(`${{ outputs.task_run.status }}`, `${{ outputs.task_run.task_run_id }}`), since there is no other
+way to read it
+([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
+
 ---
 
 ## SubDagOperator → Flatten or Separate Pipeline

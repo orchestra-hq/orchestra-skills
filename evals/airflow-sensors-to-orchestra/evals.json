@@ -51,6 +51,22 @@
         { "text": "If an ORCHESTRA_PIPELINE_STATUS sensor is used instead, timeout_mins does not exceed Orchestra's 7200-minute cap" },
         { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
       ]
+    },
+    {
+      "id": "external-task-sensor-single-task",
+      "prompt": "Convert this Airflow ExternalTaskSensor to an Orchestra sensor (see files/external_task_sensor_single_task.py). It waits only for the load_orders task inside the nightly_elt DAG, not the whole DAG. nightly_elt is already an Orchestra pipeline with id 9c4e2b17-7777-4a10-9f22-51ab33cc0012, and the migrated task keeps the id load_orders. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A sensors: block whose check uses integration: ORCHESTRA and sensor_type: ORCHESTRA_TASK_STATUS against pipeline_id 9c4e2b17-7777-4a10-9f22-51ab33cc0012 with task_id: load_orders and statuses including SUCCEEDED — not ORCHESTRA_PIPELINE_STATUS and not trigger_events, since the dependency is one task rather than the upstream pipeline's whole run. build_revenue_report stays a pipeline: task.",
+      "files": ["external_task_sensor_single_task.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An ORCHESTRA_TASK_STATUS sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*ORCHESTRA_TASK_STATUS" },
+        { "text": "The check's integration is ORCHESTRA", "check": "regex", "pattern": "integration:\\s*ORCHESTRA\\b" },
+        { "text": "The watched task_id load_orders is carried over from external_task_id", "check": "regex", "pattern": "task_id:\\s*[\"']?load_orders" },
+        { "text": "The upstream pipeline id 9c4e2b17-7777-4a10-9f22-51ab33cc0012 is carried over", "check": "regex", "pattern": "9c4e2b17-7777-4a10-9f22-51ab33cc0012" },
+        { "text": "Does not fall back to ORCHESTRA_PIPELINE_STATUS or trigger_events, which would wait for the whole upstream pipeline run and lose the point of external_task_id naming one task" },
+        { "text": "statuses includes SUCCEEDED, matching allowed_states=['success']" },
+        { "text": "build_revenue_report is still represented as a pipeline: task rather than folded into the sensor definition" }
+      ]
     }
   ]
 }

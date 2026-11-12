@@ -7,7 +7,7 @@ description: "Use this skill when a Prefect flow triggers another deployment usi
 
 Prefect cross-flow coordination uses two patterns: `run_deployment()` (trigger a separate deployment, optionally waiting for completion) and subflows (calling one `@flow` from inside another). In Orchestra, both patterns become separate pipelines. The recommended approach for cross-pipeline triggering is `trigger_events:` on the downstream pipeline, which fires when an upstream pipeline reaches a given status.
 
-**Important schema note:** `TRIGGER_PIPELINE` does not appear in the verified `IntegrationJobsEnum`. For cross-pipeline triggering, use `trigger_events:` on the downstream pipeline root. If your Orchestra version does support `TRIGGER_PIPELINE` as a task job, verify against your instance's schema before using it.
+**Which mechanism:** prefer `trigger_events:` on the downstream pipeline root — it is event-driven, needs no polling window, and keeps each flow a pipeline of its own. `ORCHESTRA` + `TRIGGER_PIPELINE` is a valid task job and is the closer match when the parent must trigger the child *and wait* mid-run; it requires the child to be published, and takes `run_inputs`, `input_set` and `branch`. To wait on a single upstream task rather than a whole run, use a sensor check of type `ORCHESTRA_TASK_STATUS` instead ([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
 
 ## Parameter Mapping
 
@@ -136,7 +136,7 @@ pipeline:
 ## Gotchas
 
 - `pipeline_id` is a UUID from the Orchestra UI pipeline URL — **never** the pipeline name string
-- `TRIGGER_PIPELINE` is not in the verified `IntegrationJobsEnum` — use `trigger_events:` instead; verify before using as task job
+- Prefer `trigger_events:` over a `TRIGGER_PIPELINE` task for plain downstream triggering; `TRIGGER_PIPELINE` exists and waits for the child, so use it only when the parent must block on the child mid-run (the child must be published)
 - Prefect subflows become **separate** Orchestra pipelines — there is no inline sub-pipeline concept
 - `trigger_events:` uses OR logic — any entry firing starts the pipeline; for AND logic, use a coordinator pipeline
 - `run_deployment` parameters → `run_inputs` under the trigger_event entry

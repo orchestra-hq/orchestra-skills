@@ -62,6 +62,7 @@ sensors:
 | `DATABRICKS_QUERY` | `DATABRICKS` | SQL query returns rows |
 | `FABRIC_SYNAPSE_QUERY` | `FABRIC_SYNAPSE` | SQL query returns rows |
 | `ORCHESTRA_PIPELINE_STATUS` | `ORCHESTRA` | Another pipeline completed with given status |
+| `ORCHESTRA_TASK_STATUS` | `ORCHESTRA` | One task in another pipeline finished with a given status |
 | `ORCHESTRA_WEBHOOK_EVENT` | `ORCHESTRA` | Webhook event received |
 
 ---
@@ -172,6 +173,28 @@ sensors:
           pipeline_id: "uuid-of-upstream-elt-pipeline"
           status: SUCCEEDED
 ```
+
+When `external_task_id` names a task instead of being `None`, use `ORCHESTRA_TASK_STATUS` -- it
+waits for that one task rather than the upstream pipeline's whole run, so downstream work starts
+without queueing behind the rest of the DAG:
+
+```yaml
+      task-check:
+        integration: ORCHESTRA
+        sensor_type: ORCHESTRA_TASK_STATUS
+        parameters:
+          pipeline_id: "uuid-of-upstream-elt-pipeline"
+          task_id: load_orders          # the migrated name of external_task_id
+          statuses: [SUCCEEDED]
+          check_latest_run: false       # default: ignore runs that finished before the window
+```
+
+Two behaviours differ from Airflow and are worth carrying into the conversion: Orchestra reads only
+the task's **final** attempt, so a failure a retry recovers from won't satisfy a check waiting on
+`FAILED`; and a task inside a matrix Task Group reports one status for the whole matrix, not one
+per iteration. `allowed_states=['failed']` on the Airflow side therefore does not convert
+faithfully when the upstream task has retries
+([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
 
 ### ADLS FileSensor → `ADLS_FILE`
 
