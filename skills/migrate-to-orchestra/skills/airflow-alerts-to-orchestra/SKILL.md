@@ -1,6 +1,6 @@
 ---
 name: airflow-alerts-to-orchestra
-description: "Use this skill when an Airflow DAG uses on_failure_callback, on_success_callback, on_retry_callback, sla_miss_callback, EmailOperator, PagerDutyEventsHook, or any notification/alerting pattern. Covers all six Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, WEBHOOK, and DATADOG. Read this skill alongside slack-airflow-to-orchestra for complete notification coverage."
+description: "Use this skill when an Airflow DAG uses on_failure_callback, on_success_callback, on_retry_callback, sla_miss_callback, EmailOperator, PagerDutyEventsHook, or any notification/alerting pattern. Covers all seven Orchestra alert destination types: SLACK, EMAIL, PAGER_DUTY, MICROSOFT_TEAMS, GOOGLE_CHAT, WEBHOOK, and DATADOG. Read this skill alongside slack-airflow-to-orchestra for complete notification coverage."
 ---
 
 # Airflow Alerts → Orchestra Alerts (All Destinations)
@@ -21,7 +21,7 @@ alerts:
     destinations:                 # required, at least one
       - integration: SLACK        # NotificationTypesEnum — see table below
         destination: '#channel'   # required for SLACK and EMAIL
-        connection_id: null       # required for PAGER_DUTY, TEAMS, WEBHOOK, DATADOG
+        connection_id: null       # required for PAGER_DUTY, TEAMS, GOOGLE_CHAT, WEBHOOK, DATADOG
         parameters: null          # optional — DATADOG priority, WEBHOOK body
     custom_message: null          # optional string, max 200 chars
 ```
@@ -80,6 +80,14 @@ destinations:
     connection_id: datadog_conn_12345      # Orchestra Datadog connection — required
     parameters:
       priority: 3                         # optional — integer 1 (highest) to 5 (lowest)
+```
+
+### GOOGLE_CHAT
+```yaml
+destinations:
+  - integration: GOOGLE_CHAT
+    connection_id: google_chat_alerts_12345   # Orchestra Google Chat connection - required
+    # destination not used - the connection's incoming webhook fixes the space
 ```
 
 ---
@@ -257,7 +265,8 @@ Use task-level when you need different alert routing per task (e.g. page on-call
 - **`on_retry_callback`** — closest is `WARNING` status, but Orchestra's WARNING fires on quality test warnings, not on task retries. No direct equivalent for retry-specific notifications.
 - **`connection_id` format** — must be the full Orchestra connection name including 5-digit suffix (e.g. `pagerduty_prod_12345`), not just the connection type.
 - **SLACK requires `destination`** — omitting the channel name will fail schema validation.
-- **PAGER_DUTY/TEAMS/WEBHOOK/DATADOG require `connection_id`** — `destination` is not used for these types.
+- **PAGER_DUTY/TEAMS/GOOGLE_CHAT/WEBHOOK/DATADOG require `connection_id`** — `destination` is not used for these types.
+- **One Google Chat connection per space** — a Google Chat connection posts through one space's incoming webhook, so an Airflow callback that notified several spaces becomes several `GOOGLE_CHAT` destinations, one connection each.
 - **`custom_message` max 200 chars** — longer messages are truncated or rejected.
 - **Alert names must be unique** — within their scope (pipeline-level or per-task). Two pipeline-level alerts cannot share a name.
 

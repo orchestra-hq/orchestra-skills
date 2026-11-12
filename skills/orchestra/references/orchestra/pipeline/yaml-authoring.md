@@ -106,6 +106,7 @@ pipeline:
 | GCP_CLOUD_STORAGE | GCP_CLOUD_STORAGE_GET_FILE / GCP_CLOUD_STORAGE_PUT_FILE | `bucket`, file paths |
 | ORCHESTRA | APPROVAL | `message_integration`, `message_connection_id`, `message_destination` |
 | ORCHESTRA | RUN_AGENT | `agent_id`, `prompt`, `set_outputs`, `model_id`, `effort`, `llm_integration`, `llm_connection_id` |
+| ORCHESTRA | TRIGGER_PIPELINE | `pipeline_id` (uuid of a **published** pipeline); optional `run_inputs`, `input_set`, `branch` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
 | AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
@@ -114,6 +115,17 @@ pipeline:
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 | LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
 | GITLAB | GITLAB_RUN_PIPELINE | `project`, `ref`, `variables`, `inputs` |
+
+### TRIGGER_PIPELINE needs a published target
+
+`TRIGGER_PIPELINE` starts another pipeline in the same account, and that pipeline has to be
+published -- pointing it at a draft fails the task immediately rather than queueing anything.
+
+Give the child run its inputs with `run_inputs`, or name one of the child pipeline's input sets
+with `input_set` to fill everything `run_inputs` leaves out. The two combine, with `run_inputs`
+winning per input. A name no input set on the child matches fails the child run as soon as it
+starts, so a typo here surfaces downstream rather than on the triggering task
+([Trigger Pipeline](https://docs.getorchestra.io/docs/integrations/orchestra/trigger_pipeline)).
 
 ### dbt major version is a repository fact, not a task parameter
 
@@ -389,6 +401,48 @@ including task conditions. `${{ outputs.payload }}` is **only** valid in that tr
 input mapping — there is no way to read the payload from a task parameter directly. See
 [webhook triggers](https://docs.getorchestra.io/docs/core-concepts/triggers/webhook#mapping-the-payload-to-run-inputs).
 
+**Sensors -- waiting on one task rather than a whole pipeline:**
+
+`ORCHESTRA_TASK_STATUS` (integration `ORCHESTRA`) waits for a single task in another pipeline,
+where `ORCHESTRA_PIPELINE_STATUS` waits for that pipeline's whole run. Reach for it when the
+downstream work needs one upstream task and shouldn't sit behind the rest of its pipeline.
+
+```yaml
+sensors:
+  orders_loaded:
+    name: Orders loaded
+    cron: 0 6 ? * * *
+    timezone: UTC
+    timeout_mins: 180
+    checks:
+      load_orders_succeeded:
+        integration: ORCHESTRA
+        sensor_type: ORCHESTRA_TASK_STATUS
+        parameters:
+          pipeline_id: <uuid of the pipeline holding the task>
+          task_id: load_orders
+          statuses: [SUCCEEDED, WARNING]   # SUCCEEDED|WARNING|FAILED|CANCELLED|SKIPPED
+          check_latest_run: false          # default
+        map_outputs:
+          upstream_status: "${{ outputs.task_run.status }}"
+```
+
+Three behaviours decide whether a check fires when an author expects it to:
+
+- `check_latest_run: false` (the default) only counts runs of that task which **finished after the
+  sensor started**. `true` reads the task's most recent run even if it finished beforehand, and
+  keeps polling an unfinished one until it completes or the sensor times out.
+- **Only the final attempt counts.** A failure that a later retry recovers from never satisfies a
+  check waiting on `FAILED`, so don't build failure-handling on the assumption that it will.
+- **A matrix task is read as one status** across the whole Task Group rather than per iteration, so
+  the check passes only once every iteration has finished.
+
+The matched run is output as `task_run`, and `map_outputs` is the only way to read it -- map the
+fields into pipeline `inputs` (`${{ outputs.task_run.<field> }}`), then use them as
+`${{ inputs.<name> }}`. Required inputs with no default have to be supplied this way, or a run the
+sensor triggers has nothing to fill them with
+([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
+
 **Alerts:**
 
 ```yaml
@@ -399,6 +453,15 @@ alerts:
   - integration: SLACK
     destination: '#data-alerts'
 ```
+
+A destination's `integration` is one of `EMAIL`, `DATADOG`, `GOOGLE_CHAT`, `MICROSOFT_TEAMS`,
+`PAGER_DUTY`, `SLACK`, `WEBHOOK`. `SLACK` and `EMAIL` address the target with `destination` (a
+channel or an address); the rest name a connection with `connection_id`.
+
+`GOOGLE_CHAT` posts to a Google Chat space through that space's incoming webhook, so the space is
+fixed by the connection, not by `destination` -- a second space means a second connection listed as
+its own destination, not a `destination` value
+([Google Chat alerts](https://docs.getorchestra.io/docs/core-concepts/alerting/google-chat)).
 
 `max_live_alerts` (integer 1–50, default 1) on an alert raises how many in-flight dbt Core
 model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or

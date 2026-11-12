@@ -60,6 +60,7 @@ sensors:
 | `DATABRICKS_QUERY` | `DATABRICKS` | SQL query returns rows |
 | `FABRIC_SYNAPSE_QUERY` | `FABRIC_SYNAPSE` | SQL query returns rows |
 | `ORCHESTRA_PIPELINE_STATUS` | `ORCHESTRA` | Another pipeline completed with a status |
+| `ORCHESTRA_TASK_STATUS` | `ORCHESTRA` | One task in another pipeline finished with a given status |
 | `ORCHESTRA_WEBHOOK_EVENT` | `ORCHESTRA` | Webhook event received |
 
 ---

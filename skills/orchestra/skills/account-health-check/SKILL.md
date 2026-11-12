@@ -98,13 +98,15 @@ Pull the evidence before judging anything. Batch the `list_*` calls first, then 
 4. **Assets** — `list_assets`. Assets with no Orchestra operation in 7+ days are a governance
    signal that work may be running outside Orchestra; confirm with `list_operations` filtered to
    the asset's integration, with `time_from`/`time_to` covering the last 7 days, before flagging.
-5. **Incident routing (for checks 5.8 and 5.9)** — `list_monitors` for the monitors in order, and
-   `get_incident_settings` for whether incidents are on at all and how big the per-incident alert
-   budget is. Read each monitor's match (which pipelines, assets, integrations, connections or
-   external-event labels it claims, and whether it is narrowed to operation failures only), its
-   group-by, and whether it names an assignee, subscribers and destinations. A monitor claiming
-   nothing relevant, or claiming dbt integrations but grouping by task, is the signal for 5.8;
-   monitors with no owner, and external-event monitors with no destinations, are 5.9. Skip this
+5. **Incident routing (for checks 5.8, 5.9 and 5.11)** — `list_monitors` for the monitors in order,
+   and `get_incident_settings` for whether incidents are on at all, whether warnings can raise them,
+   and how big the per-incident alert budget is. Read each monitor's match (which pipelines, assets,
+   integrations, connections or external-event labels it claims, and whether it is narrowed to
+   operation failures only), its group-by, whether it names an assignee, subscribers and
+   destinations, and whether it leaves **Raise incidents for warnings** on the workspace setting or
+   overrides it. A monitor claiming nothing relevant, or claiming dbt integrations but grouping by
+   task, is the signal for 5.8; monitors with no owner, and external-event monitors with no
+   destinations, are 5.9; the warnings setting, workspace-wide and per monitor, is 5.11. Skip this
    if `get_incident_settings` shows incidents are turned off — say so rather than reporting every
    monitor check as a failure.
 6. **Python compute (opportunistic, for check 7.6)** — if Python tasks are a notable share of the

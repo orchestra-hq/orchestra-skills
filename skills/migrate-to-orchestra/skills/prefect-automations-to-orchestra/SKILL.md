@@ -21,10 +21,17 @@ Prefect Automations react to external events (file arrivals, database state, web
 | `SensorModel.timeout_mins` | max 1440 (24 h) | Prefect has no equivalent cap |
 | `map_outputs` | pipes sensor query result to pipeline `inputs:` | declare matching key in pipeline `inputs:` |
 
-Valid `sensor_type` values (SensorChecksEnum — exactly 9):
-`AWS_S3_FILE`, `ADLS_FILE`, `SFTP_FILE`, `SNOWFLAKE_QUERY`, `SQL_SERVER_QUERY`, `DATABRICKS_QUERY`, `FABRIC_SYNAPSE_QUERY`, `ORCHESTRA_PIPELINE_STATUS`, `ORCHESTRA_WEBHOOK_EVENT`
+Valid `sensor_type` values (SensorChecksEnum):
+`ADLS_FILE`, `AWS_S3_FILE`, `CLICKHOUSE_QUERY`, `DATABRICKS_QUERY`, `FABRIC_SYNAPSE_QUERY`, `GCP_BIG_QUERY_QUERY`, `GCP_CLOUD_STORAGE_FILE`, `MARIADB_QUERY`, `MONGODB_QUERY`, `MYSQL_QUERY`, `ORCHESTRA_PIPELINE_STATUS`, `ORCHESTRA_TASK_STATUS`, `ORCHESTRA_WEBHOOK_EVENT`, `POSTGRES_QUERY`, `SNOWFLAKE_QUERY`, `SFTP_FILE`, `SHAREPOINT_FILE`, `SQL_SERVER_QUERY`
 
-> **POSTGRES_QUERY and GCP_BIG_QUERY_QUERY are NOT valid sensor types.**
+> Check the enum against the live pipeline schema before emitting a value — it grows as
+> Orchestra adds sensor types, so a list memorised from an older conversion goes stale.
+
+An Automation watching one upstream *task* rather than a whole flow run maps to
+`ORCHESTRA_TASK_STATUS`, which takes `pipeline_id`, `task_id`, `statuses` and
+`check_latest_run`. It reads only the task's final attempt, so a failure a retry recovers
+from won't satisfy a check waiting on `FAILED`
+([Orchestra task sensor](https://docs.getorchestra.io/docs/core-concepts/triggers/sensors/orchestra-task)).
 
 ## Orchestra YAML Structure
 
@@ -76,7 +83,7 @@ pipeline:
 - [ ] For upstream-flow triggers: use `trigger_events:` (see `prefect-cross-flow-to-orchestra`)
 - [ ] Set `timeout_mins` — never exceed 1440
 - [ ] If sensor result feeds downstream logic, declare `map_outputs` and a matching `inputs:` key at pipeline root
-- [ ] Verify `sensor_type` is one of the 9 valid enum values
+- [ ] Verify `sensor_type` is a current SensorChecksEnum value, checked against the live schema
 
 ## Before / After Example
 

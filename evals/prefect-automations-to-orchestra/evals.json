@@ -50,6 +50,21 @@
         { "text": "If trigger_events is used, its statuses include SUCCEEDED, matching the Automation firing only after the upstream pipeline completes successfully" },
         { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
       ]
+    },
+    {
+      "id": "task-run-state-automation-task-sensor",
+      "prompt": "Convert this Prefect Automation to Orchestra (see files/task_state_automation.py). It fires on the load_orders task run inside the nightly-elt deployment reaching Completed, not on the flow run. nightly-elt is Orchestra pipeline e1f2a3b4-5566-4778-9900-aabbccddeeff and the task kept the id load_orders. The revenue-report pipeline should start as soon as that task completes. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A sensors: block with an ORCHESTRA_TASK_STATUS check (integration: ORCHESTRA) against pipeline_id e1f2a3b4-5566-4778-9900-aabbccddeeff with task_id: load_orders and statuses including SUCCEEDED — not a flow-run-level trigger_events: entry or an ORCHESTRA_PIPELINE_STATUS check, since the automation watches one task run.",
+      "files": ["task_state_automation.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An ORCHESTRA_TASK_STATUS sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*ORCHESTRA_TASK_STATUS" },
+        { "text": "The check's integration is ORCHESTRA", "check": "regex", "pattern": "integration:\\s*ORCHESTRA\\b" },
+        { "text": "The watched task_id load_orders is carried over", "check": "regex", "pattern": "task_id:\\s*[\"']?load_orders" },
+        { "text": "The upstream pipeline id e1f2a3b4-5566-4778-9900-aabbccddeeff is carried over", "check": "regex", "pattern": "e1f2a3b4-5566-4778-9900-aabbccddeeff" },
+        { "text": "Does not model the trigger as trigger_events: or ORCHESTRA_PIPELINE_STATUS, either of which would wait for the whole nightly-elt run rather than the single task run the automation watches" },
+        { "text": "ORCHESTRA_TASK_STATUS is treated as a valid SensorChecksEnum value rather than rejected against a stale nine-value list" }
+      ]
     }
   ]
 }

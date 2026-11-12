@@ -42,6 +42,21 @@
         { "text": "The alert is placed on the critical-load TaskModel (task-level), not the pipeline root alerts: block — matching the task-scoped on_failure_callback rather than a DAG-wide default_args callback" },
         { "text": "stage_data and downstream_report, which have no callback, do not also get this alert" }
       ]
+    },
+    {
+      "id": "google-chat-callback-two-spaces",
+      "prompt": "Convert this Airflow failure callback to Orchestra pipeline-level alerts (see files/google_chat_callback.py). It posts to two Google Chat spaces through incoming webhooks; the Orchestra Google Chat connections are google_chat_data_alerts_12345 and google_chat_oncall_67890. Write the pipeline YAML to pipeline.yml in the current directory — no live posting, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with two GOOGLE_CHAT destinations, one per space, each naming its own connection_id and setting no destination field.",
+      "files": ["google_chat_callback.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The GOOGLE_CHAT destination sets connection_id — GOOGLE_CHAT is connection-addressed, like PAGER_DUTY/TEAMS/WEBHOOK/DATADOG", "check": "alert_destination_requires", "integration": "GOOGLE_CHAT", "field": "connection_id" },
+        { "text": "google_chat_data_alerts_12345 is carried over as a GOOGLE_CHAT connection_id", "check": "regex", "pattern": "google_chat_data_alerts_12345" },
+        { "text": "google_chat_oncall_67890 is carried over as a GOOGLE_CHAT connection_id", "check": "regex", "pattern": "google_chat_oncall_67890" },
+        { "text": "The two spaces are modelled as two separate GOOGLE_CHAT destinations rather than one destination covering both, since a Google Chat connection posts through a single space's incoming webhook" },
+        { "text": "The GOOGLE_CHAT destination sets no destination field — the space comes from the connection's incoming webhook, not from a channel name" }
+      ]
     }
   ]
 }

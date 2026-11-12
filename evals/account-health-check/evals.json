@@ -243,6 +243,41 @@
           "text": "Makes no live Orchestra tool calls"
         }
       ]
+    },
+    {
+      "id": "monitor-level-raise-incidents-for-warnings-override",
+      "prompt": "Incident review question. Our dbt tests are configured to warn rather than fail on a few freshness checks, and those warnings never show up as incidents — get_incident_settings shows Raise incidents for warnings is off for the workspace. We do want the freshness warnings from our dbt monitor to raise incidents, but we definitely don't want every warning in the workspace doing it. We also have an older monitor someone explicitly set to Off for warnings. What should we change, and is that Off monitor a problem? Don't call any live Orchestra tools.",
+      "expected_output": "Explains that two settings decide this: the workspace's Raise incidents for warnings, in the Scope section of incident settings, and each monitor's own Raise incidents for warnings, which defaults to Workspace setting and can be overridden to On or Off for the warnings that monitor claims. Recommends the monitor-level override as the fit here — leave the workspace setting off and set the dbt monitor to On — rather than turning warnings on workspace-wide and filtering afterwards. Reads the monitor explicitly set to Off as deliberate rather than drift, since the workspace does not raise warnings anyway. Notes that a monitor overridden to On still needs an owner and, for external events, its own destinations, or its warning incidents alert nobody. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that each monitor has its own Raise incidents for warnings setting which defaults to Workspace setting and can be overridden to On or Off for that monitor's warnings",
+          "check": "regex",
+          "pattern": "(?i)raise incidents for warnings",
+          "min_count": 1
+        },
+        {
+          "text": "Recommends setting the dbt monitor's override to On while leaving the workspace setting off, rather than enabling warnings workspace-wide"
+        },
+        {
+          "text": "Identifies the workspace-level Raise incidents for warnings as living in the Scope section of incident settings",
+          "check": "regex",
+          "pattern": "(?i)scope",
+          "min_count": 1
+        },
+        {
+          "text": "Treats the monitor explicitly set to Off as a deliberate choice to keep a noisy source out, not as misconfiguration to fix"
+        },
+        {
+          "text": "Notes that a monitor raising warning incidents still needs an assignee, and destinations where the events have no pipeline behind them, or the incidents alert nobody"
+        },
+        {
+          "text": "Does not claim warnings can only be enabled workspace-wide, and does not recommend changing the dbt tests to fail instead of warn as the fix"
+        },
+        {
+          "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
+        }
+      ]
     }
   ]
 }

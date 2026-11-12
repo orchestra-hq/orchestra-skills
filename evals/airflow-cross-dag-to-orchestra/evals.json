@@ -49,6 +49,21 @@
         { "text": "The trigger targets the orders_producer pipeline specifically, matching the Dataset dependency on extract_orders' outlets — not a same-pipeline dependency or a TRIGGER_PIPELINE task" },
         { "text": "build_order_summary is still represented as a pipeline: task, not folded into the trigger definition itself" }
       ]
+    },
+    {
+      "id": "external-task-sensor-single-task-not-trigger-events",
+      "prompt": "Convert this cross-DAG dependency to Orchestra (see files/external_task_sensor_single_task.py). marketing_attribution waits on the load_sessions task inside nightly_elt, which keeps running long after that task finishes. nightly_elt is Orchestra pipeline 2d7f6a93-1234-4ccc-8aaa-77bb11ee9900 and the task kept the id load_sessions. The upstream task has retries configured. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A sensors: block with an ORCHESTRA_TASK_STATUS check against pipeline_id 2d7f6a93-1234-4ccc-8aaa-77bb11ee9900 and task_id: load_sessions, rather than a trigger_events: entry — trigger_events fires on the upstream pipeline completing and cannot express a dependency on one task. build_attribution stays a pipeline: task.",
+      "files": ["external_task_sensor_single_task.py"],
+      "assertions_ref": ["cross_job"],
+      "assertions": [
+        { "text": "An ORCHESTRA_TASK_STATUS sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*ORCHESTRA_TASK_STATUS" },
+        { "text": "The watched task_id load_sessions is carried over", "check": "regex", "pattern": "task_id:\\s*[\"']?load_sessions" },
+        { "text": "The upstream pipeline id 2d7f6a93-1234-4ccc-8aaa-77bb11ee9900 is carried over", "check": "regex", "pattern": "2d7f6a93-1234-4ccc-8aaa-77bb11ee9900" },
+        { "text": "Does not model this as trigger_events:, which fires on the upstream pipeline completing and so cannot express a dependency on a single task" },
+        { "text": "timeout_mins is set and stays under the sensor's cron interval" },
+        { "text": "build_attribution is still represented as a pipeline: task" }
+      ]
     }
   ]
 }

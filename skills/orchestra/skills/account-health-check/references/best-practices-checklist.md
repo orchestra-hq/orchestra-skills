@@ -305,6 +305,21 @@ and asset on the incident has to have recovered, so an incident grouped across m
 rather than after each successful run, so an incident still open shortly after the recovering run
 is expected, not a broken setting. Docs: `/docs/core-concepts/incidents`.
 
+**5.11 Warnings raise incidents where someone acts on them** — *Low*
+Good: warnings that need acting on reach an incident, and ones that don't stay out. Two settings
+decide this. The workspace's **Raise incidents for warnings**, in the **Scope** section of incident
+settings, lets warnings open and join incidents at all. Each monitor then has its own **Raise
+incidents for warnings**, which is **Workspace setting** by default and can be set **On** or
+**Off** to override the workspace for the warnings that monitor claims. Signal: `get_incident_settings`
+shows warnings excluded workspace-wide while the workspace runs dbt tests that warn rather than
+fail, or `list_monitors` shows a monitor overriding to **On** with no owner or destination behind
+it (5.9), so its warning incidents alert nobody. → Use the monitor-level override rather than the
+workspace switch when only some warnings matter: leave the workspace setting off and turn the one
+dbt-test monitor **On**, instead of turning warnings on everywhere and then filtering. Read an
+override as deliberate: a monitor set **Off** against a workspace that raises warnings is usually a
+noisy source someone muted on purpose, not drift. Docs:
+`/docs/core-concepts/incidents/monitors`, `/docs/core-concepts/incidents`.
+
 ## 6. Security and access control
 
 All `[MANUAL]` — RBAC, workspace, API-key, IP, and deployment settings aren't exposed by the MCP.

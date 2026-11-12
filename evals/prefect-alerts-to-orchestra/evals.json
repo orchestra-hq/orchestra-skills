@@ -43,6 +43,19 @@
         { "text": "downstream_report, which has no hook, does not also get this alert" },
         { "text": "The DATADOG connection_id follows the name_XXXXX suffix convention (a plausible placeholder) rather than being left as a bare invented name, or is flagged as needing a real value from the user" }
       ]
+    },
+    {
+      "id": "google-chat-flow-failure-hook",
+      "prompt": "Convert this Prefect on_failure hook to an Orchestra pipeline-level alert (see files/google_chat_flow_hook.py). It posts to a Google Chat space through an incoming webhook; the Orchestra Google Chat connection is google_chat_data_alerts_12345. Write the pipeline YAML to pipeline.yml in the current directory — no live posting, no deploy.",
+      "expected_output": "A pipeline-level alerts: entry firing on FAILED with one GOOGLE_CHAT destination naming connection_id google_chat_data_alerts_12345 and no destination field.",
+      "files": ["google_chat_flow_hook.py"],
+      "assertions_ref": ["alerts"],
+      "assertions": [
+        { "text": "An alert fires on FAILED", "check": "alerts_status", "status": "FAILED" },
+        { "text": "The GOOGLE_CHAT destination sets connection_id — GOOGLE_CHAT is connection-addressed, like PAGER_DUTY/TEAMS/WEBHOOK/DATADOG", "check": "alert_destination_requires", "integration": "GOOGLE_CHAT", "field": "connection_id" },
+        { "text": "google_chat_data_alerts_12345 is carried over as the GOOGLE_CHAT connection_id", "check": "regex", "pattern": "google_chat_data_alerts_12345" },
+        { "text": "The GOOGLE_CHAT destination sets no destination field — the space comes from the connection's incoming webhook, not from a channel name" }
+      ]
     }
   ]
 }

@@ -48,6 +48,21 @@
         { "text": "If trigger_events is used, its statuses include SUCCEEDED, matching the asset sensor firing only after a successful upstream materialization" },
         { "text": "build_revenue_report is still represented as a pipeline: task, not folded into the trigger/sensor definition itself" }
       ]
+    },
+    {
+      "id": "asset-sensor-single-upstream-task",
+      "prompt": "Convert this Dagster asset_sensor to an Orchestra sensor (see files/asset_sensor_single_upstream_op.py). orders_raw is materialised by a single task in the already-migrated nightly_elt pipeline (id 5b8c1d20-9999-4e33-b777-0a1b2c3d4e5f, task id materialise_orders_raw), and that pipeline keeps running for another 90 minutes afterwards. The finance_close work should start as soon as orders_raw is materialised. Write the pipeline YAML to pipeline.yml in the current directory — no live access, no deploy.",
+      "expected_output": "A sensors: block with an ORCHESTRA_TASK_STATUS check against pipeline_id 5b8c1d20-9999-4e33-b777-0a1b2c3d4e5f and task_id: materialise_orders_raw, since the dependency is on the one task that materialises the asset rather than the upstream pipeline's whole run — so neither ORCHESTRA_PIPELINE_STATUS nor trigger_events, both of which would wait out the extra 90 minutes.",
+      "files": ["asset_sensor_single_upstream_op.py"],
+      "assertions_ref": ["sensors"],
+      "assertions": [
+        { "text": "An ORCHESTRA_TASK_STATUS sensor check is used", "check": "regex", "pattern": "sensor_type:\\s*ORCHESTRA_TASK_STATUS" },
+        { "text": "The task that materialises the asset is named as task_id", "check": "regex", "pattern": "task_id:\\s*[\"']?materialise_orders_raw" },
+        { "text": "The upstream pipeline id 5b8c1d20-9999-4e33-b777-0a1b2c3d4e5f is carried over", "check": "regex", "pattern": "5b8c1d20-9999-4e33-b777-0a1b2c3d4e5f" },
+        { "text": "Does not use ORCHESTRA_PIPELINE_STATUS or trigger_events, either of which would wait for the whole upstream pipeline and delay finance_close by the extra 90 minutes" },
+        { "text": "The 120-second minimum_interval_seconds is carried over as frequency_secs, which is already inside the 60-600 range" },
+        { "text": "The sensor lives only under sensors:, not duplicated as a pipeline: task" }
+      ]
     }
   ]
 }
