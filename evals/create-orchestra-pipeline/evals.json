@@ -771,6 +771,57 @@
           "text": "The TRIGGER_PIPELINE task depends on the dbt build, so the export pipeline starts after the models have loaded"
         }
       ]
+    },
+    {
+      "id": "input-sets-prod-and-backfill",
+      "prompt": "Create an Orchestra pipeline 'Orders Load' with one Snowflake query task running `CALL load_orders()`. It takes two inputs: `warehouse` (string, defaults to DEV_WH) and `full_refresh` (boolean, defaults to false). We run it three ways and don't want three copies of the pipeline: a nightly production run at 2am UTC on PROD_WH, a monthly backfill at 4am UTC on the 1st that also runs on PROD_WH but with full_refresh on, and ad-hoc dev runs that just take the defaults. Keep the per-run values on the pipeline so nobody has to retype them. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a SNOWFLAKE / SNOWFLAKE_RUN_QUERY task, an `inputs:` block declaring `warehouse` and `full_refresh` with the given defaults, and a top-level `input_sets:` block holding the reusable values -- a `prod` set with `warehouse: PROD_WH` and a backfill set. Two `schedule:` entries name their set with `input_set:`; the backfill entry gets `full_refresh: true` either from its own set or from that entry's `run_inputs`. Ad-hoc runs name no set and fall through to the declared defaults. The sets are not presented as environments and no environment is expected to select one.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Declares a top-level `input_sets:` block rather than duplicating the pipeline or hardcoding the values on each schedule",
+          "check": "regex",
+          "pattern": "(?m)^input_sets:"
+        },
+        {
+          "text": "At least one schedule entry names a set with `input_set:`",
+          "check": "regex",
+          "pattern": "input_set:\\s*\\w+"
+        },
+        {
+          "text": "The production warehouse value is held in a set rather than repeated on each trigger",
+          "check": "regex",
+          "pattern": "PROD_WH"
+        },
+        {
+          "text": "`input_sets:` sits at the pipeline's top level, a sibling of `inputs:` and `schedule:`, not nested inside `inputs:` or inside a schedule entry"
+        },
+        {
+          "text": "Every key used inside an input set is one of the pipeline's declared inputs (`warehouse`, `full_refresh`) -- a set cannot introduce an input that `inputs:` does not declare"
+        },
+        {
+          "text": "Each input set is partial: it sets only the inputs it changes and leaves the rest to their declared `default`, rather than restating every input in every set"
+        },
+        {
+          "text": "The backfill run gets `full_refresh: true` from its own input set or from that schedule entry's `run_inputs`, and does not change the `full_refresh` default to true (which would affect ad-hoc dev runs too)"
+        },
+        {
+          "text": "Does not conflate input sets with environments: no claim that running in a production environment applies a `prod` input set, and the sets are not offered as a replacement for environment variables or connections"
+        },
+        {
+          "text": "Ad-hoc dev runs are left to name no input set and take the declared defaults, rather than being given a `dev` set that merely restates those defaults"
+        }
+      ]
     }
   ]
 }

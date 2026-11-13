@@ -377,6 +377,70 @@ not a constraint: unlisted values still run. Validation requires at least one un
 literal `default` must be one of them (an expression default like `${{ ENV.X }}` is exempt). See
 [inputs](https://docs.getorchestra.io/docs/core-concepts/variables/inputs).
 
+**Input sets:**
+
+`input_sets` is a top-level key holding named, partial sets of input values. A trigger names one
+with `input_set`, and the set fills every input that run doesn't supply itself. Reach for it
+instead of cloning a pipeline per environment or retyping the same values on each run.
+
+```yaml
+inputs:
+  warehouse:
+    type: string
+    default: DEV_WH
+  full_refresh:
+    type: boolean
+    default: false
+
+input_sets:
+  prod:                     # names: letters, digits, _ and -, matched exactly
+    warehouse: PROD_WH      # keys must be declared inputs; a set is partial
+  backfill:
+    full_refresh: true
+
+schedule:
+- name: Nightly prod
+  cron: 0 2 ? * * *
+  input_set: prod
+  run_inputs:
+    full_refresh: true      # beats the set, for this trigger only
+```
+
+`input_set` is accepted on `schedule` entries, `sensors`, `trigger_events` entries, the `webhook`
+block, and the `TRIGGER_PIPELINE` task's parameters. Outside the YAML, the same choice is
+`inputSet` in the start-pipeline API body and a webhook request body, `--input-set` on
+`orchestra pipeline run` / `orchestra pipeline build`, and `input_set` on the `run-pipeline`
+GitHub Action (v1.9.0+).
+
+Per input, the first source with a value wins -- a run uses **at most one** set, and sets never
+combine:
+
+1. Values supplied by the run itself -- run dialogue entries, API `runInputs`, a trigger's own
+   `run_inputs`, or sensor outputs mapped with `map_outputs`.
+2. The named input set.
+3. The input's own `default`.
+
+Four things catch authors out:
+
+- **A set is not an environment.** `input_sets` only fills inputs; credentials, connections and
+  `${{ ENV.* }}` come from the environment, and the two are chosen separately. Running in the
+  production environment does **not** apply a set called `prod` -- name both. An environment can
+  restrict which sets its runs may use (`allowedInputSets`) and preselect one, but the
+  preselection only reaches the Run dialogue, never the API, CLI, Action or a trigger.
+- **A missing set fails, it doesn't fall back to defaults.** A name the version or branch being run
+  doesn't declare is rejected with `400` and no run is created (API, CLI, Action, run dialogue), or
+  fails the run immediately when a trigger supplied it.
+- **A schedule stores the set name at publish time.** Renaming or removing a set breaks its
+  scheduled runs until the pipeline is republished.
+- **A rerun replays the original run's resolved values** and does not re-apply the set, so editing
+  a set afterwards doesn't change what a rerun of an earlier run uses.
+
+Validation at save time: every key in a set is a declared input; each value matches that input's
+`type` and, for a `string` input with `options`, is one of them (expressions are exempt, being
+runtime-resolved); every trigger's `input_set` names a set declared in the same pipeline; and no
+two set names differ only by case. See
+[input sets](https://docs.getorchestra.io/docs/core-concepts/variables/inputs#input-sets).
+
 **Webhook:**
 
 ```yaml

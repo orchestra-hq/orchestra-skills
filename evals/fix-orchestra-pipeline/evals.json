@@ -79,6 +79,32 @@
           "text": "Makes no change to the pipeline and no Orchestra write calls"
         }
       ]
+    },
+    {
+      "id": "skipped-task-is-restricted-connection-not-credential",
+      "prompt": "Our 'Daily Revenue' pipeline run in the staging environment came back SUCCEEDED but the numbers never updated. The load_revenue Snowflake task is SKIPPED, and its message says \"Connection snowflake_prod can only be used in environments: Production\". The task has no condition on it and nothing upstream failed. We tested the snowflake_prod connection from its page and it validates fine. What's going on and how do we fix it? Don't change the pipeline.",
+      "expected_output": "Identifies that snowflake_prod is restricted to the Production environment while the run was in staging, so Orchestra refused to load its credentials and skipped the task -- the credential itself is healthy, which is why validating the connection succeeds and does not rule this out. Explains that a restricted connection causes a skip rather than a failure, which is why the pipeline reported SUCCEEDED with stale data. Gives the fix as a choice: point the staging run at a connection it is allowed to use (typically an ${{ ENV.* }} connection reference resolving per environment), or add staging to snowflake_prod's allowed environments if staging is genuinely meant to reach production -- noting that changing allowed environments needs permission on the connection and on every environment whose access changes. Does not diagnose expired credentials, a task condition, or a YAML error, and changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies the cause as the connection being restricted to environments that do not include the run's environment, rather than a credential problem"
+        },
+        {
+          "text": "Explains that the connection validating successfully is consistent with this failure and does not rule it out, because the restriction governs which runs may use the credentials rather than whether they are valid"
+        },
+        {
+          "text": "States that a restricted connection causes the task to be SKIPPED rather than FAILED, and that this is why the pipeline run reported SUCCEEDED while the data was stale"
+        },
+        {
+          "text": "Offers both remedies -- run staging against a connection it is allowed to use, or add staging to the connection's allowed environments -- rather than only one"
+        },
+        {
+          "text": "Does not attribute the problem to expired or rotated credentials, a task condition, a dependency, or a pipeline YAML error"
+        },
+        {
+          "text": "Makes no change to the pipeline, the connection, or the environment"
+        }
+      ]
     }
   ]
 }

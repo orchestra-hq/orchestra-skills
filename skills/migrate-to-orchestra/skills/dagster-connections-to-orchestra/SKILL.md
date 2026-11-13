@@ -150,6 +150,18 @@ pipeline:
 
 In Orchestra: Settings -> Environments -> set `SNOWFLAKE_CONN=snowflake_dev_11111` in dev and `snowflake_prod_22222` in prod. This mirrors how Dagster swaps resources per deployment/environment.
 
+**Enforce the split, don't just rely on it.** Pointing `SNOWFLAKE_CONN` at a different connection
+per environment keeps dev off production *by convention* — a task that hardcodes the prod
+connection id still reaches production from a dev run. Restrict the production connection to the
+production environment (**Allowed environments** on the connection, or **Connection
+restrictions** on the environment's **Configuration** tab) and the platform enforces it: a task
+whose connection isn't allowed in the run's environment is **skipped**, with the allowed
+environments named in its message. A connection with no allowed environments is usable
+everywhere, which is how every existing connection behaves, so this is opt-in per connection.
+Note the skip — the run doesn't fail, so a migration verified only by "the pipeline went green"
+can hide a task that never ran. See
+[restricting a connection to environments](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#restricting-a-connection-to-environments).
+
 ---
 
 ## Dagster EnvVar / Config -> Orchestra inputs:

@@ -52,6 +52,21 @@
         { "text": "Keeps the credential rule: values are supplied at connection-creation time from the user or their secret store, never committed to a repo or a migration script" },
         { "text": "Makes no live Orchestra MCP tool calls and creates nothing in the workspace" }
       ]
+    },
+    {
+      "id": "restrict-prod-connection-to-environment",
+      "prompt": "We finished converting our Prefect blocks. Per your multi-environment pattern, SNOWFLAKE_CONN resolves to snowflake_dev_11111 in dev and snowflake_prod_22222 in prod, the same way we loaded the \"snowflake-dev\" vs \"snowflake-prod\" block by name. What actually prevents someone running the dev pipeline against the prod Snowflake credential, and how would we notice if it were blocked? Don't call any live Orchestra tools.",
+      "expected_output": "Explains that pointing the connection at a different id per environment is a convention only, and that the enforced control is restricting the production connection to the production environment -- via Allowed environments on the connection, or Connection restrictions on the environment's Configuration tab. Says a task whose connection is not allowed in the run's environment is skipped, not failed, with the allowed environments named in the task's message, so the run can still complete green. Notes a connection with no allowed environments remains usable everywhere, so this is opt-in per connection, and that the restriction lives on the connection or the environment rather than in the pipeline YAML. Makes no live calls.",
+      "files": [],
+      "assertions": [
+        { "text": "Says the per-environment connection swap on its own is a convention, not an enforced boundary: a task naming the production connection id directly still reaches production from a dev run" },
+        { "text": "Recommends restricting the production connection to the production environment, set either as Allowed environments on the connection or as Connection restrictions on the environment's Configuration tab" },
+        { "text": "States that a task whose connection is not allowed in the run's environment is SKIPPED rather than failed, so the run can still finish green with that task never having executed" },
+        { "text": "Notes the restriction is opt-in: a connection with no allowed environments is usable in every environment, which is how existing connections already behave" },
+        { "text": "Does not claim the restriction is expressed in the pipeline YAML -- it is configured on the connection or the environment, not as a field on the task" },
+        { "text": "Makes no live Orchestra MCP tool calls and creates or modifies nothing in the workspace" },
+        { "text": "Handles the Prefect comparison honestly: loading a block by name per deployment and swapping a connection per environment are both conventions, and the environment restriction is the part Orchestra actually enforces" }
+      ]
     }
   ]
 }
