@@ -115,6 +115,7 @@ pipeline:
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 | LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
 | GITLAB | GITLAB_RUN_PIPELINE | `project`, `ref`, `variables`, `inputs` |
+| AZURE_FUNCTIONS | AZURE_FUNCTIONS_RUN_FUNCTION | `resource_group`, `function_app_name`, `function_name`; optional `payload`, `subscription_id`, `enable_polling` |
 
 ### TRIGGER_PIPELINE needs a published target
 
@@ -147,8 +148,8 @@ Slim CI keeps working while production and CI sit on different majors
 ([Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra)).
 
 Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
-Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab — are
-**strings**, not YAML mappings.
+Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab,
+`payload` on Azure Functions — are **strings**, not YAML mappings.
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
@@ -211,6 +212,34 @@ API rate limit is shared across all of a user's tokens, so give Orchestra its ow
 polling has to compete. The integration and the job are both in beta and may not be enabled on an
 account. See [GitLab](https://docs.getorchestra.io/docs/integrations/gitlab) and
 [Run CI/CD Pipeline](https://docs.getorchestra.io/docs/integrations/gitlab/gitlab_run_pipeline).
+
+`AZURE_FUNCTIONS_RUN_FUNCTION` invokes an HTTP-triggered function with the function app's default
+host key, so the function's authorization level has to be `function` or `anonymous` — an `admin`
+function can't be reached. Azure has no asynchronous invocation for HTTP triggers, so Orchestra
+sends the request and waits **10 seconds**: an error inside that window fails the task, and
+otherwise Orchestra stops waiting and the function carries on, or doesn't, depending on how it
+handles the caller disconnecting. That makes `enable_polling` (default `true`) the parameter that
+decides what the task actually reports. Left on, the task waits for the function to report its own
+status through the `orchestra_task_run_id` and `orchestra_webhook_url` that Orchestra puts in the
+request body — the `orchestra-sdk` package or plain HTTP, the same contract as an AWS Lambda — and
+fails if nothing arrives within `configuration.timeout`, default 30 minutes. Turned off, the task
+succeeds as soon as the function has been triggered, so it reports a trigger and not a result;
+don't hang data-quality gating off a task configured that way. The task's `payload` reaches the
+function as `task_run_data` alongside those two fields, rather than as the whole body.
+
+Two Azure limits sit underneath this and neither is a task parameter. Azure stops waiting for an
+HTTP-triggered function after **230 seconds** whatever the function app's own timeout says, so
+longer work belongs in a queue-triggered function that the HTTP one hands off to and that reports
+back to Orchestra itself; raising `configuration.timeout` extends only Orchestra's patience, not
+Azure's. And a function that does the work inline has to survive Orchestra disconnecting at the
+10-second mark — in the .NET isolated worker model the cancellation token is signalled then, so a
+function that honours it stops mid-run and never calls back. `subscription_id` on the task
+overrides the connection's default, and the connection's app registration needs
+`Microsoft.Web/sites/functions/read` and `Microsoft.Web/sites/host/listkeys/action` (Website
+Contributor, or a custom role with just those two). The integration and the job are both in beta
+and may not be enabled on an account. See
+[Azure Functions](https://docs.getorchestra.io/docs/integrations/azure_functions) and
+[Run Function](https://docs.getorchestra.io/docs/integrations/azure_functions/azure_functions_run_function).
 
 `AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
 `integration_job`: they are credential stores a connection reads its own credentials from, not
@@ -376,6 +405,70 @@ inputs:
 not a constraint: unlisted values still run. Validation requires at least one unique option, and a
 literal `default` must be one of them (an expression default like `${{ ENV.X }}` is exempt). See
 [inputs](https://docs.getorchestra.io/docs/core-concepts/variables/inputs).
+
+**Input sets:**
+
+`input_sets` is a top-level key holding named, partial sets of input values. A trigger names one
+with `input_set`, and the set fills every input that run doesn't supply itself. Reach for it
+instead of cloning a pipeline per environment or retyping the same values on each run.
+
+```yaml
+inputs:
+  warehouse:
+    type: string
+    default: DEV_WH
+  full_refresh:
+    type: boolean
+    default: false
+
+input_sets:
+  prod:                     # names: letters, digits, _ and -, matched exactly
+    warehouse: PROD_WH      # keys must be declared inputs; a set is partial
+  backfill:
+    full_refresh: true
+
+schedule:
+- name: Nightly prod
+  cron: 0 2 ? * * *
+  input_set: prod
+  run_inputs:
+    full_refresh: true      # beats the set, for this trigger only
+```
+
+`input_set` is accepted on `schedule` entries, `sensors`, `trigger_events` entries, the `webhook`
+block, and the `TRIGGER_PIPELINE` task's parameters. Outside the YAML, the same choice is
+`inputSet` in the start-pipeline API body and a webhook request body, `--input-set` on
+`orchestra pipeline run` / `orchestra pipeline build`, and `input_set` on the `run-pipeline`
+GitHub Action (v1.9.0+).
+
+Per input, the first source with a value wins -- a run uses **at most one** set, and sets never
+combine:
+
+1. Values supplied by the run itself -- run dialogue entries, API `runInputs`, a trigger's own
+   `run_inputs`, or sensor outputs mapped with `map_outputs`.
+2. The named input set.
+3. The input's own `default`.
+
+Four things catch authors out:
+
+- **A set is not an environment.** `input_sets` only fills inputs; credentials, connections and
+  `${{ ENV.* }}` come from the environment, and the two are chosen separately. Running in the
+  production environment does **not** apply a set called `prod` -- name both. An environment can
+  restrict which sets its runs may use (`allowedInputSets`) and preselect one, but the
+  preselection only reaches the Run dialogue, never the API, CLI, Action or a trigger.
+- **A missing set fails, it doesn't fall back to defaults.** A name the version or branch being run
+  doesn't declare is rejected with `400` and no run is created (API, CLI, Action, run dialogue), or
+  fails the run immediately when a trigger supplied it.
+- **A schedule stores the set name at publish time.** Renaming or removing a set breaks its
+  scheduled runs until the pipeline is republished.
+- **A rerun replays the original run's resolved values** and does not re-apply the set, so editing
+  a set afterwards doesn't change what a rerun of an earlier run uses.
+
+Validation at save time: every key in a set is a declared input; each value matches that input's
+`type` and, for a `string` input with `options`, is one of them (expressions are exempt, being
+runtime-resolved); every trigger's `input_set` names a set declared in the same pipeline; and no
+two set names differ only by case. See
+[input sets](https://docs.getorchestra.io/docs/core-concepts/variables/inputs#input-sets).
 
 **Webhook:**
 

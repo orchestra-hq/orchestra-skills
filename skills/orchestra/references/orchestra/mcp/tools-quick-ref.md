@@ -157,6 +157,12 @@ Optional arguments:
 - `commit`
 - `environment`
 - `run_inputs`
+- `inputSet` — name of one of the pipeline's
+  [input sets](https://docs.getorchestra.io/docs/core-concepts/variables/inputs#input-sets),
+  filling every input `run_inputs` leaves out. A run uses at most one set, and `run_inputs` wins
+  per input. A name the version being run doesn't declare is rejected with `400` and starts no
+  run, so read the set names off the pipeline definition rather than guessing from the
+  environment — an environment called `production` implies nothing about a set called `prod`.
 
 ### `get_pipeline_run_status`
 Required arguments:
@@ -239,6 +245,15 @@ clicked through Settings → Connections. Three things this changes in practice:
 
 Secret parameters come back obfuscated on every read, so a connection's stored credential can
 never be recovered through these tools — only replaced.
+
+A connection also carries `allowedEnvironmentIds`, the environments whose runs may use it; an
+empty list means every environment. This is worth checking when a task is **skipped** rather than
+failed and its message names the environments a connection is allowed in — the credential is fine,
+the run's environment just isn't on the list. The same restriction makes a sensor check error and
+suppresses an alert, and an agent can only use the connection if one of the agent's own allowed
+environments is on it. Updating `allowedEnvironmentIds` is a request of its own: it cannot be
+changed in the same call as any other field of the connection. See
+[restricting a connection to environments](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#restricting-a-connection-to-environments).
 
 Docs: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-manage-connections-programmatically
 

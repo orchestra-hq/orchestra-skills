@@ -35,6 +35,16 @@ connection: ${{ ENV.SNOWFLAKE_CONNECTION_NAME }}
 
 Set `SNOWFLAKE_CONNECTION_NAME=my_snowflake_12345` in Orchestra's environment settings.
 
+That swap is a convention, not a guard: a task that names the production connection id directly
+still reaches production from a dev run. To enforce it, restrict the production connection to the
+production environment — **Allowed environments** on the connection, or **Connection
+restrictions** on the environment's **Configuration** tab. A task whose connection isn't allowed
+in the run's environment is then **skipped**, with the allowed environments named in its message;
+a connection with no allowed environments stays usable everywhere, so this is opt-in per
+connection. Watch for the skip when verifying a migration — the run still goes green, so a task
+that never ran is easy to miss. See
+[restricting a connection to environments](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#restricting-a-connection-to-environments).
+
 ---
 
 ## Airflow Credential Idioms → What They Mean
@@ -191,6 +201,7 @@ If a `Variable` value happens to look secret-shaped (an API key someone stashed 
 
 ## Gotchas
 
+- **A restricted connection skips the task, it doesn't fail it** — if a converted task is skipped with a message naming environments, the connection is restricted and the run's environment isn't on its list, not a bad credential.
 - **One `conn_id` can be reused across many tasks/DAGs** — map it to a single Orchestra connection, don't create a duplicate per task.
 - **`conn_id=` is generic; the operator class disambiguates the type** — the same generic kwarg name is used by Power BI, HTTP, and many community-provider operators, so identify the type from the operator/hook class, not the kwarg name alone.
 - **`AIRFLOW_CONN_*` URIs are real credentials in plain sight** — if a deployment manifest or `.env` file has one, treat the value as sensitive; don't echo it back into any generated file, only use it to identify what fields the new Orchestra connection needs.
