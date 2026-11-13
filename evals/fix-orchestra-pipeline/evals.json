@@ -105,6 +105,35 @@
           "text": "Makes no change to the pipeline, the connection, or the environment"
         }
       ]
+    },
+    {
+      "id": "green-azure-function-task-is-polling-disabled",
+      "prompt": "Our 'Enrich Customers' pipeline shows the azure_enrich task SUCCEEDED every night in about four seconds, but the enriched table hasn't been written for a week. The task is an Azure Functions Run Function task. The function app's logs show the function starting each night and then nothing after about four minutes. Nobody changed the pipeline. What's happening? Don't change anything.",
+      "expected_output": "Identifies two separate things. First, the task goes green in seconds because `enable_polling` is off, so the task reports that the function was invoked and not that it finished -- which is why a failing function still leaves a green task and a SUCCEEDED pipeline run. Second, the function itself is dying around the 230-second mark, which is Azure's ceiling on an HTTP-triggered function regardless of the function app's configured timeout, so the work never completes even though it is started. Gives the fix as both: turn polling on so the task waits for the function's own status callback (`orchestra_task_run_id` / `orchestra_webhook_url`), and move the long-running work to a queue-triggered function that reports back, since turning polling on alone would just convert a fast false green into a timeout. Does not diagnose expired credentials, a missing role assignment, or a task condition, and changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Explains the four-second SUCCEEDED as `enable_polling` being off, so the task reports the trigger rather than the function's result"
+        },
+        {
+          "text": "Reads the function stopping at around four minutes as Azure's 230-second limit on HTTP-triggered functions, not as an Orchestra timeout or a task timeout"
+        },
+        {
+          "text": "States that Azure's 230-second ceiling applies whatever the function app's own timeout is configured to"
+        },
+        {
+          "text": "Recommends both parts of the fix -- enabling polling so the task waits for the function's status callback, and moving the long-running work off the HTTP trigger to a queue-triggered function that reports back to Orchestra"
+        },
+        {
+          "text": "Notes that enabling polling on its own would turn the false green into a task timeout rather than making the enrichment succeed"
+        },
+        {
+          "text": "Does not attribute the problem to expired credentials, a missing role assignment on the app registration, a task condition, or an upstream dependency"
+        },
+        {
+          "text": "Makes no change to the pipeline, the task, or the connection"
+        }
+      ]
     }
   ]
 }

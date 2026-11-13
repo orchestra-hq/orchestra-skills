@@ -115,6 +115,7 @@ pipeline:
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 | LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
 | GITLAB | GITLAB_RUN_PIPELINE | `project`, `ref`, `variables`, `inputs` |
+| AZURE_FUNCTIONS | AZURE_FUNCTIONS_RUN_FUNCTION | `resource_group`, `function_app_name`, `function_name`; optional `payload`, `subscription_id`, `enable_polling` |
 
 ### TRIGGER_PIPELINE needs a published target
 
@@ -147,8 +148,8 @@ Slim CI keeps working while production and CI sit on different majors
 ([Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra)).
 
 Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
-Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab — are
-**strings**, not YAML mappings.
+Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab,
+`payload` on Azure Functions — are **strings**, not YAML mappings.
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
@@ -211,6 +212,34 @@ API rate limit is shared across all of a user's tokens, so give Orchestra its ow
 polling has to compete. The integration and the job are both in beta and may not be enabled on an
 account. See [GitLab](https://docs.getorchestra.io/docs/integrations/gitlab) and
 [Run CI/CD Pipeline](https://docs.getorchestra.io/docs/integrations/gitlab/gitlab_run_pipeline).
+
+`AZURE_FUNCTIONS_RUN_FUNCTION` invokes an HTTP-triggered function with the function app's default
+host key, so the function's authorization level has to be `function` or `anonymous` — an `admin`
+function can't be reached. Azure has no asynchronous invocation for HTTP triggers, so Orchestra
+sends the request and waits **10 seconds**: an error inside that window fails the task, and
+otherwise Orchestra stops waiting and the function carries on, or doesn't, depending on how it
+handles the caller disconnecting. That makes `enable_polling` (default `true`) the parameter that
+decides what the task actually reports. Left on, the task waits for the function to report its own
+status through the `orchestra_task_run_id` and `orchestra_webhook_url` that Orchestra puts in the
+request body — the `orchestra-sdk` package or plain HTTP, the same contract as an AWS Lambda — and
+fails if nothing arrives within `configuration.timeout`, default 30 minutes. Turned off, the task
+succeeds as soon as the function has been triggered, so it reports a trigger and not a result;
+don't hang data-quality gating off a task configured that way. The task's `payload` reaches the
+function as `task_run_data` alongside those two fields, rather than as the whole body.
+
+Two Azure limits sit underneath this and neither is a task parameter. Azure stops waiting for an
+HTTP-triggered function after **230 seconds** whatever the function app's own timeout says, so
+longer work belongs in a queue-triggered function that the HTTP one hands off to and that reports
+back to Orchestra itself; raising `configuration.timeout` extends only Orchestra's patience, not
+Azure's. And a function that does the work inline has to survive Orchestra disconnecting at the
+10-second mark — in the .NET isolated worker model the cancellation token is signalled then, so a
+function that honours it stops mid-run and never calls back. `subscription_id` on the task
+overrides the connection's default, and the connection's app registration needs
+`Microsoft.Web/sites/functions/read` and `Microsoft.Web/sites/host/listkeys/action` (Website
+Contributor, or a custom role with just those two). The integration and the job are both in beta
+and may not be enabled on an account. See
+[Azure Functions](https://docs.getorchestra.io/docs/integrations/azure_functions) and
+[Run Function](https://docs.getorchestra.io/docs/integrations/azure_functions/azure_functions_run_function).
 
 `AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
 `integration_job`: they are credential stores a connection reads its own credentials from, not

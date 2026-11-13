@@ -822,6 +822,59 @@
           "text": "Ad-hoc dev runs are left to name no input set and take the declared defaults, rather than being given a `dev` set that merely restates those defaults"
         }
       ]
+    },
+    {
+      "id": "azure-function-polling-reports-result-not-trigger",
+      "prompt": "Create an Orchestra pipeline 'Enrich Customers' with a single task that calls our Azure Function. Resource group `data-rg`, function app `customer-enrichment`, function `enrich`, and it needs the payload `{\"mode\": \"incremental\"}`. The function takes about eight minutes to do its work. We need the pipeline to treat the task as finished only once the enrichment has actually completed, not when it's been kicked off. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with one AZURE_FUNCTIONS / AZURE_FUNCTIONS_RUN_FUNCTION task carrying `resource_group`, `function_app_name` and `function_name`, and `payload` written as a quoted JSON string rather than a YAML mapping. `enable_polling` is left on (or set true) because the task must report the enrichment's result, not its trigger. The answer flags that Orchestra waits only 10 seconds on the HTTP request and that Azure cuts an HTTP-triggered function off at 230 seconds whatever the function app's timeout says -- so an eight-minute function cannot do the work inline on the HTTP trigger and must hand off to a queue-triggered function that reports back to Orchestra with the `orchestra_task_run_id` and `orchestra_webhook_url` it was sent. It does not solve the eight minutes by raising `configuration.timeout` alone.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AZURE_FUNCTIONS integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AZURE_FUNCTIONS"
+        },
+        {
+          "text": "Uses the AZURE_FUNCTIONS_RUN_FUNCTION job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AZURE_FUNCTIONS_RUN_FUNCTION"
+        },
+        {
+          "text": "`payload` is a quoted JSON string, not a nested YAML mapping",
+          "check": "regex",
+          "pattern": "payload:\\s*['\"]\\s*\\{"
+        },
+        {
+          "text": "Sets the three required parameters `resource_group`, `function_app_name` and `function_name`, and does not invent a function URL parameter"
+        },
+        {
+          "text": "Leaves `enable_polling` on (omitted, or explicitly true) so the task completes on the function's reported result rather than on the trigger, and explains that turning it off would make the task succeed as soon as the function was invoked"
+        },
+        {
+          "text": "States that Orchestra waits only about 10 seconds on the invocation itself, so the task's completion depends on the function calling back rather than on the HTTP response"
+        },
+        {
+          "text": "Flags Azure's 230-second ceiling on HTTP-triggered functions as independent of the function app's own timeout, and therefore fatal to doing eight minutes of work inline on the HTTP trigger"
+        },
+        {
+          "text": "Recommends the queue-triggered hand-off for the long-running work, with the queue function reporting status back to Orchestra using the `orchestra_task_run_id` and `orchestra_webhook_url` Orchestra sends in the request body"
+        },
+        {
+          "text": "Does not present raising `configuration.timeout` as sufficient on its own -- a longer task timeout extends only how long Orchestra waits for a callback, not how long Azure lets the function run"
+        }
+      ]
     }
   ]
 }
