@@ -875,6 +875,101 @@
           "text": "Does not present raising `configuration.timeout` as sufficient on its own -- a longer task timeout extends only how long Orchestra waits for a callback, not how long Azure lets the function run"
         }
       ]
+    },
+    {
+      "id": "google-chat-alert-destination-uses-connection-id",
+      "prompt": "Create an Orchestra pipeline 'Billing Export' with a single Snowflake query task running `CALL export_billing()`. When the pipeline fails, alert our Google Chat spaces -- the #data-platform space (connection `google_chat_data_platform_12345`) and the #finance-ops space (connection `google_chat_finance_ops_67890`). Also add a task to the pipeline that posts a 'billing export finished' note to the #data-platform space when it's done. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a SNOWFLAKE / SNOWFLAKE_RUN_QUERY task and a pipeline-level `alerts:` entry on FAILED carrying two GOOGLE_CHAT destinations, each naming one connection with `connection_id` -- because the space is fixed by the connection, two spaces means two destinations, not a `destination` value listing channels. The requested 'post a note' task is refused or flagged rather than invented: GOOGLE_CHAT is an alerting destination with no `integration_job`, so there is no Google Chat task type, and the answer should say so and offer the alerting route (an alert on SUCCEEDED) instead of fabricating a task. The beta status of the integration is worth a mention.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Each GOOGLE_CHAT alert destination names its connection with `connection_id`, not `destination`",
+          "check": "alert_destination_requires",
+          "integration": "GOOGLE_CHAT",
+          "field": "connection_id"
+        },
+        {
+          "text": "Both Google Chat connections appear, as two separate destinations rather than one destination naming two spaces",
+          "check": "regex",
+          "pattern": "google_chat_data_platform_12345[\\s\\S]*google_chat_finance_ops_67890"
+        },
+        {
+          "text": "Does not invent a Google Chat task: the only task integration used is SNOWFLAKE, because GOOGLE_CHAT is in IntegrationsEnum as an alerting destination only and has no `integration_job`",
+          "check": "valid_enum",
+          "field": "integration",
+          "allowed": ["SNOWFLAKE"]
+        },
+        {
+          "text": "Explicitly tells the user the 'post a note' task is not possible as a task, rather than silently dropping it or inventing a job name such as GOOGLE_CHAT_SEND_MESSAGE"
+        },
+        {
+          "text": "Offers the supported alternative for the completion note -- an alert on a success status routed to the same Google Chat connection -- instead of only refusing"
+        },
+        {
+          "text": "Does not give the GOOGLE_CHAT destinations a `destination` value such as a channel name, which is a SLACK/EMAIL-only addressing style"
+        },
+        {
+          "text": "Mentions that the Google Chat integration is in beta and may not be enabled on the account"
+        },
+        {
+          "text": "Does not write a Google Chat webhook URL into the YAML -- the webhook URL carries a token and lives on the connection, not in the pipeline",
+          "check": "no_hardcoded_secret"
+        }
+      ]
+    },
+    {
+      "id": "trigger-pipeline-task-input-set-beats-trigger-event",
+      "prompt": "We have a parent pipeline 'Ingest' that finishes and then needs to kick off a child pipeline 'Transform', waiting for it mid-run. Transform has input sets `prod` and `staging`, and the parent is the one that knows which to use. Transform already has a `trigger_events:` entry that fires on Ingest SUCCEEDED and names `input_set: staging`. Show me how the parent should trigger Transform with the `prod` set, and tell me what happens to the staging set already on the trigger_events entry. Write the parent pipeline to pipeline.yml.",
+      "expected_output": "A parent pipeline YAML using an ORCHESTRA / TRIGGER_PIPELINE task with `input_set: prod` in its parameters. The explanation states that when both a TRIGGER_PIPELINE task and a matching trigger_events entry name an input set, the task's wins -- so the child's `input_set: staging` is ignored on runs the parent triggers this way, and the child would still use staging only for runs started by that trigger entry on its own. It should flag that naming a set in both places is the ambiguity to avoid, and that TRIGGER_PIPELINE requires the child to be published.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Uses the ORCHESTRA integration for the triggering task",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "ORCHESTRA"
+        },
+        {
+          "text": "Uses the TRIGGER_PIPELINE job rather than a trigger_events entry on the parent",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "TRIGGER_PIPELINE"
+        },
+        {
+          "text": "The TRIGGER_PIPELINE task's parameters carry `input_set: prod`",
+          "check": "regex",
+          "pattern": "input_set:\\s*prod"
+        },
+        {
+          "text": "States that the TRIGGER_PIPELINE task's `input_set` takes precedence over the input set named on the child's matching `trigger_events` entry"
+        },
+        {
+          "text": "Concludes specifically that the child's `input_set: staging` is ignored for runs the parent triggers through this task, rather than being merged with or combined into `prod`"
+        },
+        {
+          "text": "Does not claim the two sets combine, or that the run ends up with values from both -- a run uses at most one input set"
+        },
+        {
+          "text": "Notes that the child's trigger_events entry still applies its own set for runs started by that entry rather than by the parent's task, so the entry is not dead configuration"
+        },
+        {
+          "text": "Mentions that TRIGGER_PIPELINE requires the child pipeline to be published"
+        }
+      ]
     }
   ]
 }

@@ -250,8 +250,11 @@ A connection also carries `allowedEnvironmentIds`, the environments whose runs m
 empty list means every environment. This is worth checking when a task is **skipped** rather than
 failed and its message names the environments a connection is allowed in — the credential is fine,
 the run's environment just isn't on the list. The same restriction makes a sensor check error and
-suppresses an alert, and an agent can only use the connection if one of the agent's own allowed
-environments is on it. Updating `allowedEnvironmentIds` is a request of its own: it cannot be
+suppresses an alert, and an agent can only use the connection if one of the agent's own
+[allowed environments](https://docs.getorchestra.io/docs/ai-agents/agents#allowed-environments) is
+on it -- an agent left with none can use unrestricted connections only, so restricting a connection
+is what takes it away from every agent that hasn't been granted a matching environment. Updating
+`allowedEnvironmentIds` is a request of its own: it cannot be
 changed in the same call as any other field of the connection. See
 [restricting a connection to environments](https://docs.getorchestra.io/docs/core-concepts/tasks/connections#restricting-a-connection-to-environments).
 

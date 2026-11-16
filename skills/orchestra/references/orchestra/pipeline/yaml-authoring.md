@@ -461,6 +461,12 @@ Four things catch authors out:
   fails the run immediately when a trigger supplied it.
 - **A schedule stores the set name at publish time.** Renaming or removing a set breaks its
   scheduled runs until the pipeline is republished.
+- **Two places can name a set for the same run.** When a parent fires a child with a
+  `TRIGGER_PIPELINE` task and the child also has a `trigger_events` entry matching that parent, the
+  task's `input_set` wins over the entry's. Put the set on the task when the parent decides which
+  one to use, and on the child's `trigger_events` entry when the child does -- naming it in both
+  places means the child's entry is silently ignored
+  ([pipeline triggers](https://docs.getorchestra.io/docs/core-concepts/triggers/pipeline)).
 - **A rerun replays the original run's resolved values** and does not re-apply the set, so editing
   a set afterwards doesn't change what a rerun of an earlier run uses.
 
@@ -555,6 +561,13 @@ channel or an address); the rest name a connection with `connection_id`.
 fixed by the connection, not by `destination` -- a second space means a second connection listed as
 its own destination, not a `destination` value
 ([Google Chat alerts](https://docs.getorchestra.io/docs/core-concepts/alerting/google-chat)).
+The integration is in beta and may not be enabled on an account, and it is an alerting destination
+only: `GOOGLE_CHAT` is in `IntegrationsEnum` but has no `integration_job`, so it is a valid
+destination and never a task. A pipeline that needs to *post* a message as a step of its own wants
+a different integration. Its connection authenticates with
+the space's webhook URL, which carries a token: treat it as a credential, and expect a Workspace
+admin to have allowed incoming webhooks before the connection can be created at all. See
+[Google Chat](https://docs.getorchestra.io/docs/integrations/google_chat).
 
 `max_live_alerts` (integer 1–50, default 1) on an alert raises how many in-flight dbt Core
 model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or
