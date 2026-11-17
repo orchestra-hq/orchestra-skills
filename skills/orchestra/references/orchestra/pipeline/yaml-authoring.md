@@ -109,7 +109,7 @@ pipeline:
 | ORCHESTRA | TRIGGER_PIPELINE | `pipeline_id` (uuid of a **published** pipeline); optional `run_inputs`, `input_set`, `branch` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
-| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
+| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds`, `tags` |
 | AWS_SES | AWS_SES_SEND_EMAIL | `from_address`, `to`, `subject`, `body_text`; optional `cc`, `bcc`, `reply_to`, `body_html`, `attachments`, `attachment_encoding` (utf-8\|base64), `aws_region` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
@@ -162,14 +162,35 @@ rather than applying either habit across the board.
 EC2 or Fargate only — array jobs and multi-node parallel jobs aren't supported. A
 `job_definition` without `:<revision>` resolves to the latest active revision. `timeout_seconds`
 is a per-attempt limit with a minimum of 60, enforced by Batch. A task that hits its own
-`configuration.timeout` fails **without terminating the job** — a running job keeps running and
-a queued one can still start later — so bound queue waits with a job state time limit action on
-the queue rather than relying on the task timeout; cancelling the task does terminate the job.
+`configuration.timeout` fails **and terminates the job**, so the connection's role needs
+`batch:TerminateJob`; if that call fails the task still fails and the job may keep running.
+Cancelling the task terminates the job too. A job state time limit action on the queue is still
+worth setting to bound queue waits, but it is now a backstop rather than the only thing that
+stops a job Orchestra has given up on.
 Orchestra injects `ORCHESTRA_ACCOUNT_ID`, `ORCHESTRA_PIPELINE_RUN_ID`, `ORCHESTRA_TASK_RUN_ID`
 and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_overrides.environment`
 adds to that rather than replacing it. The integration is in beta and may not be enabled on an
 account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
 [Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
+
+`AWS_BATCH_SUBMIT_JOB` and `AWS_ECS_RUN_TASK` both take an optional `tags` mapping of key-value
+strings, put on the job or task so IAM policies and cost reports can match on them. It is a real
+YAML mapping like `container_overrides`, not a quoted JSON string. Keys are 1-128 characters and
+must not start with `orchestra:` or `aws:` — those prefixes are reserved, so a tag carried over
+from another orchestrator's naming scheme may need renaming. Values may be empty and are capped
+at 256 characters, and AWS allows at most 50 tags on a job or task.
+
+Those reserved keys belong to a separate connection-level setting, **Tag jobs with Orchestra
+IDs** (`tag_with_orchestra_ids`), which is off by default and is not a task parameter — turning it
+on makes Orchestra add `orchestra:workspace_id`, `orchestra:pipeline_id`,
+`orchestra:pipeline_run_id` and `orchestra:task_run_id` to everything it starts on that
+connection, and those four count against the 50. Either way of tagging needs `batch:TagResource`
+or `ecs:TagResource` on the role, and without it AWS rejects the submit or run request outright
+rather than dropping the tags, so a pipeline that gains `tags` against an unchanged role fails at
+the task. The payoff is being able to scope `batch:TerminateJob` / `ecs:StopTask` to
+`aws:ResourceTag/orchestra:workspace_id`; jobs and tasks started before the setting was turned on
+carry no tags, so Orchestra cannot stop those. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch)
+and [AWS ECS](https://docs.getorchestra.io/docs/integrations/aws_ecs).
 
 `AWS_SES_SEND_EMAIL` takes its recipients as YAML arrays: `to`, `cc` and `bcc` are each a
 list of address strings, not a newline-separated block of text, so an upstream task's output
@@ -225,7 +246,21 @@ request body — the `orchestra-sdk` package or plain HTTP, the same contract as
 fails if nothing arrives within `configuration.timeout`, default 30 minutes. Turned off, the task
 succeeds as soon as the function has been triggered, so it reports a trigger and not a result;
 don't hang data-quality gating off a task configured that way. The task's `payload` reaches the
-function as `task_run_data` alongside those two fields, rather than as the whole body.
+function as `task_run_data` alongside those fields, rather than as the whole body.
+
+Every task that finishes on a callback rather than on its own request — `AZURE_FUNCTIONS_RUN_FUNCTION`,
+`AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION`, `HTTP_REQUEST_ASYNC`, the GCP Cloud Functions async job,
+`AZURE_VM_RUN_COMMAND` and `ADF_PIPELINE_RUN` — is handed the workspace ID as well as the task run
+ID, as `orchestra_account_id` in the request body, an `orchestra_account_id` request header, or an
+`ORCHESTRA_ACCOUNT_ID` parameter or environment variable, depending on the integration. The code
+calling back can authenticate with a workspace API key or with a user API key (`orc_uat_`) that
+covers the task's workspace, and either way the key must not be read-only — a read-only key is the
+quiet reason a task sits waiting until `configuration.timeout`. A user API key that covers more
+than one workspace must also send that ID back as an `X-Orchestra-Account-Id` header on every
+callback, or Orchestra cannot tell which workspace the update belongs to and rejects it. The
+`orchestra-sdk` package sends the header for you, so this is a trap for hand-rolled HTTP
+callbacks, and for an ADF web activity it means passing
+`@{pipeline().parameters.ORCHESTRA_ACCOUNT_ID}` through as that header.
 
 Two Azure limits sit underneath this and neither is a task parameter. Azure stops waiting for an
 HTTP-triggered function after **230 seconds** whatever the function app's own timeout says, so

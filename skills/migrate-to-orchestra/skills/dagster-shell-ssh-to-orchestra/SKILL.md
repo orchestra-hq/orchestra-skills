@@ -160,8 +160,19 @@ task-001:
     subnet_ids: subnet-abc123,subnet-def456
     security_group_ids: sg-abc123
     assign_public_ip: false
+    tags:
+      team: data
+      cost-centre: "1234"
   depends_on: []
 ```
+
+`tags` is optional and puts key-value tags on the ECS task itself, which is the closest thing
+Orchestra has to the labels a container scheduler carries for cost allocation. Keys cannot start
+with `orchestra:` or `aws:`; those are reserved for the connection's optional **Tag jobs with
+Orchestra IDs** setting, which adds the workspace, pipeline, pipeline run and task run IDs. Either
+way the connection's role needs `ecs:TagResource`, or AWS rejects the `RunTask` call and the task
+fails — so don't add `tags` to a pipeline without saying the role has to change too
+([AWS ECS](https://docs.getorchestra.io/docs/integrations/aws_ecs)).
 
 ---
 

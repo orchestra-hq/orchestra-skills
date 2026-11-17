@@ -205,7 +205,7 @@
     {
       "id": "aws-batch-submit-job-mapping-params",
       "prompt": "Create an Orchestra pipeline called 'Nightly Transform' with a single AWS Batch task that submits to the analytics-prod job queue using the nightly-transform job definition, pinned to revision 3. Override the container command to `python transform.py` and set STAGE=prod in the container's environment. AWS Batch should kill an attempt that has been running for more than 30 minutes. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
-      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit — rather than a `configuration.timeout`, which would only fail the task and leave the job running.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit, enforced by Batch itself — rather than leaning on `configuration.timeout`, which bounds how long Orchestra waits and then fails the task and terminates the job.",
       "files": [],
       "assertions": [
         {
@@ -247,7 +247,7 @@
           "text": "The container environment is a list of {name, value} objects (STAGE / prod), not a bare key-value mapping"
         },
         {
-          "text": "The attempt limit is set with the task's own `timeout_seconds` rather than only a `configuration.timeout` — a task timeout fails the task without terminating the Batch job"
+          "text": "The 30-minute limit is expressed as the task's own `timeout_seconds`, which Batch enforces per attempt, rather than as a `configuration.timeout` — the task timeout bounds Orchestra's wait and terminates the job, so it is not a per-attempt limit"
         },
         {
           "text": "Does not set timeout_seconds below 60, the schema minimum"
@@ -907,7 +907,9 @@
           "text": "Does not invent a Google Chat task: the only task integration used is SNOWFLAKE, because GOOGLE_CHAT is in IntegrationsEnum as an alerting destination only and has no `integration_job`",
           "check": "valid_enum",
           "field": "integration",
-          "allowed": ["SNOWFLAKE"]
+          "allowed": [
+            "SNOWFLAKE"
+          ]
         },
         {
           "text": "Explicitly tells the user the 'post a note' task is not possible as a task, rather than silently dropping it or inventing a job name such as GOOGLE_CHAT_SEND_MESSAGE"
@@ -968,6 +970,81 @@
         },
         {
           "text": "Mentions that TRIGGER_PIPELINE requires the child pipeline to be published"
+        }
+      ]
+    },
+    {
+      "id": "aws-batch-tags-need-tagresource",
+      "prompt": "Create an Orchestra pipeline 'Cost Tagged Transform' with a single AWS Batch task submitting to the analytics-prod queue with the nightly-transform job definition. Finance wants every job tagged with team=data and cost-centre=1234 so they can split the AWS bill, and they also want to be able to tell which Orchestra pipeline run a job came from. Write the pipeline to pipeline.yml. Just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task carrying a `tags` mapping of team: data and cost-centre: \"1234\", written as a real nested YAML mapping rather than a quoted JSON string. The answer does not invent orchestra:-prefixed tags as task parameters -- that prefix is reserved, and the pipeline/run/task IDs come from the connection's 'Tag jobs with Orchestra IDs' setting instead, which is not expressible in the pipeline YAML. It flags that the connection's IAM role needs batch:TagResource, because without it AWS rejects the SubmitJob request outright and the task fails rather than simply running untagged.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_BATCH integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_BATCH"
+        },
+        {
+          "text": "Uses the AWS_BATCH_SUBMIT_JOB job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_BATCH_SUBMIT_JOB"
+        },
+        {
+          "text": "Sets a `tags` parameter containing the cost-centre tag",
+          "check": "regex",
+          "pattern": "cost-centre:\\s*[\"']?1234"
+        },
+        {
+          "text": "`tags` is a nested YAML mapping of key-value pairs, not a quoted JSON string"
+        },
+        {
+          "text": "Does not put any tag key starting with `orchestra:` or `aws:` in the task's `tags` -- both prefixes are reserved and AWS rejects them"
+        },
+        {
+          "text": "Attributes the pipeline / pipeline run / task run ID tags to the connection's 'Tag jobs with Orchestra IDs' setting rather than inventing task parameters for them"
+        },
+        {
+          "text": "States that the connection's IAM role needs `batch:TagResource`, and that without it AWS rejects the submit request so the task fails rather than running untagged"
+        }
+      ]
+    },
+    {
+      "id": "async-callback-user-api-key-needs-account-header",
+      "prompt": "We have an Orchestra pipeline task that calls our own service over HTTP and waits for it to call back when the work is done. The callback is authenticated with one of our user API keys that covers three workspaces. The task just sits there until it times out and we can't see why. What's wrong, and what should the callback send?",
+      "expected_output": "An answer identifying that a user API key (orc_uat_) covering more than one workspace must send the workspace ID back as an X-Orchestra-Account-Id header on every callback, otherwise Orchestra cannot attribute the status update and rejects it, leaving the task waiting until configuration.timeout. Orchestra hands the task the workspace ID alongside the task run ID -- as orchestra_account_id in the request body or header, or ORCHESTRA_ACCOUNT_ID as a parameter or environment variable, depending on the integration -- so the value is already available and should not be hardcoded. It should also note the key must not be read-only, and that the orchestra-sdk package sends the header itself, so this bites hand-rolled HTTP callbacks.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies the missing `X-Orchestra-Account-Id` header on the callback as the cause",
+          "check": "regex",
+          "pattern": "X-Orchestra-Account-Id"
+        },
+        {
+          "text": "Explains that the header is required specifically because the key is a user API key covering more than one workspace, rather than claiming every callback needs it"
+        },
+        {
+          "text": "Points at the workspace ID Orchestra already supplies to the task (orchestra_account_id in the body/header, or ORCHESTRA_ACCOUNT_ID) rather than telling the user to hardcode a workspace ID"
+        },
+        {
+          "text": "Notes that the API key must not be read-only, since the callback writes a status update"
+        },
+        {
+          "text": "Explains the symptom -- the rejected update means the task waits until `configuration.timeout` rather than failing fast with an auth error"
+        },
+        {
+          "text": "Mentions that `orchestra-sdk` sends the header automatically, so the problem is specific to hand-rolled HTTP callbacks"
         }
       ]
     }

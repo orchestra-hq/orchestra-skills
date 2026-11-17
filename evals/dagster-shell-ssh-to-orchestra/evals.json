@@ -44,6 +44,22 @@
         { "text": "cluster (data-platform-cluster), subnet_ids (subnet-0a1b2c3d), and security_group_ids (sg-0f1e2d3c) are carried over as task parameters from run_task_params rather than invented or dropped" },
         { "text": "This is represented as running an existing registered ECS task definition (AWS_ECS_RUN_TASK), not as launching an arbitrary container image directly" }
       ]
+    },
+    {
+      "id": "ecs-task-tags-carried-over",
+      "prompt": "Convert this Dagster asset that runs a tagged ECS container job via PipesECSClient into an equivalent Orchestra pipeline task (see files/ecs_tagged_container_job.py). Finance relies on those tags for cost allocation, so they must survive the move. Write the pipeline YAML to pipeline.yml in the current directory \u2014 no live AWS access, no deploy.",
+      "expected_output": "An AWS_ECS / AWS_ECS_RUN_TASK task that carries the Pipes run_task_params across and turns the run_task_params `tags` list of {key, value} objects into Orchestra's `tags` mapping (team: data, cost-centre: \"1234\"). The answer notes the connection's IAM role needs ecs:TagResource, because without it AWS rejects the RunTask call and the task fails rather than running untagged, and it does not invent orchestra:-prefixed tag keys.",
+      "files": ["ecs_tagged_container_job.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the AWS_ECS integration", "check": "some_task", "field": "integration", "equals": "AWS_ECS" },
+        { "text": "The task runs the AWS_ECS_RUN_TASK job", "check": "some_task", "field": "integration_job", "equals": "AWS_ECS_RUN_TASK" },
+        { "text": "The cost-centre tag is carried over into the task's `tags` parameter", "check": "regex", "pattern": "cost-centre:\\s*[\"']?1234" },
+        { "text": "Both source tags (team=data, cost-centre=1234) land in a `tags` mapping on the AWS_ECS_RUN_TASK task rather than being dropped or folded into the unrelated pipeline-level `tags` field" },
+        { "text": "`tags` is written as a mapping of key-value pairs, not as a quoted JSON string" },
+        { "text": "Does not introduce any tag key beginning with `orchestra:` or `aws:` \u2014 both prefixes are reserved, and the Orchestra workspace/pipeline/run IDs come from the connection's 'Tag jobs with Orchestra IDs' setting instead" },
+        { "text": "Flags that the AWS connection's IAM role needs `ecs:TagResource`, and that without it AWS rejects the RunTask request so the task fails outright rather than running untagged" }
+      ]
     }
   ]
 }
