@@ -37,7 +37,7 @@ pipeline:
         integration: DBT_CORE
         integration_job: DBT_CORE_EXECUTE
         name: <descriptive name>
-        connection: null  # MANUAL: set to your Orchestra dbt-core connection's id (name_12345)
+        connection: null  # null = the workspace's default dbt-core connection; only set an existing connection's id (name_12345) to pick a specific one, never invent a name
         parameters:
           commands: 'dbt seed; dbt build --select tag:daily;'
           package_manager: PIP

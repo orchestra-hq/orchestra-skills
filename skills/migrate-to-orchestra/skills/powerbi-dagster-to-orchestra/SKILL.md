@@ -42,7 +42,7 @@ pipeline:
         integration: POWER_BI
         integration_job: POWER_BI_REFRESH_DATASET
         name: <descriptive name>
-        connection: null  # MANUAL: set to your Orchestra power-bi connection's id (name_12345)
+        connection: null  # null = the workspace's default power-bi connection; only set an existing connection's id (name_12345) to pick a specific one, never invent a name
         parameters:
           dataset_id: <power-bi-dataset-guid>     # required
           workspace_id: null                        # optional — leave null to use the workspace on the connection; only set if this task targets a different workspace

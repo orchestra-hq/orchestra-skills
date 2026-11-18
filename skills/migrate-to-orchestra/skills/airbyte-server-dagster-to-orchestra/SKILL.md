@@ -32,7 +32,7 @@ pipeline:
         integration: AIRBYTE_SERVER
         integration_job: AIRBYTE_SERVER_JOB
         name: <descriptive name>
-        connection: null  # MANUAL: set to your Orchestra airbyte-server connection's id (name_12345)
+        connection: null  # null = the workspace's default airbyte-server connection; only set an existing connection's id (name_12345) to pick a specific one, never invent a name
         parameters:
           connection_id: <airbyte-connection-uuid>
           job_type: sync
