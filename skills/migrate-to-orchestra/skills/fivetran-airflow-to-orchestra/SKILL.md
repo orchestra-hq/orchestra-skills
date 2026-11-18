@@ -32,7 +32,7 @@ pipeline:
         integration: FIVETRAN
         integration_job: FIVETRAN_SYNC_ALL
         name: <task_id value from Airflow>
-        connection: <orchestra-fivetran-connection-name>
+        connection: null  # MANUAL: set to your Orchestra fivetran connection's id (name_12345)
         parameters:
           connector_id: <fivetran-connector-id>
         depends_on: []

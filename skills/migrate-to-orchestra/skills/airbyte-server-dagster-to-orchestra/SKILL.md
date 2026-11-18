@@ -32,7 +32,7 @@ pipeline:
         integration: AIRBYTE_SERVER
         integration_job: AIRBYTE_SERVER_JOB
         name: <descriptive name>
-        connection: <orchestra-airbyte-server-connection-name>
+        connection: null  # MANUAL: set to your Orchestra airbyte-server connection's id (name_12345)
         parameters:
           connection_id: <airbyte-connection-uuid>
           job_type: sync

@@ -32,7 +32,7 @@ pipeline:
         integration: TABLEAU_CLOUD
         integration_job: TABLEAU_REFRESH_WORKBOOK
         name: <descriptive name>
-        connection: <orchestra-tableau-cloud-connection-name>
+        connection: null  # MANUAL: set to your Orchestra tableau-cloud connection's id (name_12345)
         parameters:
           project_name: <tableau-project-name>   # required
           workbook_name: <tableau-workbook-name>    # required

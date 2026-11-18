@@ -37,7 +37,7 @@ pipeline:
         integration: DBT_CORE
         integration_job: DBT_CORE_EXECUTE
         name: <descriptive name>
-        connection: <orchestra-dbt-core-connection-name>
+        connection: null  # MANUAL: set to your Orchestra dbt-core connection's id (name_12345)
         parameters:
           commands: 'dbt seed; dbt build --select tag:daily;'
           package_manager: PIP

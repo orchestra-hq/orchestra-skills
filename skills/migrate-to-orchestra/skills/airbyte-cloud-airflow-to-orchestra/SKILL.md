@@ -34,7 +34,7 @@ pipeline:
         integration: AIRBYTE_CLOUD
         integration_job: AIRBYTE_CLOUD_JOB
         name: <task_id value from Airflow>
-        connection: <orchestra-airbyte-cloud-connection-name>
+        connection: null  # MANUAL: set to your Orchestra airbyte-cloud connection's id (name_12345)
         parameters:
           connection_id: <airbyte-connection-uuid>
           job_type: sync          # required: "sync" or "reset"
