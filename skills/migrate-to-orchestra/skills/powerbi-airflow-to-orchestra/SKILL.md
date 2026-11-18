@@ -38,7 +38,7 @@ pipeline:
         integration: POWER_BI
         integration_job: POWER_BI_REFRESH_DATASET
         name: <task_id value from Airflow>
-        connection: <orchestra-power-bi-connection-name>
+        connection: null  # null = the workspace's default power-bi connection; only set an existing connection's id (name_12345) to pick a specific one, never invent a name
         parameters:
           dataset_id: <power-bi-dataset-guid>     # required
           workspace_id: null                        # optional — leave null to use the workspace on the connection; only set if this task's group_id differs from it

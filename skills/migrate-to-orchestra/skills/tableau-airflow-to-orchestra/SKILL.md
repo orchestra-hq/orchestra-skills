@@ -32,7 +32,7 @@ pipeline:
         integration: TABLEAU_CLOUD
         integration_job: TABLEAU_REFRESH_WORKBOOK
         name: <task_id value from Airflow>
-        connection: <orchestra-tableau-cloud-connection-name>
+        connection: null  # null = the workspace's default tableau-cloud connection; only set an existing connection's id (name_12345) to pick a specific one, never invent a name
         parameters:
           project_name: <tableau-project-name>   # required
           workbook_name: <tableau-workbook-name>    # required
