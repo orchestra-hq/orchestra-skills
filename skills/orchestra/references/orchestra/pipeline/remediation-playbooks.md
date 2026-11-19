@@ -64,6 +64,9 @@ Orchestra-backed pipelines.
      - dbt: suggest incremental models instead of full refresh
      - Python: suggest chunking large operations
      - Lambda: note the 15-minute hard ceiling
+     - Azure Functions: raising `configuration.timeout` only extends how long Orchestra
+       waits for the callback — Azure cuts the HTTP request at 230 seconds regardless,
+       so work that runs longer has to move to a queue-triggered function
 4. For Orchestra-backed pipelines, update timeout via `update_pipeline`:
    ```json
    { "configuration": { "timeout": 600 } }

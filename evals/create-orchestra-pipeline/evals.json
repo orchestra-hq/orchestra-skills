@@ -205,7 +205,7 @@
     {
       "id": "aws-batch-submit-job-mapping-params",
       "prompt": "Create an Orchestra pipeline called 'Nightly Transform' with a single AWS Batch task that submits to the analytics-prod job queue using the nightly-transform job definition, pinned to revision 3. Override the container command to `python transform.py` and set STAGE=prod in the container's environment. AWS Batch should kill an attempt that has been running for more than 30 minutes. Write the pipeline to pipeline.yml. Just the YAML file, don't deploy it.",
-      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit — rather than a `configuration.timeout`, which would only fail the task and leave the job running.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task: job_queue analytics-prod, job_definition nightly-transform:3, a `container_overrides` written as a real nested YAML mapping (command list plus an environment list of name/value objects) rather than a quoted JSON string, and `timeout_seconds: 1800` — the per-attempt Batch limit, enforced by Batch itself — rather than leaning on `configuration.timeout`, which bounds how long Orchestra waits and then fails the task and terminates the job.",
       "files": [],
       "assertions": [
         {
@@ -247,7 +247,7 @@
           "text": "The container environment is a list of {name, value} objects (STAGE / prod), not a bare key-value mapping"
         },
         {
-          "text": "The attempt limit is set with the task's own `timeout_seconds` rather than only a `configuration.timeout` — a task timeout fails the task without terminating the Batch job"
+          "text": "The 30-minute limit is expressed as the task's own `timeout_seconds`, which Batch enforces per attempt, rather than as a `configuration.timeout` — the task timeout bounds Orchestra's wait and terminates the job, so it is not a per-attempt limit"
         },
         {
           "text": "Does not set timeout_seconds below 60, the schema minimum"
@@ -769,6 +769,282 @@
         },
         {
           "text": "The TRIGGER_PIPELINE task depends on the dbt build, so the export pipeline starts after the models have loaded"
+        }
+      ]
+    },
+    {
+      "id": "input-sets-prod-and-backfill",
+      "prompt": "Create an Orchestra pipeline 'Orders Load' with one Snowflake query task running `CALL load_orders()`. It takes two inputs: `warehouse` (string, defaults to DEV_WH) and `full_refresh` (boolean, defaults to false). We run it three ways and don't want three copies of the pipeline: a nightly production run at 2am UTC on PROD_WH, a monthly backfill at 4am UTC on the 1st that also runs on PROD_WH but with full_refresh on, and ad-hoc dev runs that just take the defaults. Keep the per-run values on the pipeline so nobody has to retype them. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a SNOWFLAKE / SNOWFLAKE_RUN_QUERY task, an `inputs:` block declaring `warehouse` and `full_refresh` with the given defaults, and a top-level `input_sets:` block holding the reusable values -- a `prod` set with `warehouse: PROD_WH` and a backfill set. Two `schedule:` entries name their set with `input_set:`; the backfill entry gets `full_refresh: true` either from its own set or from that entry's `run_inputs`. Ad-hoc runs name no set and fall through to the declared defaults. The sets are not presented as environments and no environment is expected to select one.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Declares a top-level `input_sets:` block rather than duplicating the pipeline or hardcoding the values on each schedule",
+          "check": "regex",
+          "pattern": "(?m)^input_sets:"
+        },
+        {
+          "text": "At least one schedule entry names a set with `input_set:`",
+          "check": "regex",
+          "pattern": "input_set:\\s*\\w+"
+        },
+        {
+          "text": "The production warehouse value is held in a set rather than repeated on each trigger",
+          "check": "regex",
+          "pattern": "PROD_WH"
+        },
+        {
+          "text": "`input_sets:` sits at the pipeline's top level, a sibling of `inputs:` and `schedule:`, not nested inside `inputs:` or inside a schedule entry"
+        },
+        {
+          "text": "Every key used inside an input set is one of the pipeline's declared inputs (`warehouse`, `full_refresh`) -- a set cannot introduce an input that `inputs:` does not declare"
+        },
+        {
+          "text": "Each input set is partial: it sets only the inputs it changes and leaves the rest to their declared `default`, rather than restating every input in every set"
+        },
+        {
+          "text": "The backfill run gets `full_refresh: true` from its own input set or from that schedule entry's `run_inputs`, and does not change the `full_refresh` default to true (which would affect ad-hoc dev runs too)"
+        },
+        {
+          "text": "Does not conflate input sets with environments: no claim that running in a production environment applies a `prod` input set, and the sets are not offered as a replacement for environment variables or connections"
+        },
+        {
+          "text": "Ad-hoc dev runs are left to name no input set and take the declared defaults, rather than being given a `dev` set that merely restates those defaults"
+        }
+      ]
+    },
+    {
+      "id": "azure-function-polling-reports-result-not-trigger",
+      "prompt": "Create an Orchestra pipeline 'Enrich Customers' with a single task that calls our Azure Function. Resource group `data-rg`, function app `customer-enrichment`, function `enrich`, and it needs the payload `{\"mode\": \"incremental\"}`. The function takes about eight minutes to do its work. We need the pipeline to treat the task as finished only once the enrichment has actually completed, not when it's been kicked off. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with one AZURE_FUNCTIONS / AZURE_FUNCTIONS_RUN_FUNCTION task carrying `resource_group`, `function_app_name` and `function_name`, and `payload` written as a quoted JSON string rather than a YAML mapping. `enable_polling` is left on (or set true) because the task must report the enrichment's result, not its trigger. The answer flags that Orchestra waits only 10 seconds on the HTTP request and that Azure cuts an HTTP-triggered function off at 230 seconds whatever the function app's timeout says -- so an eight-minute function cannot do the work inline on the HTTP trigger and must hand off to a queue-triggered function that reports back to Orchestra with the `orchestra_task_run_id` and `orchestra_webhook_url` it was sent. It does not solve the eight minutes by raising `configuration.timeout` alone.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AZURE_FUNCTIONS integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AZURE_FUNCTIONS"
+        },
+        {
+          "text": "Uses the AZURE_FUNCTIONS_RUN_FUNCTION job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AZURE_FUNCTIONS_RUN_FUNCTION"
+        },
+        {
+          "text": "`payload` is a quoted JSON string, not a nested YAML mapping",
+          "check": "regex",
+          "pattern": "payload:\\s*['\"]\\s*\\{"
+        },
+        {
+          "text": "Sets the three required parameters `resource_group`, `function_app_name` and `function_name`, and does not invent a function URL parameter"
+        },
+        {
+          "text": "Leaves `enable_polling` on (omitted, or explicitly true) so the task completes on the function's reported result rather than on the trigger, and explains that turning it off would make the task succeed as soon as the function was invoked"
+        },
+        {
+          "text": "States that Orchestra waits only about 10 seconds on the invocation itself, so the task's completion depends on the function calling back rather than on the HTTP response"
+        },
+        {
+          "text": "Flags Azure's 230-second ceiling on HTTP-triggered functions as independent of the function app's own timeout, and therefore fatal to doing eight minutes of work inline on the HTTP trigger"
+        },
+        {
+          "text": "Recommends the queue-triggered hand-off for the long-running work, with the queue function reporting status back to Orchestra using the `orchestra_task_run_id` and `orchestra_webhook_url` Orchestra sends in the request body"
+        },
+        {
+          "text": "Does not present raising `configuration.timeout` as sufficient on its own -- a longer task timeout extends only how long Orchestra waits for a callback, not how long Azure lets the function run"
+        }
+      ]
+    },
+    {
+      "id": "google-chat-alert-destination-uses-connection-id",
+      "prompt": "Create an Orchestra pipeline 'Billing Export' with a single Snowflake query task running `CALL export_billing()`. When the pipeline fails, alert our Google Chat spaces -- the #data-platform space (connection `google_chat_data_platform_12345`) and the #finance-ops space (connection `google_chat_finance_ops_67890`). Also add a task to the pipeline that posts a 'billing export finished' note to the #data-platform space when it's done. Write it to pipeline.yml -- just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with a SNOWFLAKE / SNOWFLAKE_RUN_QUERY task and a pipeline-level `alerts:` entry on FAILED carrying two GOOGLE_CHAT destinations, each naming one connection with `connection_id` -- because the space is fixed by the connection, two spaces means two destinations, not a `destination` value listing channels. The requested 'post a note' task is refused or flagged rather than invented: GOOGLE_CHAT is an alerting destination with no `integration_job`, so there is no Google Chat task type, and the answer should say so and offer the alerting route (an alert on SUCCEEDED) instead of fabricating a task. The beta status of the integration is worth a mention.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Each GOOGLE_CHAT alert destination names its connection with `connection_id`, not `destination`",
+          "check": "alert_destination_requires",
+          "integration": "GOOGLE_CHAT",
+          "field": "connection_id"
+        },
+        {
+          "text": "Both Google Chat connections appear, as two separate destinations rather than one destination naming two spaces",
+          "check": "regex",
+          "pattern": "google_chat_data_platform_12345[\\s\\S]*google_chat_finance_ops_67890"
+        },
+        {
+          "text": "Does not invent a Google Chat task: the only task integration used is SNOWFLAKE, because GOOGLE_CHAT is in IntegrationsEnum as an alerting destination only and has no `integration_job`",
+          "check": "valid_enum",
+          "field": "integration",
+          "allowed": [
+            "SNOWFLAKE"
+          ]
+        },
+        {
+          "text": "Explicitly tells the user the 'post a note' task is not possible as a task, rather than silently dropping it or inventing a job name such as GOOGLE_CHAT_SEND_MESSAGE"
+        },
+        {
+          "text": "Offers the supported alternative for the completion note -- an alert on a success status routed to the same Google Chat connection -- instead of only refusing"
+        },
+        {
+          "text": "Does not give the GOOGLE_CHAT destinations a `destination` value such as a channel name, which is a SLACK/EMAIL-only addressing style"
+        },
+        {
+          "text": "Mentions that the Google Chat integration is in beta and may not be enabled on the account"
+        },
+        {
+          "text": "Does not write a Google Chat webhook URL into the YAML -- the webhook URL carries a token and lives on the connection, not in the pipeline",
+          "check": "no_hardcoded_secret"
+        }
+      ]
+    },
+    {
+      "id": "trigger-pipeline-task-input-set-beats-trigger-event",
+      "prompt": "We have a parent pipeline 'Ingest' that finishes and then needs to kick off a child pipeline 'Transform', waiting for it mid-run. Transform has input sets `prod` and `staging`, and the parent is the one that knows which to use. Transform already has a `trigger_events:` entry that fires on Ingest SUCCEEDED and names `input_set: staging`. Show me how the parent should trigger Transform with the `prod` set, and tell me what happens to the staging set already on the trigger_events entry. Write the parent pipeline to pipeline.yml.",
+      "expected_output": "A parent pipeline YAML using an ORCHESTRA / TRIGGER_PIPELINE task with `input_set: prod` in its parameters. The explanation states that when both a TRIGGER_PIPELINE task and a matching trigger_events entry name an input set, the task's wins -- so the child's `input_set: staging` is ignored on runs the parent triggers this way, and the child would still use staging only for runs started by that trigger entry on its own. It should flag that naming a set in both places is the ambiguity to avoid, and that TRIGGER_PIPELINE requires the child to be published.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Uses the ORCHESTRA integration for the triggering task",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "ORCHESTRA"
+        },
+        {
+          "text": "Uses the TRIGGER_PIPELINE job rather than a trigger_events entry on the parent",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "TRIGGER_PIPELINE"
+        },
+        {
+          "text": "The TRIGGER_PIPELINE task's parameters carry `input_set: prod`",
+          "check": "regex",
+          "pattern": "input_set:\\s*prod"
+        },
+        {
+          "text": "States that the TRIGGER_PIPELINE task's `input_set` takes precedence over the input set named on the child's matching `trigger_events` entry"
+        },
+        {
+          "text": "Concludes specifically that the child's `input_set: staging` is ignored for runs the parent triggers through this task, rather than being merged with or combined into `prod`"
+        },
+        {
+          "text": "Does not claim the two sets combine, or that the run ends up with values from both -- a run uses at most one input set"
+        },
+        {
+          "text": "Notes that the child's trigger_events entry still applies its own set for runs started by that entry rather than by the parent's task, so the entry is not dead configuration"
+        },
+        {
+          "text": "Mentions that TRIGGER_PIPELINE requires the child pipeline to be published"
+        }
+      ]
+    },
+    {
+      "id": "aws-batch-tags-need-tagresource",
+      "prompt": "Create an Orchestra pipeline 'Cost Tagged Transform' with a single AWS Batch task submitting to the analytics-prod queue with the nightly-transform job definition. Finance wants every job tagged with team=data and cost-centre=1234 so they can split the AWS bill, and they also want to be able to tell which Orchestra pipeline run a job came from. Write the pipeline to pipeline.yml. Just the YAML, don't deploy it.",
+      "expected_output": "An Orchestra v1 pipeline YAML with an AWS_BATCH / AWS_BATCH_SUBMIT_JOB task carrying a `tags` mapping of team: data and cost-centre: \"1234\", written as a real nested YAML mapping rather than a quoted JSON string. The answer does not invent orchestra:-prefixed tags as task parameters -- that prefix is reserved, and the pipeline/run/task IDs come from the connection's 'Tag jobs with Orchestra IDs' setting instead, which is not expressible in the pipeline YAML. It flags that the connection's IAM role needs batch:TagResource, because without it AWS rejects the SubmitJob request outright and the task fails rather than simply running untagged.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output is a valid YAML document",
+          "check": "valid_yaml"
+        },
+        {
+          "text": "Pipeline declares version v1",
+          "check": "yaml_eq",
+          "path": "version",
+          "value": "v1"
+        },
+        {
+          "text": "Uses the AWS_BATCH integration",
+          "check": "some_task",
+          "field": "integration",
+          "equals": "AWS_BATCH"
+        },
+        {
+          "text": "Uses the AWS_BATCH_SUBMIT_JOB job",
+          "check": "some_task",
+          "field": "integration_job",
+          "equals": "AWS_BATCH_SUBMIT_JOB"
+        },
+        {
+          "text": "Sets a `tags` parameter containing the cost-centre tag",
+          "check": "regex",
+          "pattern": "cost-centre:\\s*[\"']?1234"
+        },
+        {
+          "text": "`tags` is a nested YAML mapping of key-value pairs, not a quoted JSON string"
+        },
+        {
+          "text": "Does not put any tag key starting with `orchestra:` or `aws:` in the task's `tags` -- both prefixes are reserved and AWS rejects them"
+        },
+        {
+          "text": "Attributes the pipeline / pipeline run / task run ID tags to the connection's 'Tag jobs with Orchestra IDs' setting rather than inventing task parameters for them"
+        },
+        {
+          "text": "States that the connection's IAM role needs `batch:TagResource`, and that without it AWS rejects the submit request so the task fails rather than running untagged"
+        }
+      ]
+    },
+    {
+      "id": "async-callback-user-api-key-needs-account-header",
+      "prompt": "We have an Orchestra pipeline task that calls our own service over HTTP and waits for it to call back when the work is done. The callback is authenticated with one of our user API keys that covers three workspaces. The task just sits there until it times out and we can't see why. What's wrong, and what should the callback send?",
+      "expected_output": "An answer identifying that a user API key (orc_uat_) covering more than one workspace must send the workspace ID back as an X-Orchestra-Account-Id header on every callback, otherwise Orchestra cannot attribute the status update and rejects it, leaving the task waiting until configuration.timeout. Orchestra hands the task the workspace ID alongside the task run ID -- as orchestra_account_id in the request body or header, or ORCHESTRA_ACCOUNT_ID as a parameter or environment variable, depending on the integration -- so the value is already available and should not be hardcoded. It should also note the key must not be read-only, and that the orchestra-sdk package sends the header itself, so this bites hand-rolled HTTP callbacks.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Identifies the missing `X-Orchestra-Account-Id` header on the callback as the cause",
+          "check": "regex",
+          "pattern": "X-Orchestra-Account-Id"
+        },
+        {
+          "text": "Explains that the header is required specifically because the key is a user API key covering more than one workspace, rather than claiming every callback needs it"
+        },
+        {
+          "text": "Points at the workspace ID Orchestra already supplies to the task (orchestra_account_id in the body/header, or ORCHESTRA_ACCOUNT_ID) rather than telling the user to hardcode a workspace ID"
+        },
+        {
+          "text": "Notes that the API key must not be read-only, since the callback writes a status update"
+        },
+        {
+          "text": "Explains the symptom -- the rejected update means the task waits until `configuration.timeout` rather than failing fast with an auth error"
+        },
+        {
+          "text": "Mentions that `orchestra-sdk` sends the header automatically, so the problem is specific to hand-rolled HTTP callbacks"
         }
       ]
     }

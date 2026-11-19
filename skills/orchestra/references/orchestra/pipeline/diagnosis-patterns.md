@@ -13,7 +13,7 @@ Use this to classify errors in Step 4 of the fix workflow.
 6. [Fivetran](#fivetran)
 7. [Airbyte](#airbyte)
 8. [AWS services](#aws-services) — Lambda, Glue, ECS, S3, Redshift
-9. [Azure services](#azure-services) — ADF, Synapse, Container Apps
+9. [Azure services](#azure-services) — ADF, Synapse, Container Apps, Functions
 10. [GCP services](#gcp-services) — BigQuery, Cloud Run, Dataflow
 11. [Sync job conflicts](#sync-job-conflicts)
 
@@ -352,6 +352,27 @@ credential expiry) or destination side (warehouse permissions, schema drift).
   never succeeded, treat it as setup rather than a credential that has gone stale
   ([Azure Container Apps](https://docs.getorchestra.io/docs/integrations/azure_container_apps),
   [Run Job](https://docs.getorchestra.io/docs/integrations/azure_container_apps/aca_run_job))
+
+### Functions — AZURE_FUNCTIONS_RUN_FUNCTION
+- Task fails on timeout with nothing logged from the function — with `enable_polling` on,
+  Orchestra is waiting for a callback that never came. Either the function never posted to the
+  `orchestra_webhook_url` it was given, or it died when Azure cut the HTTP request at 230
+  seconds. Check the function app's own logs for a run that started and stopped around the
+  230-second mark before treating this as an Orchestra-side timeout.
+- Task SUCCEEDED but the downstream data never changed — read `enable_polling` before
+  diagnosing anything else. Turned off, the task reports that the function was triggered, not
+  that it finished, so a function that failed afterwards leaves a green task.
+- `401` / `403` invoking the function — Orchestra calls with the function app's default host
+  key, so a function set to `admin` authorization is unreachable by design; it has to be
+  `function` or `anonymous`.
+- Authorization failure *before* the function is reached — a missing role assignment on the app
+  registration, not an expired secret. Orchestra needs
+  `Microsoft.Web/sites/functions/read` and `Microsoft.Web/sites/host/listkeys/action`, which
+  Website Contributor grants.
+- Function or function app not found — check the task's `subscription_id`, which overrides the
+  connection's default subscription when set
+  ([Azure Functions](https://docs.getorchestra.io/docs/integrations/azure_functions),
+  [Run Function](https://docs.getorchestra.io/docs/integrations/azure_functions/azure_functions_run_function))
 
 ---
 

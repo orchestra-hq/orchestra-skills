@@ -109,12 +109,13 @@ pipeline:
 | ORCHESTRA | TRIGGER_PIPELINE | `pipeline_id` (uuid of a **published** pipeline); optional `run_inputs`, `input_set`, `branch` |
 | OPEN_AI | OPEN_AI_CHAT | `prompt`, `model`, `context`, `instructions`, `set_outputs` |
 | AWS_LAMBDA | AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION | `function_name` |
-| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds` |
+| AWS_BATCH | AWS_BATCH_SUBMIT_JOB | `job_queue`, `job_definition`, `job_name`, `parameters`, `container_overrides`, `timeout_seconds`, `tags` |
 | AWS_SES | AWS_SES_SEND_EMAIL | `from_address`, `to`, `subject`, `body_text`; optional `cc`, `bcc`, `reply_to`, `body_html`, `attachments`, `attachment_encoding` (utf-8\|base64), `aws_region` |
 | ESTUARY | ESTUARY_CHECK_FLOW | `task`, `error_threshold`, `warn_threshold` |
 | LIGHTDASH | LIGHTDASH_REFRESH_DASHBOARD | `dashboard_id`, `invalidate_cache` |
 | LIGHTDASH | LIGHTDASH_CLEAR_RESULTS_CACHE | `scope` (PROJECT\|DASHBOARD\|CHART), `content_uuid` (required when `scope` is DASHBOARD or CHART) |
 | GITLAB | GITLAB_RUN_PIPELINE | `project`, `ref`, `variables`, `inputs` |
+| AZURE_FUNCTIONS | AZURE_FUNCTIONS_RUN_FUNCTION | `resource_group`, `function_app_name`, `function_name`; optional `payload`, `subscription_id`, `enable_polling` |
 
 ### TRIGGER_PIPELINE needs a published target
 
@@ -147,8 +148,8 @@ Slim CI keeps working while production and CI sit on different majors
 ([Running dbt v2 in Orchestra](https://docs.getorchestra.io/docs/guides/dbt-core/orchestra-setup#running-dbt-v2-in-orchestra)).
 
 Parameters that hold a JSON object — `body` and `custom_headers` on HTTP, `arguments` on AWS
-Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab — are
-**strings**, not YAML mappings.
+Glue, `environment_variables` on Python and dbt Core, `variables` and `inputs` on GitLab,
+`payload` on Azure Functions — are **strings**, not YAML mappings.
 Write them quoted (`environment_variables: '{}'`, `body: '{"id": 1}'`). A bare `{}` or a nested
 YAML block is the wrong type and the schema rejects it; this is an easy one to get wrong when
 porting a dict straight out of Airflow or Dagster, where it really is a mapping.
@@ -161,14 +162,35 @@ rather than applying either habit across the board.
 EC2 or Fargate only — array jobs and multi-node parallel jobs aren't supported. A
 `job_definition` without `:<revision>` resolves to the latest active revision. `timeout_seconds`
 is a per-attempt limit with a minimum of 60, enforced by Batch. A task that hits its own
-`configuration.timeout` fails **without terminating the job** — a running job keeps running and
-a queued one can still start later — so bound queue waits with a job state time limit action on
-the queue rather than relying on the task timeout; cancelling the task does terminate the job.
+`configuration.timeout` fails **and terminates the job**, so the connection's role needs
+`batch:TerminateJob`; if that call fails the task still fails and the job may keep running.
+Cancelling the task terminates the job too. A job state time limit action on the queue is still
+worth setting to bound queue waits, but it is now a backstop rather than the only thing that
+stops a job Orchestra has given up on.
 Orchestra injects `ORCHESTRA_ACCOUNT_ID`, `ORCHESTRA_PIPELINE_RUN_ID`, `ORCHESTRA_TASK_RUN_ID`
 and `ORCHESTRA_WEBHOOK_URL` into the container's environment, so `container_overrides.environment`
 adds to that rather than replacing it. The integration is in beta and may not be enabled on an
 account. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch) and
 [Submit Job](https://docs.getorchestra.io/docs/integrations/aws_batch/aws_batch_submit_job).
+
+`AWS_BATCH_SUBMIT_JOB` and `AWS_ECS_RUN_TASK` both take an optional `tags` mapping of key-value
+strings, put on the job or task so IAM policies and cost reports can match on them. It is a real
+YAML mapping like `container_overrides`, not a quoted JSON string. Keys are 1-128 characters and
+must not start with `orchestra:` or `aws:` — those prefixes are reserved, so a tag carried over
+from another orchestrator's naming scheme may need renaming. Values may be empty and are capped
+at 256 characters, and AWS allows at most 50 tags on a job or task.
+
+Those reserved keys belong to a separate connection-level setting, **Tag jobs with Orchestra
+IDs** (`tag_with_orchestra_ids`), which is off by default and is not a task parameter — turning it
+on makes Orchestra add `orchestra:workspace_id`, `orchestra:pipeline_id`,
+`orchestra:pipeline_run_id` and `orchestra:task_run_id` to everything it starts on that
+connection, and those four count against the 50. Either way of tagging needs `batch:TagResource`
+or `ecs:TagResource` on the role, and without it AWS rejects the submit or run request outright
+rather than dropping the tags, so a pipeline that gains `tags` against an unchanged role fails at
+the task. The payoff is being able to scope `batch:TerminateJob` / `ecs:StopTask` to
+`aws:ResourceTag/orchestra:workspace_id`; jobs and tasks started before the setting was turned on
+carry no tags, so Orchestra cannot stop those. See [AWS Batch](https://docs.getorchestra.io/docs/integrations/aws_batch)
+and [AWS ECS](https://docs.getorchestra.io/docs/integrations/aws_ecs).
 
 `AWS_SES_SEND_EMAIL` takes its recipients as YAML arrays: `to`, `cc` and `bcc` are each a
 list of address strings, not a newline-separated block of text, so an upstream task's output
@@ -211,6 +233,48 @@ API rate limit is shared across all of a user's tokens, so give Orchestra its ow
 polling has to compete. The integration and the job are both in beta and may not be enabled on an
 account. See [GitLab](https://docs.getorchestra.io/docs/integrations/gitlab) and
 [Run CI/CD Pipeline](https://docs.getorchestra.io/docs/integrations/gitlab/gitlab_run_pipeline).
+
+`AZURE_FUNCTIONS_RUN_FUNCTION` invokes an HTTP-triggered function with the function app's default
+host key, so the function's authorization level has to be `function` or `anonymous` — an `admin`
+function can't be reached. Azure has no asynchronous invocation for HTTP triggers, so Orchestra
+sends the request and waits **10 seconds**: an error inside that window fails the task, and
+otherwise Orchestra stops waiting and the function carries on, or doesn't, depending on how it
+handles the caller disconnecting. That makes `enable_polling` (default `true`) the parameter that
+decides what the task actually reports. Left on, the task waits for the function to report its own
+status through the `orchestra_task_run_id` and `orchestra_webhook_url` that Orchestra puts in the
+request body — the `orchestra-sdk` package or plain HTTP, the same contract as an AWS Lambda — and
+fails if nothing arrives within `configuration.timeout`, default 30 minutes. Turned off, the task
+succeeds as soon as the function has been triggered, so it reports a trigger and not a result;
+don't hang data-quality gating off a task configured that way. The task's `payload` reaches the
+function as `task_run_data` alongside those fields, rather than as the whole body.
+
+Every task that finishes on a callback rather than on its own request — `AZURE_FUNCTIONS_RUN_FUNCTION`,
+`AWS_LAMBDA_EXECUTE_ASYNC_FUNCTION`, `HTTP_REQUEST_ASYNC`, the GCP Cloud Functions async job,
+`AZURE_VM_RUN_COMMAND` and `ADF_PIPELINE_RUN` — is handed the workspace ID as well as the task run
+ID, as `orchestra_account_id` in the request body, an `orchestra_account_id` request header, or an
+`ORCHESTRA_ACCOUNT_ID` parameter or environment variable, depending on the integration. The code
+calling back can authenticate with a workspace API key or with a user API key (`orc_uat_`) that
+covers the task's workspace, and either way the key must not be read-only — a read-only key is the
+quiet reason a task sits waiting until `configuration.timeout`. A user API key that covers more
+than one workspace must also send that ID back as an `X-Orchestra-Account-Id` header on every
+callback, or Orchestra cannot tell which workspace the update belongs to and rejects it. The
+`orchestra-sdk` package sends the header for you, so this is a trap for hand-rolled HTTP
+callbacks, and for an ADF web activity it means passing
+`@{pipeline().parameters.ORCHESTRA_ACCOUNT_ID}` through as that header.
+
+Two Azure limits sit underneath this and neither is a task parameter. Azure stops waiting for an
+HTTP-triggered function after **230 seconds** whatever the function app's own timeout says, so
+longer work belongs in a queue-triggered function that the HTTP one hands off to and that reports
+back to Orchestra itself; raising `configuration.timeout` extends only Orchestra's patience, not
+Azure's. And a function that does the work inline has to survive Orchestra disconnecting at the
+10-second mark — in the .NET isolated worker model the cancellation token is signalled then, so a
+function that honours it stops mid-run and never calls back. `subscription_id` on the task
+overrides the connection's default, and the connection's app registration needs
+`Microsoft.Web/sites/functions/read` and `Microsoft.Web/sites/host/listkeys/action` (Website
+Contributor, or a custom role with just those two). The integration and the job are both in beta
+and may not be enabled on an account. See
+[Azure Functions](https://docs.getorchestra.io/docs/integrations/azure_functions) and
+[Run Function](https://docs.getorchestra.io/docs/integrations/azure_functions/azure_functions_run_function).
 
 `AWS_SECRETS_MANAGER` and `AZURE_KEY_VAULT` are in `IntegrationsEnum` but have no
 `integration_job`: they are credential stores a connection reads its own credentials from, not
@@ -377,6 +441,76 @@ not a constraint: unlisted values still run. Validation requires at least one un
 literal `default` must be one of them (an expression default like `${{ ENV.X }}` is exempt). See
 [inputs](https://docs.getorchestra.io/docs/core-concepts/variables/inputs).
 
+**Input sets:**
+
+`input_sets` is a top-level key holding named, partial sets of input values. A trigger names one
+with `input_set`, and the set fills every input that run doesn't supply itself. Reach for it
+instead of cloning a pipeline per environment or retyping the same values on each run.
+
+```yaml
+inputs:
+  warehouse:
+    type: string
+    default: DEV_WH
+  full_refresh:
+    type: boolean
+    default: false
+
+input_sets:
+  prod:                     # names: letters, digits, _ and -, matched exactly
+    warehouse: PROD_WH      # keys must be declared inputs; a set is partial
+  backfill:
+    full_refresh: true
+
+schedule:
+- name: Nightly prod
+  cron: 0 2 ? * * *
+  input_set: prod
+  run_inputs:
+    full_refresh: true      # beats the set, for this trigger only
+```
+
+`input_set` is accepted on `schedule` entries, `sensors`, `trigger_events` entries, the `webhook`
+block, and the `TRIGGER_PIPELINE` task's parameters. Outside the YAML, the same choice is
+`inputSet` in the start-pipeline API body and a webhook request body, `--input-set` on
+`orchestra pipeline run` / `orchestra pipeline build`, and `input_set` on the `run-pipeline`
+GitHub Action (v1.9.0+).
+
+Per input, the first source with a value wins -- a run uses **at most one** set, and sets never
+combine:
+
+1. Values supplied by the run itself -- run dialogue entries, API `runInputs`, a trigger's own
+   `run_inputs`, or sensor outputs mapped with `map_outputs`.
+2. The named input set.
+3. The input's own `default`.
+
+Four things catch authors out:
+
+- **A set is not an environment.** `input_sets` only fills inputs; credentials, connections and
+  `${{ ENV.* }}` come from the environment, and the two are chosen separately. Running in the
+  production environment does **not** apply a set called `prod` -- name both. An environment can
+  restrict which sets its runs may use (`allowedInputSets`) and preselect one, but the
+  preselection only reaches the Run dialogue, never the API, CLI, Action or a trigger.
+- **A missing set fails, it doesn't fall back to defaults.** A name the version or branch being run
+  doesn't declare is rejected with `400` and no run is created (API, CLI, Action, run dialogue), or
+  fails the run immediately when a trigger supplied it.
+- **A schedule stores the set name at publish time.** Renaming or removing a set breaks its
+  scheduled runs until the pipeline is republished.
+- **Two places can name a set for the same run.** When a parent fires a child with a
+  `TRIGGER_PIPELINE` task and the child also has a `trigger_events` entry matching that parent, the
+  task's `input_set` wins over the entry's. Put the set on the task when the parent decides which
+  one to use, and on the child's `trigger_events` entry when the child does -- naming it in both
+  places means the child's entry is silently ignored
+  ([pipeline triggers](https://docs.getorchestra.io/docs/core-concepts/triggers/pipeline)).
+- **A rerun replays the original run's resolved values** and does not re-apply the set, so editing
+  a set afterwards doesn't change what a rerun of an earlier run uses.
+
+Validation at save time: every key in a set is a declared input; each value matches that input's
+`type` and, for a `string` input with `options`, is one of them (expressions are exempt, being
+runtime-resolved); every trigger's `input_set` names a set declared in the same pipeline; and no
+two set names differ only by case. See
+[input sets](https://docs.getorchestra.io/docs/core-concepts/variables/inputs#input-sets).
+
 **Webhook:**
 
 ```yaml
@@ -462,6 +596,13 @@ channel or an address); the rest name a connection with `connection_id`.
 fixed by the connection, not by `destination` -- a second space means a second connection listed as
 its own destination, not a `destination` value
 ([Google Chat alerts](https://docs.getorchestra.io/docs/core-concepts/alerting/google-chat)).
+The integration is in beta and may not be enabled on an account, and it is an alerting destination
+only: `GOOGLE_CHAT` is in `IntegrationsEnum` but has no `integration_job`, so it is a valid
+destination and never a task. A pipeline that needs to *post* a message as a step of its own wants
+a different integration. Its connection authenticates with
+the space's webhook URL, which carries a token: treat it as a credential, and expect a Workspace
+admin to have allowed incoming webhooks before the connection can be created at all. See
+[Google Chat](https://docs.getorchestra.io/docs/integrations/google_chat).
 
 `max_live_alerts` (integer 1–50, default 1) on an alert raises how many in-flight dbt Core
 model-failure alerts each Slack channel gets per task run. It doesn't cap alerts sent when a task or

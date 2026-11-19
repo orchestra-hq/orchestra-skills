@@ -47,6 +47,22 @@
         { "text": "The image (123456789012.dkr.ecr.us-east-1.amazonaws.com/enrichment:latest), namespace (data-team), and env_vars (ENV=prod) are reflected in the job_manifest rather than invented or dropped" },
         { "text": "cluster_context and any AWS credential material are not inlined as literal parameter values — the AWS connection reference stands in for them, and this is represented as running a job manifest (AWS_EKS_RUN_JOB), not as launching an arbitrary image directly" }
       ]
+    },
+    {
+      "id": "ecs-task-tags-carried-over",
+      "prompt": "Convert this Airflow DAG that runs a tagged ECS task via EcsRunTaskOperator into an equivalent Orchestra pipeline task (see files/ecs_tagged_run_task.py). Finance relies on those tags for cost allocation, so they must survive the move. Write the pipeline YAML to pipeline.yml in the current directory \u2014 no live AWS access, no deploy.",
+      "expected_output": "An AWS_ECS / AWS_ECS_RUN_TASK task carrying cluster, task_definition, subnet_ids and security_group_ids across from the operator, with the operator's `tags` becoming Orchestra's `tags` mapping (team: data, cost-centre: \"1234\") on the task \u2014 not the unrelated pipeline-level `tags` field. The answer notes the connection's IAM role needs ecs:TagResource, because without it AWS rejects the RunTask call and the task fails rather than running untagged, and it does not invent orchestra:-prefixed tag keys.",
+      "files": ["ecs_tagged_run_task.py"],
+      "assertions_ref": ["shell_ssh", "connections"],
+      "assertions": [
+        { "text": "The task uses the AWS_ECS integration", "check": "some_task", "field": "integration", "equals": "AWS_ECS" },
+        { "text": "The task runs the AWS_ECS_RUN_TASK job", "check": "some_task", "field": "integration_job", "equals": "AWS_ECS_RUN_TASK" },
+        { "text": "The cost-centre tag is carried over into the task's `tags` parameter", "check": "regex", "pattern": "cost-centre:\\s*[\"']?1234" },
+        { "text": "Both source tags (team=data, cost-centre=1234) land in a `tags` mapping on the AWS_ECS_RUN_TASK task rather than being dropped or folded into the unrelated pipeline-level `tags` field" },
+        { "text": "`tags` is written as a mapping of key-value pairs, not as a quoted JSON string" },
+        { "text": "Does not introduce any tag key beginning with `orchestra:` or `aws:` \u2014 both prefixes are reserved, and the Orchestra workspace/pipeline/run IDs come from the connection's 'Tag jobs with Orchestra IDs' setting instead" },
+        { "text": "Flags that the AWS connection's IAM role needs `ecs:TagResource`, and that without it AWS rejects the RunTask request so the task fails outright rather than running untagged" }
+      ]
     }
   ]
 }
