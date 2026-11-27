@@ -1047,6 +1047,32 @@
           "text": "Mentions that `orchestra-sdk` sends the header automatically, so the problem is specific to hand-rolled HTTP callbacks"
         }
       ]
+    },
+    {
+      "id": "hybrid-compute-resource-id-is-a-parameter",
+      "prompt": "We've just set up Hybrid so our dbt Core and Python tasks run on our own AWS account. The compute resource is registered in Orchestra with Resource ID `analytics-runner`. Add it to our pipeline: a dbt Core task `run_dbt` (command `dbt build`) and a Python task `publish` that should both use it, plus an existing `AWS_ECS_RUN_TASK` task `legacy_export` that we also want pinned to it. Show the YAML.",
+      "expected_output": "YAML in which run_dbt (DBT_CORE / DBT_CORE_EXECUTE) and publish (PYTHON / PYTHON_EXECUTE_SCRIPT) each carry compute_resource_id: analytics-runner inside their parameters: block, not as a task-level or pipeline-level key. The request to pin legacy_export is refused: AWS_ECS_RUN_TASK has no compute_resource_id parameter and the schema rejects it -- an ECS task already runs on the user's own compute by a different route. Should note the setting is per task, so a pipeline can mix Hybrid and Orchestra-managed tasks, and that omitting it means Orchestra-managed compute.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Puts compute_resource_id inside the parameters: block of each task, not at task level or pipeline level"
+        },
+        {
+          "text": "Sets compute_resource_id to analytics-runner on both the dbt Core and the Python task",
+          "check": "regex",
+          "pattern": "compute_resource_id:\\s*analytics-runner",
+          "min_count": 2
+        },
+        {
+          "text": "Does not add compute_resource_id to the AWS_ECS_RUN_TASK task, and says the parameter does not exist on that integration so the schema would reject it"
+        },
+        {
+          "text": "States that compute_resource_id is per task, so one pipeline can mix Hybrid and Orchestra-managed tasks, and that leaving it out means Orchestra-managed compute"
+        },
+        {
+          "text": "Does not invent a pipeline-level compute setting, a top-level compute_resource_id, or a connection field to select the Hybrid compute resource"
+        }
+      ]
     }
   ]
 }

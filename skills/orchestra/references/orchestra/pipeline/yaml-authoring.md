@@ -291,6 +291,32 @@ doesn't fails the run — and never an API key written into the YAML. Nothing ca
 session again once it is created, so everything the agent needs goes in that first `prompt`. See
 [Run Agent](https://docs.getorchestra.io/docs/integrations/orchestra/run_agent).
 
+### `compute_resource_id` pins a task to self-managed compute
+
+In a Hybrid deployment the task runs on compute in the user's own AWS or Azure account while
+Orchestra keeps the control plane. In the YAML that is one optional string **inside
+`parameters:`**, not a task-level or pipeline-level field, and only three jobs accept it:
+`DBT_CORE_EXECUTE`, `PYTHON_EXECUTE_SCRIPT` and `TOBIKO_CLOUD_EXECUTE`. It defaults to null,
+which means Orchestra-managed compute — so it is a per-task choice and one pipeline can mix
+Hybrid and Orchestra-managed tasks freely. Its value is the Resource ID registered on the
+compute resource, which can't be changed after creation, so a renamed resource means a new one
+and every YAML naming the old ID needs updating.
+
+Don't invent it for other integrations — an `AWS_ECS_RUN_TASK` or `ACA_RUN_JOB` task already
+runs on the user's own compute by a different route, and those parameter models set
+`additionalProperties: false`, so adding `compute_resource_id` there fails validation.
+
+Two consequences worth raising when the repo sits on a private network, since a Hybrid task
+clones from inside the network and the control plane can't reach the Git server:
+
+- The dbt Core or Python connection has to use **token authentication**; the Git connection
+  method needs Orchestra to refresh tokens with the provider.
+- Orchestra can't record the head commit, so a retry clones the latest commit on the branch
+  rather than re-running the one that failed, and no production manifest is loaded — which is
+  what `--defer --state latest_production` depends on.
+
+See [Hybrid](https://docs.getorchestra.io/docs/deployment-options/hybrid).
+
 ## Connection format
 
 ```yaml
