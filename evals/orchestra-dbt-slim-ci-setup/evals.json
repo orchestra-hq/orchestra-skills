@@ -368,6 +368,32 @@
           "text": "Writes no files and makes no Orchestra calls"
         }
       ]
+    },
+    {
+      "id": "hybrid-private-git-has-no-production-manifest",
+      "prompt": "We want Slim CI on our production dbt pipeline. The dbt task runs on Hybrid compute in our own VPC (compute_resource_id is set on it) and our Git server is a self-managed GitLab that is only reachable from inside that VPC -- nothing on the public internet can reach it. Can we retrofit Slim CI the normal way? Advise only, don't write any files or call Orchestra.",
+      "expected_output": "Says no, not as-is: because the Git server is unreachable from Orchestra's control plane, no production manifest is loaded for that task, so --defer --state latest_production has nothing to compare state:modified+ against and CI would effectively build everything rather than the modified subset. Also notes retries clone the branch head rather than the commit that failed. Offers making the self-managed GitLab reachable by Orchestra (GitHub Enterprise Server and self-managed GitLab are supported) as the thing to resolve, and does not propose a CI job that silently builds the whole project. Changes nothing.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "States that Slim CI cannot be retrofitted the normal way while the Git server is reachable only from inside the network"
+        },
+        {
+          "text": "Explains that no production manifest is loaded because Orchestra's control plane cannot reach the Git server, so --defer --state latest_production has nothing for state:modified+ to compare against"
+        },
+        {
+          "text": "Notes that retries clone the latest commit on the branch rather than the commit that failed"
+        },
+        {
+          "text": "Raises making the self-managed Git server reachable by Orchestra as the fix to resolve, rather than treating the Hybrid compute itself as the blocker"
+        },
+        {
+          "text": "Does not hand over a Slim CI workflow that would silently build the whole project, and does not blame an empty or unseeded latest_production artifact history"
+        },
+        {
+          "text": "Writes no files and makes no Orchestra calls"
+        }
+      ]
     }
   ]
 }

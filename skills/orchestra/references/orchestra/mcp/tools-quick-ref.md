@@ -182,7 +182,10 @@ runs, without touching the pipeline's tasks or definition. Reach for it when a p
 failing repeatedly and the fix will take a while — it stops the noise without editing or
 deleting anything, and unpausing restores the previous behaviour exactly. It does **not** stop
 a run already in flight; cancel that with `cancel_pipeline_run`. Needs a standard (not
-read-only) credential, and is recorded in the audit trail as **Pipeline paused**.
+read-only) credential. It shows in the audit trail as **Pipeline paused** only when the
+connection authenticates as a person — an OAuth sign-in or a user API key; a workspace API key
+writes no audit-trail entry at all, so don't promise a record of who paused it without knowing
+which credential the connection uses.
 
 Prefer this over pausing every task individually: a paused *task* is removed from the DAG while
 the rest of the pipeline keeps running, which is a different outcome. See
@@ -289,3 +292,13 @@ Docs: https://docs.getorchestra.io/docs/core-concepts/tasks/connections#can-i-ma
   don't read that as an Orchestra outage and don't retry it. Say the key needs replacing, and
   that its owner manages it under Settings → Security. See
   [User API Keys](https://docs.getorchestra.io/docs/organisation-settings/user-api-keys).
+- A user API key is also the only API credential that leaves a trace. Actions taken with one
+  are recorded against its owner in the
+  [audit trail](https://docs.getorchestra.io/docs/organisation-settings/audit-trail), shown as
+  **via API key** with the key id; actions taken with a workspace API key are not recorded
+  there at all. So recommend a user API key for an MCP client a person runs themselves, and
+  keep workspace keys for shared automation such as CI/CD and webhooks, which has to keep
+  working after the person who set it up leaves. It also means the audit trail is not a
+  complete record of state-changing tool calls — don't offer it as evidence of who started,
+  paused or cancelled something without first establishing the connection wasn't using a
+  workspace key. See [Orchestra MCP](https://docs.getorchestra.io/docs/mcp#connect-with-an-api-key).

@@ -134,6 +134,38 @@
           "text": "Makes no change to the pipeline, the task, or the connection"
         }
       ]
+    },
+    {
+      "id": "pause-audit-trail-entry-depends-on-credential-type",
+      "prompt": "Our daily_ingest pipeline has been failing all week and the fix will take a few days, so please pause it. Also, my manager will ask who turned it off — confirm she'll be able to see that it was me in the Orchestra audit trail. The MCP server here is connected with our team's workspace API key. Explain what you'd do before doing it.",
+      "expected_output": "Agrees pause_pipeline is the right action for a pipeline that will stay broken for days, noting it stops schedules, sensors, trigger events and start_pipeline calls without touching the pipeline's tasks or definition, and does not stop a run already in flight. Corrects the audit-trail assumption: because the connection uses a workspace API key, the pause will not appear in the audit trail at all — a Pipeline paused entry is only written when the action is taken by a person, through an OAuth sign-in or a user API key, in which case it shows as 'via API key' with the key id. Does not promise the manager will see who paused it, and does not claim the entry will simply be attributed to the workspace or to the key's creator. Offers the way to get an attributable record: have the user pause it from the Orchestra app, or reconnect the MCP with their own user API key first. Notes pause_pipeline needs a standard rather than read-only credential.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Confirms pause_pipeline is the right remediation for a pipeline that will stay broken for days"
+        },
+        {
+          "text": "States that pausing stops new runs from schedules, sensors, trigger events and start_pipeline without editing or deleting the pipeline's tasks or definition"
+        },
+        {
+          "text": "Notes that pausing does not stop a run already in flight"
+        },
+        {
+          "text": "Corrects the user: with a workspace API key the pause writes no audit-trail entry"
+        },
+        {
+          "text": "Explains that the Pipeline paused entry is written only for an action taken as a person, via an OAuth sign-in or a user API key"
+        },
+        {
+          "text": "Does not promise the manager will be able to see who paused the pipeline under the current credential"
+        },
+        {
+          "text": "Offers an attributable alternative — pausing from the Orchestra app, or reconnecting the MCP with the user's own user API key"
+        },
+        {
+          "text": "Notes pause_pipeline requires a standard rather than a read-only credential"
+        }
+      ]
     }
   ]
 }

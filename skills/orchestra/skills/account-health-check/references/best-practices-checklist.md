@@ -329,12 +329,22 @@ List these under **Manual verification**; recommend based on what the user repor
 custom groups scoped to least privilege. Docs: `/docs/organisation-settings/Role-based-access-control`.
 **6.2 Workspaces isolated; tokens clearly named** `[MANUAL]` — no cross-workspace resources; token
 names like `ORCHESTRA_WORKSPACENAME_TOKEN`. Docs: `/docs/organisation-settings/workspaces`.
-**6.3 API keys in a secrets manager and rotated** `[MANUAL]` — rotate via Workspace Settings. Docs:
-`/docs/organisation-settings/api-key`.
+**6.3 API keys in a secrets manager and rotated** `[MANUAL]` — rotate workspace keys via Workspace
+Settings; workspace keys never expire, so rotation is entirely a matter of policy. User API keys
+expire on a chosen 30/90/365-day term and have no rotate action — replace one by creating a new key,
+moving tooling across, then deleting the old. Docs: `/docs/organisation-settings/api-keys`.
 **6.4 IP restrictions (CIDR), include current network** `[MANUAL]` — Docs:
 `/docs/organisation-settings/ip-restrictions`.
 **6.5 Deployment model fits requirements** `[MANUAL]` — SaaS / hybrid / private connections. Docs:
 `/docs/deployment-options`.
+**6.6 Human-run tooling uses user API keys, not workspace keys** `[MANUAL]` — MCP clients, the
+Orchestra CLI and local scripts should authenticate with the operator's own user API key, so each
+action runs with that person's permissions and is attributed to them in the audit trail (shown as
+**via API key** with the key id). Actions taken with a workspace API key are not recorded in the
+audit trail at all, so a workspace key handed round a team erases who did what. Keep workspace keys
+for CI/CD, webhooks and shared automation, which must survive a person leaving. Flag a shared
+workspace key pasted into personal MCP configs as a governance gap, not just a hygiene one. Docs:
+`/docs/organisation-settings/user-api-keys`, `/docs/organisation-settings/audit-trail`.
 
 ## 7. Performance and cost
 
