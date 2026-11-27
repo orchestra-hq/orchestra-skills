@@ -278,6 +278,47 @@
           "text": "Makes no live Orchestra MCP tool calls and takes no action against the workspace"
         }
       ]
+    },
+    {
+      "id": "workspace-key-in-personal-mcp-breaks-audit-attribution",
+      "prompt": "We're doing an Orchestra account review before a SOC 2 audit. One thing I want your view on: we generated a single workspace API key called ORCHESTRA_PROD_TOKEN and the six of us on the data team all have it pasted into our own Cursor MCP configs, plus it's the key our GitHub Actions deploy job uses. Our auditor wants to see who triggered and paused pipelines over the last quarter. Is that setup fine? Don't call any live Orchestra tools.",
+      "expected_output": "Flags the shared workspace API key in personal MCP configs as a governance finding under security and access control, not merely untidy. Explains that actions taken with a workspace API key are not recorded in the audit trail at all, so the quarter's triggers and pauses made through those six MCP clients left no record and the auditor's question cannot be answered retrospectively from Orchestra. Says each person should instead use their own user API key, which acts with that person's own permissions and is recorded against them in the audit trail, shown as 'via API key' with the key id. Says the workspace key is the right credential to keep for the GitHub Actions deploy job, because shared automation must keep working when a person leaves, and that a user key is unsuitable there since it expires and is revoked when its owner loses access. Does not claim the missing history can be recovered or backfilled. Marks the check as manual rather than asserting a pass/fail from MCP data, since API-key and audit settings are not exposed to the MCP. Makes no live Orchestra tool calls.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Treats the shared workspace API key in personal MCP configs as a security/access-control finding, not just a hygiene nit"
+        },
+        {
+          "text": "States that actions taken with a workspace API key are not recorded in the audit trail"
+        },
+        {
+          "text": "Concludes the auditor's question about who triggered and paused pipelines cannot be answered for the period those MCP clients used the workspace key"
+        },
+        {
+          "text": "Recommends each person use their own user API key for their MCP client"
+        },
+        {
+          "text": "Says a user API key runs with its owner's own permissions and is attributed to them in the audit trail, shown as 'via API key' with the key id",
+          "check": "regex",
+          "pattern": "via API key",
+          "min_count": 1
+        },
+        {
+          "text": "Keeps the workspace API key for the GitHub Actions deploy job rather than moving CI onto a user key, because shared automation must survive its owner leaving"
+        },
+        {
+          "text": "Notes a user API key expires and is revoked when its owner loses access, which is why it is wrong for CI"
+        },
+        {
+          "text": "Does not claim the missing audit history can be recovered, backfilled or reconstructed"
+        },
+        {
+          "text": "Reports the item as a manual check rather than asserting a verdict from MCP data"
+        },
+        {
+          "text": "Makes no live Orchestra tool calls"
+        }
+      ]
     }
   ]
 }
